@@ -12,7 +12,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useThemeTokens } from "@/contexts/ThemeTokenContext";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Bell, Clock, Copy, Edit, Eye, EyeOff, FileSpreadsheet, GripVertical, Key, Mail, Palette, Plus, RefreshCw, Save, Send, Settings, Shield, Sliders, Trash2, Users, Check, Archive, SlidersHorizontal, Megaphone, Sparkles } from "lucide-react";
+import { Bell, Clock, Copy, Edit, Eye, EyeOff, FileSpreadsheet, GripVertical, Mail, Palette, Plus, RefreshCw, Save, Send, Settings, Shield, Sliders, Trash2, Users, Check, Archive, SlidersHorizontal, Megaphone, Sparkles } from "lucide-react";
 import NotificationSettingsContent from "@/components/NotificationSettingsContent";
 import NotificationsTab from "@/components/NotificationsTab";
 import MeetingNotificationSettings from "@/components/MeetingNotificationSettings";
@@ -121,10 +121,6 @@ export default function AdminSettings() {
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
-  const [editNewPassword, setEditNewPassword] = useState("");
-  const [editConfirmPassword, setEditConfirmPassword] = useState("");
-  const [showEditPassword, setShowEditPassword] = useState(false);
-  const [editPasswordError, setEditPasswordError] = useState("");
   const [showAddStage, setShowAddStage] = useState(false);
   const [selectedColor, setSelectedColor] = useState<string>("#3b82f6");
   const [showAddField, setShowAddField] = useState(false);
@@ -153,35 +149,6 @@ export default function AdminSettings() {
     onSuccess: () => { toast.success(isRTL ? "تم تحديث حالة المستخدم" : "User status updated"); refetchUsers(); },
     onError: (e) => toast.error(e.message),
   });
-  const adminSetPassword = trpc.auth.adminSetPassword.useMutation({
-    onSuccess: () => {
-      toast.success(isRTL ? "تم تغيير كلمة المرور بنجاح" : "Password changed successfully");
-      setEditNewPassword("");
-      setEditConfirmPassword("");
-      setShowEditPassword(false);
-      setEditPasswordError("");
-    },
-    onError: (e) => {
-      setEditPasswordError(e.message);
-      toast.error(e.message);
-    },
-  });
-  function handleAdminSetPassword(userId: number) {
-    setEditPasswordError("");
-    if (!editNewPassword) {
-      setEditPasswordError(isRTL ? "يرجى إدخال كلمة المرور الجديدة" : "Please enter a new password");
-      return;
-    }
-    if (editNewPassword.length < 6) {
-      setEditPasswordError(isRTL ? "كلمة المرور يجب أن تكون 6 أحرف على الأقل" : "Password must be at least 6 characters");
-      return;
-    }
-    if (editNewPassword !== editConfirmPassword) {
-      setEditPasswordError(isRTL ? "كلمة المرور غير متطابقة" : "Passwords do not match");
-      return;
-    }
-    adminSetPassword.mutate({ userId, newPassword: editNewPassword });
-  }
   function handleDeleteUser(u: any) {
     if (!window.confirm(isRTL ? `هل أنت متأكد من حذف "${u.name ?? u.email}"؟ لا يمكن التراجع.` : `Delete user "${u.name ?? u.email}"? This cannot be undone.`)) return;
     deleteUserMutation.mutate({ id: u.id });
@@ -839,7 +806,7 @@ export default function AdminSettings() {
         </Tabs>
       </div>
       {/* Add/Edit User Dialog */}
-      <Dialog open={showAddUser} onOpenChange={(v) => { setShowAddUser(v); if (!v) { setEditingUser(null); setShowPassword(false); setEditNewPassword(""); setEditConfirmPassword(""); setShowEditPassword(false); setEditPasswordError(""); } }}>
+      <Dialog open={showAddUser} onOpenChange={(v) => { setShowAddUser(v); if (!v) { setEditingUser(null); setShowPassword(false); } }}>
         <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
             <DialogTitle>{editingUser ? t("editUser") : t("addUser")}</DialogTitle>
@@ -918,103 +885,6 @@ export default function AdminSettings() {
                   <p className="text-xs text-muted-foreground mt-1 font-mono dir-ltr" dir="ltr">
                     {userWatch("password")}
                   </p>
-                )}
-              </div>
-            )}
-            {editingUser && (
-              <div className="border-t border-border pt-4 mt-2">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Key size={14} className="text-muted-foreground" />
-                    <Label className="font-semibold text-sm">{isRTL ? "تغيير كلمة المرور" : "Change Password"}</Label>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs gap-1"
-                    onClick={() => { setShowEditPassword(!showEditPassword); setEditPasswordError(""); setEditNewPassword(""); setEditConfirmPassword(""); }}
-                  >
-                    {showEditPassword ? (isRTL ? "إلغاء" : "Cancel") : (isRTL ? "تعيين كلمة مرور جديدة" : "Set New Password")}
-                  </Button>
-                </div>
-                {showEditPassword && (
-                  <div className="space-y-3 bg-muted/30 p-3 rounded-lg">
-                    {editPasswordError && (
-                      <div className="text-red-500 text-xs bg-red-50 dark:bg-red-950 p-2 rounded-lg">{editPasswordError}</div>
-                    )}
-                    <div>
-                      <Label className="text-xs">{isRTL ? "كلمة المرور الجديدة" : "New Password"}</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="relative flex-1">
-                          <Input
-                            type={showPassword ? "text" : "password"}
-                            value={editNewPassword}
-                            onChange={(e) => setEditNewPassword(e.target.value)}
-                            placeholder={isRTL ? "أدخل كلمة المرور الجديدة (6 أحرف على الأقل)" : "Enter new password (min 6 characters)"}
-                            dir="ltr"
-                            className="pr-10"
-                          />
-                          <button
-                            type="button"
-                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                            onClick={() => setShowPassword(!showPassword)}
-                          >
-                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={() => {
-                            const pwd = generateStrongPassword();
-                            setEditNewPassword(pwd);
-                            setShowPassword(true);
-                          }}
-                          title={isRTL ? "توليد كلمة مرور قوية" : "Generate strong password"}
-                        >
-                          <RefreshCw size={16} />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={() => {
-                            if (editNewPassword) {
-                              navigator.clipboard.writeText(editNewPassword);
-                              toast.success(isRTL ? "تم نسخ كلمة المرور" : "Password copied to clipboard");
-                            }
-                          }}
-                          title={isRTL ? "نسخ كلمة المرور" : "Copy password"}
-                        >
-                          <Copy size={16} />
-                        </Button>
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs">{isRTL ? "تأكيد كلمة المرور الجديدة" : "Confirm New Password"}</Label>
-                      <Input
-                        type="password"
-                        value={editConfirmPassword}
-                        onChange={(e) => setEditConfirmPassword(e.target.value)}
-                        placeholder={isRTL ? "أعد إدخال كلمة المرور الجديدة" : "Re-enter new password"}
-                        dir="ltr"
-                        className="mt-1"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      style={{ background: tokens.primaryColor }}
-                      className="text-white gap-1.5 w-full"
-                      onClick={() => handleAdminSetPassword(editingUser.id)}
-                      disabled={adminSetPassword.isPending}
-                    >
-                      <Key size={14} />
-                      {adminSetPassword.isPending ? (isRTL ? "جاري التغيير..." : "Changing...") : (isRTL ? "تغيير كلمة المرور" : "Change Password")}
-                    </Button>
-                  </div>
                 )}
               </div>
             )}
