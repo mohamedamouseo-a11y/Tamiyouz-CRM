@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+*.bak
+test_pw.cjs
+.DS_Store
+*.log
+server_backup_phase4/
+*.json.bak
+google-calendar-key.json
+ecosystem.config.cjs
+.env*

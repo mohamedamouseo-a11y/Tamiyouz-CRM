@@ -1,0 +1,1995 @@
+import { and, desc, eq, gte, ilike, inArray, isNull, isNotNull, like, lte, or, sql, count} from "drizzle-orm";
+import { drizzle } from "drizzle-orm/mysql2";
+import {
+  Activity,
+  Campaign,
+  CustomField,
+  Deal,
+  InsertActivity,
+  InsertCampaign,
+  InsertCustomField,
+  InsertDeal,
+  InsertLead,
+  InsertPipelineStage,
+  InsertUser,
+  Lead,
+  NotificationSubscriber,
+  InsertNotificationSubscriber,
+  PasswordResetToken,
+  PipelineStage,
+  SlaConfig,
+  ThemeSetting,
+  User,
+  activities,
+  campaigns,
+  customFields,
+  deals,
+  leads,
+  notificationSubscribers,
+  passwordResetTokens,
+  pipelineStages,
+  slaConfig,
+  themeSettings,
+  users,
+  internalNotes,
+  leadTransfers,
+  chatMessages,
+  auditLogs,
+  inAppNotifications,
+  InAppNotification,
+  InsertInAppNotification,
+} from "../drizzle/schema";
+import { ENV } from "./_core/env";
+import { notifyNewLead, notifyLeadAssigned, notifySLABreach, notifyStageChange, notifyDealWon, notifyDealLost, notifyActivityLogged, notifyLeadQualityChange, notifyLeadTransfer, notifyDuplicateLead } from "./notificationEngine";
+
+let _db: ReturnType<typeof drizzle> | null = null;
+
+export async function getDb() {
+  if (!_db && process.env.DATABASE_URL) {
+    try {
+      _db = drizzle(process.env.DATABASE_URL);
+    } catch (error) {
+      console.warn("[Database] Failed to connect:", error);
+      _db = null;
+    }
+  }
+  return _db;
+}
+
+// ─── Phone Normalization ──────────────────────────────────────────────────────
+export function normalizePhone(phone: string): string {
+  // Remove all non-digit characters
+  let digits = phone.replace(/\D/g, "");
+  // Handle leading zeros: 0XXXXXXXXX → 966XXXXXXXXX
+  if (digits.startsWith("0") && digits.length === 10) {
+    digits = "966" + digits.slice(1);
+  }
+  // Handle +966 format
+  if (digits.startsWith("966") && digits.length === 12) {
+    return "+" + digits;
+  }
+  // Handle 5XXXXXXXX (9 digits, Saudi mobile)
+  if (digits.startsWith("5") && digits.length === 9) {
+    return "+966" + digits;
+  }
+  // Already has country code without +
+  if (digits.length >= 11) {
+    return "+" + digits;
+  }
+  return phone; // Return as-is if can't normalize
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+export async function upsertUser(user: InsertUser): Promise<void> {
+  if (!user.openId) throw new Error("User openId is required for upsert");
+  const db = await getDb();
+  if (!db) return;
+
+  const values: InsertUser = { openId: user.openId };
+  const updateSet: Record<string, unknown> = {};
+
+  const textFields = ["name", "email", "loginMethod"] as const;
+  for (const field of textFields) {
+    const value = user[field];
+    if (value !== undefined) {
+      values[field] = value ?? null;
+      updateSet[field] = value ?? null;
+    }
+  }
+
+  if (user.lastSignedIn !== undefined) {
+    values.lastSignedIn = user.lastSignedIn;
+    updateSet.lastSignedIn = user.lastSignedIn;
+  }
+
+  if (user.role !== undefined) {
+    values.role = user.role;
+    updateSet.role = user.role;
+  } else if (user.openId === ENV.ownerOpenId) {
+    values.role = "Admin";
+    updateSet.role = "Admin";
+  }
+
+  if (!values.lastSignedIn) values.lastSignedIn = new Date();
+  if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
+
+  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+}
+
+export async function getUserByOpenId(openId: string): Promise<User | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  return result[0];
+}
+
+export async function getUserByEmail(email: string): Promise<User | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  return result[0];
+}
+
+export async function createUser(data: InsertUser): Promise<User> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(users).values(data);
+  const created = await db.select().from(users).where(eq(users.email, data.email!)).limit(1);
+  if (!created[0]) throw new Error("Failed to create user");
+  return created[0];
+}
+
+export async function getAllUsers(): Promise<User[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(users).where(isNull(users.deletedAt)).orderBy(users.name);
+}
+
+export async function getUsersByRole(role: string): Promise<User[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(users).where(and(eq(users.role, role as any), isNull(users.deletedAt)));
+}
+
+export async function updateUser(id: number, data: Partial<InsertUser>): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set(data).where(eq(users.id, id));
+}
+export async function deleteUser(id: number, deletedByUserId?: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ deletedAt: new Date(), deletedBy: deletedByUserId ?? null, isActive: false } as any).where(eq(users.id, id));
+}
+
+// ─── Leads ────────────────────────────────────────────────────────────────────
+export interface LeadFilters {
+  ownerId?: number;
+  stage?: string;
+  leadQuality?: string;
+  campaignName?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  search?: string;
+  slaBreached?: boolean;
+  isDuplicate?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getLeads(filters: LeadFilters = {}) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [isNull(leads.deletedAt)];
+  if (filters.ownerId) conditions.push(eq(leads.ownerId, filters.ownerId));
+  if (filters.stage) conditions.push(eq(leads.stage, filters.stage));
+  if (filters.leadQuality) conditions.push(eq(leads.leadQuality, filters.leadQuality as any));
+  if (filters.campaignName) conditions.push(eq(leads.campaignName, filters.campaignName));
+  // Filter by contactTime (date when client was contacted)
+  if (filters.dateFrom) {
+    conditions.push(gte(leads.contactTime, filters.dateFrom));
+  }
+  if (filters.dateTo) {
+    conditions.push(lte(leads.contactTime, filters.dateTo));
+  }
+  if (filters.slaBreached !== undefined) conditions.push(eq(leads.slaBreached, filters.slaBreached));
+  if (filters.isDuplicate !== undefined) conditions.push(eq(leads.isDuplicate, filters.isDuplicate));
+  if (filters.search) {
+    conditions.push(
+      or(
+        like(leads.name, `%${filters.search}%`),
+        like(leads.phone, `%${filters.search}%`),
+        like(leads.businessProfile, `%${filters.search}%`)
+      )!
+    );
+  }
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+  const rows = await db
+    .select({
+      id: leads.id,
+      name: leads.name,
+      phone: leads.phone,
+      country: leads.country,
+      businessProfile: leads.businessProfile,
+      leadQuality: leads.leadQuality,
+      stage: leads.stage,
+      campaignName: leads.campaignName,
+      adCreative: leads.adCreative,
+      ownerId: leads.ownerId,
+      slaBreached: leads.slaBreached,
+      isDuplicate: leads.isDuplicate,
+      duplicateOfId: leads.duplicateOfId,
+      notes: leads.notes,
+      leadTime: leads.leadTime,
+      contactTime: leads.contactTime,
+      createdAt: leads.createdAt,
+      updatedAt: leads.updatedAt,
+      ownerName: users.name,
+    })
+    .from(leads)
+    .leftJoin(users, eq(leads.ownerId, users.id))
+    .where(whereClause)
+    .orderBy(desc(leads.contactTime ?? leads.createdAt))
+    .limit(filters.limit ?? 50)
+    .offset(filters.offset ?? 0);
+  // Map rows to include owner object for frontend compatibility
+  return rows.map((row) => ({
+    ...row,
+    owner: row.ownerName ? { name: row.ownerName } : null,
+  }));
+}
+
+export async function getLeadById(id: number): Promise<Lead | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(leads).where(eq(leads.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createLead(data: InsertLead): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Normalize phone
+  if (data.phone) data.phone = normalizePhone(data.phone);
+
+  // Check for duplicates
+  const existing = await db
+    .select()
+    .from(leads)
+    .where(eq(leads.phone, data.phone))
+    .limit(1);
+
+  if (existing.length > 0) {
+    data.isDuplicate = true;
+    data.duplicateOfId = existing[0].id;
+  }
+  const result = await db.insert(leads).values(data);
+  const createdId = (result as any)[0]?.insertId ?? 0;
+  notifyNewLead({
+    id: createdId,
+    name: data.name,
+    phone: data.phone,
+    campaignName: data.campaignName,
+    ownerId: data.ownerId,
+  }).catch((err) => console.error("[NotificationEngine] notifyNewLead error:", err));
+  // Notification #10 — Duplicate Lead Detected
+  if (data.isDuplicate && data.duplicateOfId) {
+    notifyDuplicateLead({
+      id: createdId,
+      name: data.name,
+      phone: data.phone,
+      duplicateOfId: data.duplicateOfId,
+      ownerId: data.ownerId,
+    }).catch((err) => console.error("[NotificationEngine] notifyDuplicateLead error:", err));
+  }
+  return createdId;
+}
+
+
+export async function getLeadByPhone(phone: string): Promise<any | null> {
+  const db = await getDb();
+  const result = await db
+    .select()
+    .from(leads)
+    .where(and(eq(leads.phone, phone), isNull(leads.deletedAt)))
+    .limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+export async function updateLead(id: number, data: Partial<InsertLead>): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const existingLead = await getLeadById(id);
+  if (data.phone) data.phone = normalizePhone(data.phone);
+  await db.update(leads).set(data).where(eq(leads.id, id));
+  // Notification #2 — Lead Assigned (owner changed)
+  if (data.ownerId && existingLead && data.ownerId !== existingLead.ownerId) {
+    notifyLeadAssigned(
+      { id, name: existingLead.name, phone: existingLead.phone },
+      data.ownerId
+    ).catch((err) => console.error("[NotificationEngine] notifyLeadAssigned error:", err));
+  }
+  // Notification #4 — Stage Change
+  if (data.stage && existingLead && data.stage !== existingLead.stage) {
+    notifyStageChange({
+      id,
+      name: existingLead.name,
+      phone: existingLead.phone,
+      ownerId: data.ownerId ?? existingLead.ownerId,
+      oldStage: existingLead.stage,
+      newStage: data.stage,
+    }).catch((err) => console.error("[NotificationEngine] notifyStageChange error:", err));
+  }
+  // Notification #8 — Lead Quality Change
+  if (data.leadQuality && existingLead && data.leadQuality !== existingLead.leadQuality) {
+    notifyLeadQualityChange({
+      id,
+      name: existingLead.name,
+      phone: existingLead.phone,
+      ownerId: data.ownerId ?? existingLead.ownerId,
+      oldQuality: existingLead.leadQuality,
+      newQuality: data.leadQuality,
+    }).catch((err) => console.error("[NotificationEngine] notifyLeadQualityChange error:", err));
+  }
+}
+
+export async function deleteLead(id: number, deletedByUserId?: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(leads).set({ deletedAt: new Date(), deletedBy: deletedByUserId ?? null } as any).where(eq(leads.id, id));
+}
+
+export async function getLeadsCount(filters: LeadFilters = {}): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const conditions = [isNull(leads.deletedAt)];
+  if (filters.ownerId) conditions.push(eq(leads.ownerId, filters.ownerId));
+  if (filters.stage) conditions.push(eq(leads.stage, filters.stage));
+  if (filters.leadQuality) conditions.push(eq(leads.leadQuality, filters.leadQuality as any));
+  if (filters.campaignName) conditions.push(eq(leads.campaignName, filters.campaignName));
+  if (filters.dateFrom) {
+    conditions.push(gte(leads.contactTime, filters.dateFrom));
+  }
+  if (filters.dateTo) {
+    conditions.push(lte(leads.contactTime, filters.dateTo));
+  }
+  if (filters.slaBreached !== undefined) conditions.push(eq(leads.slaBreached, filters.slaBreached));
+
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(leads)
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  return Number(result[0]?.count ?? 0);
+}
+
+// ─── Round-Robin Assignment ───────────────────────────────────────────────────
+export async function assignLeadRoundRobin(campaignName: string): Promise<number | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  // Find campaign
+  const campaign = await db
+    .select()
+    .from(campaigns)
+    .where(and(eq(campaigns.name, campaignName), eq(campaigns.roundRobinEnabled, true)))
+    .limit(1);
+
+  if (!campaign.length || !campaign[0].roundRobinEnabled) return null;
+
+  // Get active sales agents
+  const agents = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.role, "SalesAgent"), eq(users.isActive, true)));
+
+  if (!agents.length) return null;
+
+  const currentIndex = campaign[0].roundRobinIndex % agents.length;
+  const assignedAgent = agents[currentIndex];
+
+  // Update round-robin index
+  await db
+    .update(campaigns)
+    .set({ roundRobinIndex: currentIndex + 1 })
+    .where(eq(campaigns.id, campaign[0].id));
+
+  return assignedAgent.id;
+}
+
+// ─── SLA Check ────────────────────────────────────────────────────────────────
+export async function checkAndUpdateSLA(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const config = await db.select().from(slaConfig).limit(1);
+  if (!config.length || !config[0].isEnabled) return 0;
+
+  const hoursThreshold = config[0].hoursThreshold;
+  const thresholdDate = new Date(Date.now() - hoursThreshold * 60 * 60 * 1000);
+
+  // Find leads created before threshold with no activities
+  const leadsWithNoActivity = await db.execute(sql`
+    SELECT l.id FROM leads l
+    LEFT JOIN activities a ON a.leadId = l.id
+    WHERE l.createdAt < ${thresholdDate}
+    AND l.slaBreached = false
+    AND l.deletedAt IS NULL
+    AND a.id IS NULL
+  `);
+
+  const breachedIds = (leadsWithNoActivity as any)[0]?.map((r: any) => r.id) ?? [];
+
+  if (breachedIds.length > 0) {
+    // Fetch full lead data before updating for notifications
+    const breachedLeads = await db
+      .select({
+        id: leads.id,
+        name: leads.name,
+        phone: leads.phone,
+        ownerId: leads.ownerId,
+        slaAlertedAt: leads.slaAlertedAt,
+      })
+      .from(leads)
+      .where(inArray(leads.id, breachedIds));
+
+    await db
+      .update(leads)
+      .set({ slaBreached: true, slaAlertedAt: new Date() })
+      .where(inArray(leads.id, breachedIds));
+
+    if (breachedLeads.length > 0) {
+      notifySLABreach(breachedLeads).catch((err) =>
+        console.error("[NotificationEngine] notifySLABreach error:", err)
+      );
+    }
+  }
+
+  return breachedIds.length;
+}
+
+// ─── Activities ───────────────────────────────────────────────────────────────
+export async function getActivitiesByLead(leadId: number): Promise<Activity[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(activities)
+    .where(and(eq(activities.leadId, leadId), isNull(activities.deletedAt)))
+    .orderBy(desc(activities.activityTime));
+}
+
+export async function getActivitiesByUser(userId: number, limit = 20): Promise<Activity[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(activities)
+    .where(and(eq(activities.userId, userId), isNull(activities.deletedAt)))
+    .orderBy(desc(activities.activityTime))
+    .limit(limit);
+}
+
+export async function createActivity(data: InsertActivity): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(activities).values(data);
+  const activityId = (result as any)[0]?.insertId ?? 0;
+  // Mark lead as contacted (update contactTime if first activity)
+  const existingActivities = await db
+    .select()
+    .from(activities)
+    .where(eq(activities.leadId, data.leadId))
+    .limit(2);
+  if (existingActivities.length === 1) {
+    await db
+      .update(leads)
+      .set({ contactTime: new Date(), slaBreached: false })
+      .where(eq(leads.id, data.leadId));
+  }
+  // Notification #7 — Activity Logged
+  notifyActivityLogged({
+    id: activityId,
+    leadId: data.leadId,
+    userId: data.userId,
+    type: data.type,
+    outcome: data.outcome,
+  }).catch((err) => console.error("[NotificationEngine] notifyActivityLogged error:", err));
+  return activityId;
+}
+
+export async function updateActivity(id: number, data: Partial<InsertActivity>): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(activities).set(data).where(eq(activities.id, id));
+}
+
+export async function deleteActivity(id: number, deletedByUserId?: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(activities).set({ deletedAt: new Date(), deletedBy: deletedByUserId ?? null } as any).where(eq(activities.id, id));
+}
+
+// ─── Deals ────────────────────────────────────────────────────────────────────
+export async function getDealByLead(leadId: number): Promise<Deal | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(deals).where(eq(deals.leadId, leadId)).limit(1);
+  return result[0];
+}
+
+export async function getDealsByUser(userId: number): Promise<Deal[]> {
+  const db = await getDb();
+  if (!db) return [];
+  // Join with leads to filter by owner
+  const result = await db.execute(sql`
+    SELECT d.* FROM deals d
+    JOIN leads l ON l.id = d.leadId
+    WHERE l.ownerId = ${userId}
+    ORDER BY d.createdAt DESC
+  `);
+  return (result as any)[0] ?? [];
+}
+
+export async function createDeal(data: InsertDeal): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(deals).values(data);
+  const dealId = (result as any)[0]?.insertId ?? 0;
+  // Update lead stage based on deal status
+  if (data.status === "Won") {
+    await db.update(leads).set({ stage: "Won" }).where(eq(leads.id, data.leadId));
+  } else if (data.status === "Lost") {
+    await db.update(leads).set({ stage: "Lost" }).where(eq(leads.id, data.leadId));
+  }
+  // Notification #5/#6 — Deal Won/Lost
+  const lead = await getLeadById(data.leadId);
+  const leadName = lead ? (lead.name ?? lead.phone) : `Lead #${data.leadId}`;
+  const ownerName = lead?.ownerId ? await _getUserNameById(lead.ownerId) : "Unknown";
+  if (data.status === "Won") {
+    notifyDealWon({ id: dealId, leadId: data.leadId, valueSar: data.valueSar }, leadName, ownerName)
+      .catch((err) => console.error("[NotificationEngine] notifyDealWon error:", err));
+  } else if (data.status === "Lost") {
+    notifyDealLost({ id: dealId, leadId: data.leadId, lossReason: data.lossReason }, leadName, ownerName)
+      .catch((err) => console.error("[NotificationEngine] notifyDealLost error:", err));
+  }
+  return dealId;
+}
+
+export async function updateDeal(id: number, data: Partial<InsertDeal>): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(deals).set(data).where(eq(deals.id, id));
+  // Update lead stage if deal status changed
+  if (data.status && data.leadId) {
+    if (data.status === "Won") {
+      await db.update(leads).set({ stage: "Won" }).where(eq(leads.id, data.leadId));
+    } else if (data.status === "Lost") {
+      await db.update(leads).set({ stage: "Lost" }).where(eq(leads.id, data.leadId));
+    }
+    // Notification #5/#6 — Deal Won/Lost on update
+    const lead = await getLeadById(data.leadId);
+    const leadName = lead ? (lead.name ?? lead.phone) : `Lead #${data.leadId}`;
+    const ownerName = lead?.ownerId ? await _getUserNameById(lead.ownerId) : "Unknown";
+    if (data.status === "Won") {
+      notifyDealWon({ id, leadId: data.leadId, valueSar: data.valueSar }, leadName, ownerName)
+        .catch((err) => console.error("[NotificationEngine] notifyDealWon error:", err));
+    } else if (data.status === "Lost") {
+      notifyDealLost({ id, leadId: data.leadId, lossReason: data.lossReason }, leadName, ownerName)
+        .catch((err) => console.error("[NotificationEngine] notifyDealLost error:", err));
+    }
+  }
+}
+
+// ─── Campaigns ────────────────────────────────────────────────────────────────
+export async function getCampaigns(): Promise<Campaign[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(campaigns).where(isNull(campaigns.deletedAt)).orderBy(desc(campaigns.createdAt));
+}
+
+export async function createCampaign(data: InsertCampaign): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(campaigns).values(data);
+  return (result as any)[0]?.insertId ?? 0;
+}
+
+export async function updateCampaign(id: number, data: Partial<InsertCampaign>): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(campaigns).set(data).where(eq(campaigns.id, id));
+}
+
+export async function deleteCampaign(id: number, deletedByUserId?: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(campaigns).set({ deletedAt: new Date(), deletedBy: deletedByUserId ?? null } as any).where(eq(campaigns.id, id));
+}
+
+// ─── Campaign Stats ───────────────────────────────────────────────────────────
+export interface CampaignLeadStats {
+  campaignName: string;
+  totalLeads: number;
+  hot: number;
+  warm: number;
+  cold: number;
+  bad: number;
+  unknown: number;
+}
+export async function getCampaignStats(dateFrom?: Date, dateTo?: Date): Promise<CampaignLeadStats[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const hasDateFilter = dateFrom && dateTo;
+  const rows = hasDateFilter
+    ? await db.execute(sql`
+        SELECT
+          COALESCE(l.campaignName, 'Unassigned') AS campaignName,
+          COUNT(*) AS totalLeads,
+          SUM(CASE WHEN l.leadQuality = 'Hot' THEN 1 ELSE 0 END) AS hot,
+          SUM(CASE WHEN l.leadQuality = 'Warm' THEN 1 ELSE 0 END) AS warm,
+          SUM(CASE WHEN l.leadQuality = 'Cold' THEN 1 ELSE 0 END) AS cold,
+          SUM(CASE WHEN l.leadQuality = 'Bad' THEN 1 ELSE 0 END) AS bad,
+          SUM(CASE WHEN l.leadQuality = 'Unknown' THEN 1 ELSE 0 END) AS unknown
+        FROM leads l
+        WHERE l.createdAt >= ${dateFrom} AND l.createdAt <= ${dateTo} AND l.deletedAt IS NULL
+        GROUP BY l.campaignName
+        ORDER BY totalLeads DESC
+      `)
+    : await db.execute(sql`
+        SELECT
+          COALESCE(l.campaignName, 'Unassigned') AS campaignName,
+          COUNT(*) AS totalLeads,
+          SUM(CASE WHEN l.leadQuality = 'Hot' THEN 1 ELSE 0 END) AS hot,
+          SUM(CASE WHEN l.leadQuality = 'Warm' THEN 1 ELSE 0 END) AS warm,
+          SUM(CASE WHEN l.leadQuality = 'Cold' THEN 1 ELSE 0 END) AS cold,
+          SUM(CASE WHEN l.leadQuality = 'Bad' THEN 1 ELSE 0 END) AS bad,
+          SUM(CASE WHEN l.leadQuality = 'Unknown' THEN 1 ELSE 0 END) AS unknown
+        FROM leads l
+        WHERE l.deletedAt IS NULL
+        GROUP BY l.campaignName
+        ORDER BY totalLeads DESC
+      `);
+  return ((rows as any)[0] ?? []).map((r: any) => ({
+    campaignName: r.campaignName ?? 'Unassigned',
+    totalLeads: Number(r.totalLeads ?? 0),
+    hot: Number(r.hot ?? 0),
+    warm: Number(r.warm ?? 0),
+    cold: Number(r.cold ?? 0),
+    bad: Number(r.bad ?? 0),
+    unknown: Number(r.unknown ?? 0),
+  }));
+}
+
+// ─── Campaign Detail (per ad-creative breakdown) ─────────────────────────────
+export interface AdCreativeStats {
+  adCreative: string;
+  totalLeads: number;
+  hot: number;
+  warm: number;
+  cold: number;
+  bad: number;
+  unknown: number;
+}
+export interface CampaignDetail {
+  campaignName: string;
+  totalLeads: number;
+  hot: number;
+  warm: number;
+  cold: number;
+  bad: number;
+  unknown: number;
+  adCreatives: AdCreativeStats[];
+}
+export async function getCampaignDetail(campaignName: string, dateFrom?: Date, dateTo?: Date): Promise<CampaignDetail | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const hasDateFilter = dateFrom && dateTo;
+
+  // Overall campaign stats
+  const totalRows = hasDateFilter
+    ? await db.execute(sql`
+        SELECT
+          COUNT(*) AS totalLeads,
+          SUM(CASE WHEN leadQuality = 'Hot' THEN 1 ELSE 0 END) AS hot,
+          SUM(CASE WHEN leadQuality = 'Warm' THEN 1 ELSE 0 END) AS warm,
+          SUM(CASE WHEN leadQuality = 'Cold' THEN 1 ELSE 0 END) AS cold,
+          SUM(CASE WHEN leadQuality = 'Bad' THEN 1 ELSE 0 END) AS bad,
+          SUM(CASE WHEN leadQuality = 'Unknown' THEN 1 ELSE 0 END) AS unknown
+        FROM leads
+        WHERE campaignName = ${campaignName} AND createdAt >= ${dateFrom} AND createdAt <= ${dateTo}
+      `)
+    : await db.execute(sql`
+        SELECT
+          COUNT(*) AS totalLeads,
+          SUM(CASE WHEN leadQuality = 'Hot' THEN 1 ELSE 0 END) AS hot,
+          SUM(CASE WHEN leadQuality = 'Warm' THEN 1 ELSE 0 END) AS warm,
+          SUM(CASE WHEN leadQuality = 'Cold' THEN 1 ELSE 0 END) AS cold,
+          SUM(CASE WHEN leadQuality = 'Bad' THEN 1 ELSE 0 END) AS bad,
+          SUM(CASE WHEN leadQuality = 'Unknown' THEN 1 ELSE 0 END) AS unknown
+        FROM leads
+        WHERE campaignName = ${campaignName}
+      `);
+  const t = ((totalRows as any)[0] ?? [])[0];
+  if (!t || Number(t.totalLeads) === 0) {
+    return {
+      campaignName,
+      totalLeads: 0, hot: 0, warm: 0, cold: 0, bad: 0, unknown: 0,
+      adCreatives: [],
+    };
+  }
+
+  // Per ad-creative breakdown
+  const adRows = hasDateFilter
+    ? await db.execute(sql`
+        SELECT
+          COALESCE(adCreative, 'بدون إعلان') AS adCreative,
+          COUNT(*) AS totalLeads,
+          SUM(CASE WHEN leadQuality = 'Hot' THEN 1 ELSE 0 END) AS hot,
+          SUM(CASE WHEN leadQuality = 'Warm' THEN 1 ELSE 0 END) AS warm,
+          SUM(CASE WHEN leadQuality = 'Cold' THEN 1 ELSE 0 END) AS cold,
+          SUM(CASE WHEN leadQuality = 'Bad' THEN 1 ELSE 0 END) AS bad,
+          SUM(CASE WHEN leadQuality = 'Unknown' THEN 1 ELSE 0 END) AS unknown
+        FROM leads
+        WHERE campaignName = ${campaignName} AND createdAt >= ${dateFrom} AND createdAt <= ${dateTo}
+        GROUP BY adCreative
+        ORDER BY totalLeads DESC
+      `)
+    : await db.execute(sql`
+        SELECT
+          COALESCE(adCreative, 'بدون إعلان') AS adCreative,
+          COUNT(*) AS totalLeads,
+          SUM(CASE WHEN leadQuality = 'Hot' THEN 1 ELSE 0 END) AS hot,
+          SUM(CASE WHEN leadQuality = 'Warm' THEN 1 ELSE 0 END) AS warm,
+          SUM(CASE WHEN leadQuality = 'Cold' THEN 1 ELSE 0 END) AS cold,
+          SUM(CASE WHEN leadQuality = 'Bad' THEN 1 ELSE 0 END) AS bad,
+          SUM(CASE WHEN leadQuality = 'Unknown' THEN 1 ELSE 0 END) AS unknown
+        FROM leads
+        WHERE campaignName = ${campaignName}
+        GROUP BY adCreative
+        ORDER BY totalLeads DESC
+      `);
+
+  const adCreatives: AdCreativeStats[] = ((adRows as any)[0] ?? []).map((r: any) => ({
+    adCreative: r.adCreative ?? 'بدون إعلان',
+    totalLeads: Number(r.totalLeads ?? 0),
+    hot: Number(r.hot ?? 0),
+    warm: Number(r.warm ?? 0),
+    cold: Number(r.cold ?? 0),
+    bad: Number(r.bad ?? 0),
+    unknown: Number(r.unknown ?? 0),
+  }));
+
+  return {
+    campaignName,
+    totalLeads: Number(t.totalLeads ?? 0),
+    hot: Number(t.hot ?? 0),
+    warm: Number(t.warm ?? 0),
+    cold: Number(t.cold ?? 0),
+    bad: Number(t.bad ?? 0),
+    unknown: Number(t.unknown ?? 0),
+    adCreatives,
+  };
+}
+
+// ─── Pipeline Stages ─────────────────────────────────────────────────────────
+export async function getPipelineStages(): Promise<PipelineStage[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pipelineStages).orderBy(pipelineStages.order);
+}
+
+export async function createPipelineStage(data: InsertPipelineStage): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(pipelineStages).values(data);
+  return (result as any)[0]?.insertId ?? 0;
+}
+
+export async function updatePipelineStage(id: number, data: Partial<InsertPipelineStage>): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(pipelineStages).set(data).where(eq(pipelineStages.id, id));
+}
+
+export async function deletePipelineStage(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(pipelineStages).where(eq(pipelineStages.id, id));
+}
+
+// ─── Custom Fields ────────────────────────────────────────────────────────────
+export async function getCustomFields(entity?: string): Promise<CustomField[]> {
+  const db = await getDb();
+  if (!db) return [];
+  if (entity) {
+    return db
+      .select()
+      .from(customFields)
+      .where(eq(customFields.entity, entity as any))
+      .orderBy(customFields.order);
+  }
+  return db.select().from(customFields).orderBy(customFields.entity, customFields.order);
+}
+
+export async function createCustomField(data: InsertCustomField): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(customFields).values(data);
+  return (result as any)[0]?.insertId ?? 0;
+}
+
+export async function deleteCustomField(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(customFields).where(eq(customFields.id, id));
+}
+
+// ─── Theme Settings ───────────────────────────────────────────────────────────
+export async function getThemeSettings(): Promise<ThemeSetting[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(themeSettings);
+}
+
+export async function upsertThemeSetting(key: string, value: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .insert(themeSettings)
+    .values({ key, value })
+    .onDuplicateKeyUpdate({ set: { value } });
+}
+
+// ─── SLA Config ───────────────────────────────────────────────────────────────
+export async function getSlaConfig(): Promise<SlaConfig | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(slaConfig).limit(1);
+  return result[0];
+}
+
+export async function updateSlaConfig(hoursThreshold: number, isEnabled: boolean): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await db.select().from(slaConfig).limit(1);
+  if (existing.length > 0) {
+    await db.update(slaConfig).set({ hoursThreshold, isEnabled });
+  } else {
+    await db.insert(slaConfig).values({ hoursThreshold, isEnabled });
+  }
+}
+
+// ─── Dashboard Stats ──────────────────────────────────────────────────────────
+export async function getAgentStats(userId: number, dateFrom?: Date, dateTo?: Date) {
+  const db = await getDb();
+  if (!db) return null;
+  const from = dateFrom ?? new Date(0);
+  const to = dateTo ?? new Date();
+  if (dateTo) { to.setHours(23, 59, 59, 999); }
+  const leadConditions = [eq(leads.ownerId, userId), isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to)];
+  const activityConditions = [eq(activities.userId, userId), gte(activities.createdAt, from), lte(activities.createdAt, to)];
+  const [myLeads, myActivities, myDeals, slaBreached] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(leads).where(and(...leadConditions)),
+    db.select({ count: sql<number>`count(*)` }).from(activities).where(and(...activityConditions)),
+    db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(d.valueSar), 0) as totalValue FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.ownerId = ${userId} AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to}`),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(leads)
+      .where(and(eq(leads.ownerId, userId), eq(leads.slaBreached, true), isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to))),
+  ]);
+  const dealsData = (myDeals as any)[0]?.[0] ?? { count: 0, totalValue: 0 };
+  return {
+    totalLeads: Number(myLeads[0]?.count ?? 0),
+    totalActivities: Number(myActivities[0]?.count ?? 0),
+    wonDeals: Number(dealsData.count ?? 0),
+    totalRevenue: Number(dealsData.totalValue ?? 0),
+    slaBreached: Number(slaBreached[0]?.count ?? 0),
+  };
+}
+
+export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
+  const db = await getDb();
+  if (!db) return null;
+  const from = dateFrom ?? new Date(0);
+  const to = dateTo ?? new Date();
+  if (dateTo) { to.setHours(23, 59, 59, 999); }
+  const [totalLeads, totalDeals, stageBreakdown, agentPerformance] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(leads).where(and(isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to))),
+    db.execute(sql`
+      SELECT status, COUNT(*) as count, COALESCE(SUM(valueSar), 0) as totalValue
+      FROM deals WHERE createdAt BETWEEN ${from} AND ${to} GROUP BY status
+    `),
+    db.execute(sql`
+      SELECT stage, COUNT(*) as count FROM leads
+      WHERE deletedAt IS NULL AND createdAt BETWEEN ${from} AND ${to} GROUP BY stage
+    `),
+    db.execute(sql`
+      SELECT u.id, u.name,
+        COUNT(DISTINCT l.id) as leadCount,
+        COUNT(DISTINCT a.id) as activityCount,
+        SUM(CASE WHEN d.status = 'Won' THEN 1 ELSE 0 END) as wonDeals,
+        SUM(CASE WHEN d.status = 'Won' THEN d.valueSar ELSE 0 END) as revenue,
+        SUM(CASE WHEN l.slaBreached = 1 THEN 1 ELSE 0 END) as slaBreachedCount
+      FROM users u
+      LEFT JOIN leads l ON l.ownerId = u.id AND l.deletedAt IS NULL AND l.createdAt BETWEEN ${from} AND ${to}
+      LEFT JOIN activities a ON a.userId = u.id AND a.createdAt BETWEEN ${from} AND ${to}
+      LEFT JOIN deals d ON d.leadId = l.id AND d.createdAt BETWEEN ${from} AND ${to}
+      WHERE u.role = 'SalesAgent' AND u.deletedAt IS NULL
+      GROUP BY u.id, u.name
+      ORDER BY wonDeals DESC
+    `),
+  ]);
+
+  // Process agent performance
+  const agentRows = (agentPerformance as any)[0] ?? [];
+  const processedAgents = agentRows.map((a: any) => ({
+    agentId: a.id,
+    agentName: a.name,
+    totalLeads: Number(a.leadCount ?? 0),
+    totalActivities: Number(a.activityCount ?? 0),
+    wonDeals: Number(a.wonDeals ?? 0),
+    revenue: Number(a.revenue ?? 0),
+    conversionRate: Number(a.leadCount) > 0 ? (Number(a.wonDeals) / Number(a.leadCount)) * 100 : 0,
+    slaBreached: Number(a.slaBreachedCount ?? 0),
+  }));
+
+  const stageRows = (stageBreakdown as any)[0] ?? [];
+  const dealRows = (totalDeals as any)[0] ?? [];
+
+  const wonRow = dealRows.find((r: any) => r.status === 'Won');
+  const wonDeals = Number(wonRow?.count ?? 0);
+  const totalRevenue = Number(wonRow?.totalValue ?? 0);
+
+  // SLA breached count (date-filtered)
+  const slaBreachedCount = await db.select({ count: sql<number>`count(*)` }).from(leads).where(and(eq(leads.slaBreached, true), isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to)));
+
+  return {
+    totalLeads: Number(totalLeads[0]?.count ?? 0),
+    wonDeals,
+    totalRevenue,
+    slaBreached: Number(slaBreachedCount[0]?.count ?? 0),
+    dealStats: dealRows,
+    leadsByStage: stageRows.map((r: any) => ({ stage: r.stage, count: Number(r.count) })),
+    leadsByAgent: processedAgents.map((a: any) => ({ agentName: a.agentName, count: a.totalLeads })),
+    dealsByAgent: processedAgents.map((a: any) => ({ agentName: a.agentName, wonDeals: a.wonDeals, revenue: a.revenue })),
+    leadsByQuality: await (async () => {
+      const q = await db.execute(sql`SELECT leadQuality as quality, COUNT(*) as count FROM leads WHERE deletedAt IS NULL AND createdAt BETWEEN ${from} AND ${to} GROUP BY leadQuality`);
+      return ((q as any)[0] ?? []).map((r: any) => ({ quality: r.quality, count: Number(r.count) }));
+    })(),
+    agentPerformance: processedAgents,
+    totalDeals: dealRows.map((r: any) => ({ status: r.status, count: Number(r.count), totalValue: Number(r.totalValue ?? 0) })),
+  };
+}
+
+// ─── Sales Funnel Dashboard ───────────────────────────────────────────────────
+export async function getSalesFunnelData(dateFrom?: Date, dateTo?: Date, userRole?: string, userId?: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const from = dateFrom ?? new Date(0);
+  const to = dateTo ?? new Date();
+  if (dateTo) { to.setHours(23, 59, 59, 999); }
+  const isAgent = userRole === 'SalesAgent';
+  const agentId = userId ?? 0;
+
+  // 1. Funnel stages — count leads in each pipeline stage
+  const [funnelRows] = isAgent
+    ? await db.execute(sql`
+        SELECT COALESCE(l.stage, 'New') AS stage, COUNT(*) AS count
+        FROM leads l
+        WHERE l.deletedAt IS NULL AND l.ownerId = ${agentId}
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+        GROUP BY l.stage ORDER BY count DESC
+      `) as any
+    : await db.execute(sql`
+        SELECT COALESCE(l.stage, 'New') AS stage, COUNT(*) AS count
+        FROM leads l
+        WHERE l.deletedAt IS NULL
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+        GROUP BY l.stage ORDER BY count DESC
+      `) as any;
+
+  // 2. Pipeline stages with colors
+  const stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
+  const stageMap = new Map(stages.map(s => [s.name, s]));
+
+  // Build ordered funnel
+  const funnelCountMap = new Map((funnelRows ?? []).map((r: any) => [r.stage, Number(r.count)]));
+  const funnelData = stages.map(s => ({
+    stage: s.name,
+    stageAr: s.nameAr,
+    color: s.color,
+    count: funnelCountMap.get(s.name) ?? 0,
+  }));
+  // Add any stages not in pipeline_stages
+  for (const [stage, count] of funnelCountMap) {
+    if (!stageMap.has(stage)) {
+      funnelData.push({ stage, stageAr: stage, color: '#9ca3af', count });
+    }
+  }
+
+  const totalLeads = funnelData.reduce((sum, s) => sum + s.count, 0);
+
+  // 3. Conversion rates between stages
+  const conversionRates = funnelData.map((s, i) => ({
+    stage: s.stage,
+    stageAr: s.stageAr,
+    count: s.count,
+    percentage: totalLeads > 0 ? ((s.count / totalLeads) * 100) : 0,
+    dropOff: i > 0 && funnelData[i - 1].count > 0
+      ? (((funnelData[i - 1].count - s.count) / funnelData[i - 1].count) * 100)
+      : 0,
+  }));
+
+  // 4. Campaign performance
+  const [campaignRows] = isAgent
+    ? await db.execute(sql`
+        SELECT COALESCE(l.campaignName, 'Direct') AS campaignName, COUNT(*) AS totalLeads,
+          SUM(CASE WHEN l.stage = 'Won' THEN 1 ELSE 0 END) AS wonLeads,
+          SUM(CASE WHEN l.stage = 'Lost' THEN 1 ELSE 0 END) AS lostLeads,
+          SUM(CASE WHEN l.stage IN ('Contacted', 'Contacted Us', 'Meeting Scheduled', 'Proposal Delivered', 'Won') THEN 1 ELSE 0 END) AS progressedLeads
+        FROM leads l WHERE l.deletedAt IS NULL AND l.ownerId = ${agentId}
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+        GROUP BY l.campaignName ORDER BY totalLeads DESC
+      `) as any
+    : await db.execute(sql`
+        SELECT COALESCE(l.campaignName, 'Direct') AS campaignName, COUNT(*) AS totalLeads,
+          SUM(CASE WHEN l.stage = 'Won' THEN 1 ELSE 0 END) AS wonLeads,
+          SUM(CASE WHEN l.stage = 'Lost' THEN 1 ELSE 0 END) AS lostLeads,
+          SUM(CASE WHEN l.stage IN ('Contacted', 'Contacted Us', 'Meeting Scheduled', 'Proposal Delivered', 'Won') THEN 1 ELSE 0 END) AS progressedLeads
+        FROM leads l WHERE l.deletedAt IS NULL
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+        GROUP BY l.campaignName ORDER BY totalLeads DESC
+      `) as any;
+
+  const campaignPerformance = (campaignRows ?? []).map((r: any) => ({
+    campaignName: r.campaignName ?? 'Direct',
+    totalLeads: Number(r.totalLeads ?? 0),
+    wonLeads: Number(r.wonLeads ?? 0),
+    lostLeads: Number(r.lostLeads ?? 0),
+    progressedLeads: Number(r.progressedLeads ?? 0),
+    conversionRate: Number(r.totalLeads) > 0 ? (Number(r.wonLeads) / Number(r.totalLeads)) * 100 : 0,
+  }));
+
+  // 5. Deal values
+  const [dealRows] = isAgent
+    ? await db.execute(sql`
+        SELECT d.status, COUNT(*) AS count, COALESCE(SUM(d.valueSar), 0) AS totalValue, COALESCE(AVG(d.valueSar), 0) AS avgValue
+        FROM deals d JOIN leads l ON l.id = d.leadId
+        WHERE d.deletedAt IS NULL AND l.ownerId = ${agentId}
+          AND d.createdAt >= ${from} AND d.createdAt <= ${to}
+        GROUP BY d.status
+      `) as any
+    : await db.execute(sql`
+        SELECT d.status, COUNT(*) AS count, COALESCE(SUM(d.valueSar), 0) AS totalValue, COALESCE(AVG(d.valueSar), 0) AS avgValue
+        FROM deals d WHERE d.deletedAt IS NULL
+          AND d.createdAt >= ${from} AND d.createdAt <= ${to}
+        GROUP BY d.status
+      `) as any;
+
+  const dealSummary = {
+    won: { count: 0, totalValue: 0, avgValue: 0 },
+    lost: { count: 0, totalValue: 0, avgValue: 0 },
+    pending: { count: 0, totalValue: 0, avgValue: 0 },
+  };
+  for (const r of (dealRows ?? [])) {
+    const key = (r.status ?? '').toLowerCase() as keyof typeof dealSummary;
+    if (dealSummary[key]) {
+      dealSummary[key] = {
+        count: Number(r.count ?? 0),
+        totalValue: Number(r.totalValue ?? 0),
+        avgValue: Number(r.avgValue ?? 0),
+      };
+    }
+  }
+
+  // 6. Lead quality breakdown per stage
+  const [qualityRows] = isAgent
+    ? await db.execute(sql`
+        SELECT l.stage, l.leadQuality, COUNT(*) AS count FROM leads l
+        WHERE l.deletedAt IS NULL AND l.ownerId = ${agentId}
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+        GROUP BY l.stage, l.leadQuality ORDER BY l.stage, l.leadQuality
+      `) as any
+    : await db.execute(sql`
+        SELECT l.stage, l.leadQuality, COUNT(*) AS count FROM leads l
+        WHERE l.deletedAt IS NULL
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+        GROUP BY l.stage, l.leadQuality ORDER BY l.stage, l.leadQuality
+      `) as any;
+
+  const qualityByStage: Record<string, Record<string, number>> = {};
+  for (const r of (qualityRows ?? [])) {
+    const stage = r.stage ?? 'New';
+    if (!qualityByStage[stage]) qualityByStage[stage] = {};
+    qualityByStage[stage][r.leadQuality ?? 'Unknown'] = Number(r.count ?? 0);
+  }
+
+  // 7. Time-based trend (leads created per day in the range)
+  const [trendRows] = isAgent
+    ? await db.execute(sql`
+        SELECT DATE(l.createdAt) AS date, COUNT(*) AS count FROM leads l
+        WHERE l.deletedAt IS NULL AND l.ownerId = ${agentId}
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+        GROUP BY DATE(l.createdAt) ORDER BY date ASC
+      `) as any
+    : await db.execute(sql`
+        SELECT DATE(l.createdAt) AS date, COUNT(*) AS count FROM leads l
+        WHERE l.deletedAt IS NULL
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+        GROUP BY DATE(l.createdAt) ORDER BY date ASC
+      `) as any;
+
+  const leadTrend = (trendRows ?? []).map((r: any) => ({
+    date: r.date,
+    count: Number(r.count ?? 0),
+  }));
+
+  // 8. Average time to contact (for leads that have contactTime)
+  const [avgContactTime] = isAgent
+    ? await db.execute(sql`
+        SELECT AVG(TIMESTAMPDIFF(HOUR, l.createdAt, l.contactTime)) AS avgHours FROM leads l
+        WHERE l.deletedAt IS NULL AND l.contactTime IS NOT NULL AND l.ownerId = ${agentId}
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+      `) as any
+    : await db.execute(sql`
+        SELECT AVG(TIMESTAMPDIFF(HOUR, l.createdAt, l.contactTime)) AS avgHours FROM leads l
+        WHERE l.deletedAt IS NULL AND l.contactTime IS NOT NULL
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+      `) as any;
+
+  return {
+    totalLeads,
+    funnelData,
+    conversionRates,
+    campaignPerformance,
+    dealSummary,
+    qualityByStage,
+    leadTrend,
+    avgContactTimeHours: Number((avgContactTime ?? [])[0]?.avgHours ?? 0),
+  };
+}
+
+// ─── Task & SLA Dashboard ─────────────────────────────────────────────────────
+export async function getTaskSlaDashboardData(dateFrom?: Date, dateTo?: Date, userRole?: string, userId?: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const from = dateFrom ?? new Date(0);
+  const to = dateTo ?? new Date();
+  if (dateTo) { to.setHours(23, 59, 59, 999); }
+  const isAgent = userRole === 'SalesAgent';
+  const agentId = userId ?? 0;
+
+  // 1. SLA Config
+  const slaConfigResult = await db.select().from(slaConfig).limit(1);
+  const slaSettings = slaConfigResult[0] ?? { hoursThreshold: 24, isEnabled: true };
+
+  // 2. SLA Overview
+  const [slaOverview] = isAgent
+    ? await db.execute(sql`
+        SELECT COUNT(*) AS totalLeads,
+          SUM(CASE WHEN l.slaBreached = 1 THEN 1 ELSE 0 END) AS breachedCount,
+          SUM(CASE WHEN l.contactTime IS NOT NULL THEN 1 ELSE 0 END) AS contactedCount,
+          SUM(CASE WHEN l.contactTime IS NULL AND l.slaBreached = 0 THEN 1 ELSE 0 END) AS pendingCount,
+          AVG(CASE WHEN l.contactTime IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, l.createdAt, l.contactTime) ELSE NULL END) AS avgResponseMinutes
+        FROM leads l WHERE l.deletedAt IS NULL AND l.ownerId = ${agentId}
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+      `) as any
+    : await db.execute(sql`
+        SELECT COUNT(*) AS totalLeads,
+          SUM(CASE WHEN l.slaBreached = 1 THEN 1 ELSE 0 END) AS breachedCount,
+          SUM(CASE WHEN l.contactTime IS NOT NULL THEN 1 ELSE 0 END) AS contactedCount,
+          SUM(CASE WHEN l.contactTime IS NULL AND l.slaBreached = 0 THEN 1 ELSE 0 END) AS pendingCount,
+          AVG(CASE WHEN l.contactTime IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, l.createdAt, l.contactTime) ELSE NULL END) AS avgResponseMinutes
+        FROM leads l WHERE l.deletedAt IS NULL
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+      `) as any;
+
+  const slaData = (slaOverview ?? [])[0] ?? {};
+
+  // 3. SLA Breached by Agent
+  const [slaByAgent] = isAgent
+    ? await db.execute(sql`
+        SELECT u.id AS agentId, u.name AS agentName, COUNT(l.id) AS totalLeads,
+          SUM(CASE WHEN l.slaBreached = 1 THEN 1 ELSE 0 END) AS breachedCount,
+          SUM(CASE WHEN l.contactTime IS NOT NULL THEN 1 ELSE 0 END) AS contactedCount,
+          AVG(CASE WHEN l.contactTime IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, l.createdAt, l.contactTime) ELSE NULL END) AS avgResponseMinutes
+        FROM users u LEFT JOIN leads l ON l.ownerId = u.id AND l.deletedAt IS NULL AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+        WHERE u.id = ${agentId} AND u.deletedAt IS NULL
+        GROUP BY u.id, u.name ORDER BY breachedCount DESC
+      `) as any
+    : await db.execute(sql`
+        SELECT u.id AS agentId, u.name AS agentName, COUNT(l.id) AS totalLeads,
+          SUM(CASE WHEN l.slaBreached = 1 THEN 1 ELSE 0 END) AS breachedCount,
+          SUM(CASE WHEN l.contactTime IS NOT NULL THEN 1 ELSE 0 END) AS contactedCount,
+          AVG(CASE WHEN l.contactTime IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, l.createdAt, l.contactTime) ELSE NULL END) AS avgResponseMinutes
+        FROM users u LEFT JOIN leads l ON l.ownerId = u.id AND l.deletedAt IS NULL AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+        WHERE u.role = 'SalesAgent' AND u.deletedAt IS NULL
+        GROUP BY u.id, u.name ORDER BY breachedCount DESC
+      `) as any;
+
+  const agentSlaPerformance = (slaByAgent ?? []).map((r: any) => ({
+    agentId: Number(r.agentId),
+    agentName: r.agentName ?? 'Unknown',
+    totalLeads: Number(r.totalLeads ?? 0),
+    breachedCount: Number(r.breachedCount ?? 0),
+    contactedCount: Number(r.contactedCount ?? 0),
+    avgResponseMinutes: Number(r.avgResponseMinutes ?? 0),
+    complianceRate: Number(r.totalLeads) > 0
+      ? (((Number(r.totalLeads) - Number(r.breachedCount)) / Number(r.totalLeads)) * 100)
+      : 100,
+  }));
+
+  // 4. Activity Summary
+  const [activitySummary] = isAgent
+    ? await db.execute(sql`
+        SELECT a.type, COUNT(*) AS count, COUNT(DISTINCT a.userId) AS uniqueAgents
+        FROM activities a WHERE a.deletedAt IS NULL AND a.userId = ${agentId}
+          AND a.createdAt >= ${from} AND a.createdAt <= ${to}
+        GROUP BY a.type ORDER BY count DESC
+      `) as any
+    : await db.execute(sql`
+        SELECT a.type, COUNT(*) AS count, COUNT(DISTINCT a.userId) AS uniqueAgents
+        FROM activities a WHERE a.deletedAt IS NULL
+          AND a.createdAt >= ${from} AND a.createdAt <= ${to}
+        GROUP BY a.type ORDER BY count DESC
+      `) as any;
+
+  const activityByType = (activitySummary ?? []).map((r: any) => ({
+    type: r.type ?? 'Unknown',
+    count: Number(r.count ?? 0),
+    uniqueAgents: Number(r.uniqueAgents ?? 0),
+  }));
+
+  // 5. Activity by Agent
+  const [activityByAgent] = isAgent
+    ? await db.execute(sql`
+        SELECT u.id AS agentId, u.name AS agentName, COUNT(a.id) AS totalActivities,
+          SUM(CASE WHEN a.type = 'Call' THEN 1 ELSE 0 END) AS calls,
+          SUM(CASE WHEN a.type = 'WhatsApp' THEN 1 ELSE 0 END) AS whatsapp,
+          SUM(CASE WHEN a.type = 'Meeting' THEN 1 ELSE 0 END) AS meetings,
+          SUM(CASE WHEN a.type = 'Email' THEN 1 ELSE 0 END) AS emails,
+          SUM(CASE WHEN a.type = 'SMS' THEN 1 ELSE 0 END) AS sms,
+          SUM(CASE WHEN a.type = 'Offer' THEN 1 ELSE 0 END) AS offers,
+          SUM(CASE WHEN a.type = 'Note' THEN 1 ELSE 0 END) AS notes
+        FROM users u LEFT JOIN activities a ON a.userId = u.id AND a.deletedAt IS NULL AND a.createdAt >= ${from} AND a.createdAt <= ${to}
+        WHERE u.id = ${agentId} AND u.deletedAt IS NULL
+        GROUP BY u.id, u.name ORDER BY totalActivities DESC
+      `) as any
+    : await db.execute(sql`
+        SELECT u.id AS agentId, u.name AS agentName, COUNT(a.id) AS totalActivities,
+          SUM(CASE WHEN a.type = 'Call' THEN 1 ELSE 0 END) AS calls,
+          SUM(CASE WHEN a.type = 'WhatsApp' THEN 1 ELSE 0 END) AS whatsapp,
+          SUM(CASE WHEN a.type = 'Meeting' THEN 1 ELSE 0 END) AS meetings,
+          SUM(CASE WHEN a.type = 'Email' THEN 1 ELSE 0 END) AS emails,
+          SUM(CASE WHEN a.type = 'SMS' THEN 1 ELSE 0 END) AS sms,
+          SUM(CASE WHEN a.type = 'Offer' THEN 1 ELSE 0 END) AS offers,
+          SUM(CASE WHEN a.type = 'Note' THEN 1 ELSE 0 END) AS notes
+        FROM users u LEFT JOIN activities a ON a.userId = u.id AND a.deletedAt IS NULL AND a.createdAt >= ${from} AND a.createdAt <= ${to}
+        WHERE u.role = 'SalesAgent' AND u.deletedAt IS NULL
+        GROUP BY u.id, u.name ORDER BY totalActivities DESC
+      `) as any;
+
+  const agentActivityBreakdown = (activityByAgent ?? []).map((r: any) => ({
+    agentId: Number(r.agentId),
+    agentName: r.agentName ?? 'Unknown',
+    totalActivities: Number(r.totalActivities ?? 0),
+    calls: Number(r.calls ?? 0),
+    whatsapp: Number(r.whatsapp ?? 0),
+    meetings: Number(r.meetings ?? 0),
+    emails: Number(r.emails ?? 0),
+    sms: Number(r.sms ?? 0),
+    offers: Number(r.offers ?? 0),
+    notes: Number(r.notes ?? 0),
+  }));
+
+  // 6. Activity Outcome Distribution
+  const [outcomeRows] = isAgent
+    ? await db.execute(sql`
+        SELECT COALESCE(a.outcome, 'Unknown') AS outcome, COUNT(*) AS count
+        FROM activities a WHERE a.deletedAt IS NULL AND a.userId = ${agentId}
+          AND a.createdAt >= ${from} AND a.createdAt <= ${to}
+        GROUP BY a.outcome ORDER BY count DESC
+      `) as any
+    : await db.execute(sql`
+        SELECT COALESCE(a.outcome, 'Unknown') AS outcome, COUNT(*) AS count
+        FROM activities a WHERE a.deletedAt IS NULL
+          AND a.createdAt >= ${from} AND a.createdAt <= ${to}
+        GROUP BY a.outcome ORDER BY count DESC
+      `) as any;
+
+  const activityOutcomes = (outcomeRows ?? []).map((r: any) => ({
+    outcome: r.outcome ?? 'Unknown',
+    count: Number(r.count ?? 0),
+  }));
+
+  // 7. Activity Trend (daily)
+  const [activityTrend] = isAgent
+    ? await db.execute(sql`
+        SELECT DATE(a.createdAt) AS date, COUNT(*) AS count
+        FROM activities a WHERE a.deletedAt IS NULL AND a.userId = ${agentId}
+          AND a.createdAt >= ${from} AND a.createdAt <= ${to}
+        GROUP BY DATE(a.createdAt) ORDER BY date ASC
+      `) as any
+    : await db.execute(sql`
+        SELECT DATE(a.createdAt) AS date, COUNT(*) AS count
+        FROM activities a WHERE a.deletedAt IS NULL
+          AND a.createdAt >= ${from} AND a.createdAt <= ${to}
+        GROUP BY DATE(a.createdAt) ORDER BY date ASC
+      `) as any;
+
+  const activityDailyTrend = (activityTrend ?? []).map((r: any) => ({
+    date: r.date,
+    count: Number(r.count ?? 0),
+  }));
+
+  // 8. SLA Breach Trend (daily — how many leads breached SLA per day)
+  const [slaTrend] = isAgent
+    ? await db.execute(sql`
+        SELECT DATE(l.createdAt) AS date,
+          SUM(CASE WHEN l.slaBreached = 1 THEN 1 ELSE 0 END) AS breached, COUNT(*) AS total
+        FROM leads l WHERE l.deletedAt IS NULL AND l.ownerId = ${agentId}
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+        GROUP BY DATE(l.createdAt) ORDER BY date ASC
+      `) as any
+    : await db.execute(sql`
+        SELECT DATE(l.createdAt) AS date,
+          SUM(CASE WHEN l.slaBreached = 1 THEN 1 ELSE 0 END) AS breached, COUNT(*) AS total
+        FROM leads l WHERE l.deletedAt IS NULL
+          AND l.createdAt >= ${from} AND l.createdAt <= ${to}
+        GROUP BY DATE(l.createdAt) ORDER BY date ASC
+      `) as any;
+
+  const slaDailyTrend = (slaTrend ?? []).map((r: any) => ({
+    date: r.date,
+    breached: Number(r.breached ?? 0),
+    total: Number(r.total ?? 0),
+  }));
+
+  // 9. Top SLA breached leads (most recent, for the table)
+  const [topBreachedLeads] = isAgent
+    ? await db.execute(sql`
+        SELECT l.id, l.name, l.phone, l.stage, l.campaignName, l.createdAt, l.slaBreached,
+          u.name AS ownerName, TIMESTAMPDIFF(HOUR, l.createdAt, NOW()) AS hoursElapsed
+        FROM leads l LEFT JOIN users u ON u.id = l.ownerId
+        WHERE l.slaBreached = 1 AND l.deletedAt IS NULL AND l.contactTime IS NULL AND l.ownerId = ${agentId}
+        ORDER BY l.createdAt DESC LIMIT 20
+      `) as any
+    : await db.execute(sql`
+        SELECT l.id, l.name, l.phone, l.stage, l.campaignName, l.createdAt, l.slaBreached,
+          u.name AS ownerName, TIMESTAMPDIFF(HOUR, l.createdAt, NOW()) AS hoursElapsed
+        FROM leads l LEFT JOIN users u ON u.id = l.ownerId
+        WHERE l.slaBreached = 1 AND l.deletedAt IS NULL AND l.contactTime IS NULL
+        ORDER BY l.createdAt DESC LIMIT 20
+      `) as any;
+
+  const breachedLeadsList = (topBreachedLeads ?? []).map((r: any) => ({
+    id: Number(r.id),
+    name: r.name ?? r.phone,
+    phone: r.phone,
+    stage: r.stage,
+    campaignName: r.campaignName ?? 'Direct',
+    ownerName: r.ownerName ?? 'Unassigned',
+    hoursElapsed: Number(r.hoursElapsed ?? 0),
+    createdAt: r.createdAt,
+  }));
+
+  return {
+    slaSettings: {
+      hoursThreshold: Number(slaSettings.hoursThreshold),
+      isEnabled: Boolean(slaSettings.isEnabled),
+    },
+    slaOverview: {
+      totalLeads: Number(slaData.totalLeads ?? 0),
+      breachedCount: Number(slaData.breachedCount ?? 0),
+      contactedCount: Number(slaData.contactedCount ?? 0),
+      pendingCount: Number(slaData.pendingCount ?? 0),
+      avgResponseMinutes: Number(slaData.avgResponseMinutes ?? 0),
+      complianceRate: Number(slaData.totalLeads) > 0
+        ? (((Number(slaData.totalLeads) - Number(slaData.breachedCount)) / Number(slaData.totalLeads)) * 100)
+        : 100,
+    },
+    agentSlaPerformance,
+    activityByType,
+    agentActivityBreakdown,
+    activityOutcomes,
+    activityDailyTrend,
+    slaDailyTrend,
+    breachedLeadsList,
+  };
+}
+
+// ─── Bulk Lead Import ─────────────────────────────────────────────────────────
+export async function bulkCreateLeads(leadsData: InsertLead[]): Promise<{ created: number; duplicates: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  let created = 0;
+  let duplicates = 0;
+
+  for (const lead of leadsData) {
+    if (lead.phone) lead.phone = normalizePhone(lead.phone);
+
+    // Check for duplicate
+    const existing = await db
+      .select({ id: leads.id })
+      .from(leads)
+      .where(eq(leads.phone, lead.phone))
+      .limit(1);
+
+    if (existing.length > 0) {
+      lead.isDuplicate = true;
+      lead.duplicateOfId = existing[0].id;
+      duplicates++;
+    } else {
+      created++;
+    }
+
+    await db.insert(leads).values(lead);
+  }
+
+  return { created, duplicates };
+}
+
+// ─── Password Reset Tokens ────────────────────────────────────────────────────
+export async function createPasswordResetToken(userId: number, token: string, expiresAt: Date): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Invalidate any existing tokens for this user
+  await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+  await db.insert(passwordResetTokens).values({ userId, token, expiresAt });
+}
+
+export async function getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.token, token)).limit(1);
+  return result[0];
+}
+
+export async function markPasswordResetTokenUsed(token: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.token, token));
+}
+
+// ─── Notification Subscribers ─────────────────────────────────────────────────
+export async function getNotificationSubscribers(): Promise<NotificationSubscriber[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(notificationSubscribers).orderBy(notificationSubscribers.createdAt);
+}
+
+export async function addNotificationSubscriber(data: InsertNotificationSubscriber): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(notificationSubscribers).values(data);
+  return (result as any)[0]?.insertId ?? 0;
+}
+
+export async function updateNotificationSubscriber(id: number, data: Partial<InsertNotificationSubscriber>): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(notificationSubscribers).set(data).where(eq(notificationSubscribers.id, id));
+}
+
+export async function deleteNotificationSubscriber(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(notificationSubscribers).where(eq(notificationSubscribers.id, id));
+}
+
+export async function getActiveNotificationSubscribers(frequency?: "daily" | "weekly"): Promise<NotificationSubscriber[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [eq(notificationSubscribers.isActive, true)];
+  if (frequency) conditions.push(eq(notificationSubscribers.frequency, frequency));
+  return db.select().from(notificationSubscribers).where(and(...conditions));
+}
+
+// ─── Report Data ──────────────────────────────────────────────────────────────
+export async function getReportData(dateFrom?: Date, dateTo?: Date) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const from = dateFrom ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const to = dateTo ?? new Date();
+
+  // Total leads in period
+  const totalLeadsResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(leads)
+    .where(and(gte(leads.createdAt, from), lte(leads.createdAt, to)));
+  const totalLeads = Number(totalLeadsResult[0]?.count ?? 0);
+
+  // SLA breached leads
+  const slaBreachedResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(leads)
+    .where(eq(leads.slaBreached, true));
+  const slaBreached = Number(slaBreachedResult[0]?.count ?? 0);
+
+  // Won deals in period
+  const wonDealsResult = await db
+    .select({ count: sql<number>`count(*)`, total: sql<number>`COALESCE(SUM(valueSar), 0)` })
+    .from(deals)
+    .where(and(eq(deals.status, "Won"), gte(deals.createdAt, from), lte(deals.createdAt, to)));
+  const wonDeals = Number(wonDealsResult[0]?.count ?? 0);
+  const wonValue = Number(wonDealsResult[0]?.total ?? 0);
+
+  // Lost deals in period
+  const lostDealsResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(deals)
+    .where(and(eq(deals.status, "Lost"), gte(deals.createdAt, from), lte(deals.createdAt, to)));
+  const lostDeals = Number(lostDealsResult[0]?.count ?? 0);
+
+  // Per-agent stats
+  const agentStats = await db.execute(sql`
+    SELECT u.name, u.email,
+      COUNT(DISTINCT l.id) as totalLeads,
+      COUNT(DISTINCT a.id) as totalActivities,
+      COUNT(DISTINCT CASE WHEN d.status = 'Won' THEN d.id END) as wonDeals,
+      COUNT(DISTINCT CASE WHEN l.slaBreached = true THEN l.id END) as slaBreached
+    FROM users u
+    LEFT JOIN leads l ON l.ownerId = u.id AND l.createdAt BETWEEN ${from} AND ${to}
+    LEFT JOIN activities a ON a.userId = u.id AND a.createdAt BETWEEN ${from} AND ${to}
+    LEFT JOIN deals d ON d.leadId = l.id
+    WHERE u.role = 'SalesAgent' AND u.isActive = true
+    GROUP BY u.id, u.name, u.email
+    ORDER BY totalLeads DESC
+  `);
+
+  return {
+    period: { from, to },
+    totalLeads,
+    slaBreached,
+    wonDeals,
+    wonValue,
+    lostDeals,
+    agentStats: (agentStats as any)[0] ?? [],
+  };
+}
+
+// ─── Leads Export (with owner name join) ─────────────────────────────────────
+export interface LeadExportFilters {
+  limit?: number;
+  stage?: string;
+  leadQuality?: string;
+  campaignName?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  slaBreached?: boolean;
+  search?: string;
+  ownerId?: number;
+}
+
+export async function getLeadsForExport(filters: LeadExportFilters = {}) {
+  const db = await getDb();
+  if (!db) return [];
+  const limit = Math.min(filters.limit ?? 100, 5000); // cap at 5000 rows
+
+  const rows = await db.execute(sql`
+    SELECT
+      l.id,
+      l.name,
+      l.phone,
+      l.country,
+      l.businessProfile,
+      l.leadQuality,
+      l.stage,
+      l.campaignName,
+      l.slaBreached,
+      l.createdAt,
+      l.notes,
+      u.name AS ownerName
+    FROM leads l
+    LEFT JOIN users u ON u.id = l.ownerId
+    WHERE 1=1
+      ${filters.ownerId ? sql`AND l.ownerId = ${filters.ownerId}` : sql``}
+      ${filters.stage ? sql`AND l.stage = ${filters.stage}` : sql``}
+      ${filters.leadQuality ? sql`AND l.leadQuality = ${filters.leadQuality}` : sql``}
+      ${filters.campaignName ? sql`AND l.campaignName = ${filters.campaignName}` : sql``}
+      ${filters.slaBreached !== undefined ? sql`AND l.slaBreached = ${filters.slaBreached}` : sql``}
+      ${filters.dateFrom ? sql`AND l.createdAt >= ${filters.dateFrom}` : sql``}
+      ${filters.dateTo ? sql`AND l.createdAt <= ${filters.dateTo}` : sql``}
+      ${filters.search ? sql`AND (l.name LIKE ${`%${filters.search}%`} OR l.phone LIKE ${`%${filters.search}%`})` : sql``}
+    ORDER BY l.createdAt DESC
+    LIMIT ${limit}
+  `);
+  return (rows as any)[0] as Array<{
+    id: number;
+    name: string | null;
+    phone: string | null;
+    country: string | null;
+    businessProfile: string | null;
+    leadQuality: string | null;
+    stage: string | null;
+    campaignName: string | null;
+    slaBreached: boolean;
+    createdAt: Date;
+    notes: string | null;
+    ownerName: string | null;
+  }>;
+}
+
+// ─── Internal Notes ───────────────────────────────────────────────────────────
+export async function getInternalNotesByLead(leadId: number) {
+  const db = await getDb();
+  const rows = await db.execute(sql`
+    SELECT n.*, u.name as userName
+    FROM internal_notes n
+    LEFT JOIN users u ON u.id = n.userId
+    WHERE n.leadId = ${leadId} AND n.deletedAt IS NULL
+    ORDER BY n.createdAt DESC
+  `);
+  return (rows as any)[0] ?? [];
+}
+
+export async function createInternalNote(data: { leadId: number; userId: number; content: string }): Promise<number> {
+  const db = await getDb();
+  const result = await db.insert(internalNotes).values(data);
+  return Number((result as any)[0]?.insertId ?? 0);
+}
+
+export async function deleteInternalNote(id: number, deletedByUserId?: number): Promise<void> {
+  const db = await getDb();
+  await db.update(internalNotes).set({ deletedAt: new Date(), deletedBy: deletedByUserId ?? null } as any).where(eq(internalNotes.id, id));
+}
+
+// ─── Lead Transfers ──────────────────────────────────────────────────────────
+export async function getLeadTransfersByLead(leadId: number) {
+  const db = await getDb();
+  const rows = await db.execute(sql`
+    SELECT t.*, 
+      fu.name as fromUserName, 
+      tu.name as toUserName
+    FROM lead_transfers t
+    LEFT JOIN users fu ON fu.id = t.fromUserId
+    LEFT JOIN users tu ON tu.id = t.toUserId
+    WHERE t.leadId = ${leadId}
+    ORDER BY t.createdAt DESC
+  `);
+  return (rows as any)[0] ?? [];
+}
+
+export async function createLeadTransfer(data: { leadId: number; fromUserId: number; toUserId: number; reason?: string; notes?: string }): Promise<number> {
+  const db = await getDb();
+  // 1. Create transfer record
+  const result = await db.insert(leadTransfers).values(data);
+  // 2. Update lead ownership
+  await db.update(leads).set({ ownerId: data.toUserId }).where(eq(leads.id, data.leadId));
+  // Notification #9 — Lead Transfer
+  notifyLeadTransfer({
+    leadId: data.leadId,
+    fromUserId: data.fromUserId,
+    toUserId: data.toUserId,
+    reason: data.reason,
+  }).catch((err) => console.error("[NotificationEngine] notifyLeadTransfer error:", err));
+  return Number((result as any)[0]?.insertId ?? 0);
+}
+
+// ─── Chat Messages ───────────────────────────────────────────────────────────
+export async function getChatMessages(filters: { fromUserId?: number; toUserId?: number; roomId?: string; limit?: number }) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  let conditions = [];
+  if (filters.roomId) {
+    conditions.push(eq(chatMessages.roomId, filters.roomId));
+  } else if (filters.fromUserId && filters.toUserId) {
+    conditions.push(
+      or(
+        and(eq(chatMessages.fromUserId, filters.fromUserId), eq(chatMessages.toUserId, filters.toUserId)),
+        and(eq(chatMessages.fromUserId, filters.toUserId), eq(chatMessages.toUserId, filters.fromUserId))
+      )
+    );
+  }
+
+  const query = db.select({
+    id: chatMessages.id,
+    fromUserId: chatMessages.fromUserId,
+    fromUserName: users.name,
+    toUserId: chatMessages.toUserId,
+    toUserName: sql`tu.name`,
+    content: chatMessages.content,
+    isRead: chatMessages.isRead,
+    createdAt: chatMessages.createdAt,
+  })
+  .from(chatMessages)
+  .leftJoin(users, eq(chatMessages.fromUserId, users.id))
+  .leftJoin(sql`users tu`, eq(chatMessages.toUserId, sql`tu.id`))
+  .where(conditions.length > 0 ? and(...conditions) : undefined)
+  .orderBy(desc(chatMessages.createdAt))
+  .limit(filters.limit || 50);
+
+  const rows = await query;
+  return rows.reverse();
+}
+
+export async function getAllChatConversations() {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const rows = await db.execute(sql`
+    SELECT 
+      m.id, m.fromUserId, m.toUserId, m.content, m.createdAt,
+      u1.name as fromUserName, u2.name as toUserName
+    FROM chat_messages m
+    JOIN users u1 ON m.fromUserId = u1.id
+    JOIN users u2 ON m.toUserId = u2.id
+    WHERE m.deletedAt IS NULL AND m.id IN (
+      SELECT MAX(id) FROM chat_messages WHERE deletedAt IS NULL GROUP BY LEAST(fromUserId, toUserId), GREATEST(fromUserId, toUserId)
+    )
+    ORDER BY m.createdAt DESC
+  `);
+  return (rows as any)[0] ?? [];
+}
+
+// ─── Chat Notifications ─────────────────────────────────────────────────────
+export async function getUnreadMessageCount(userId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  
+  const result = await db.select({
+    count: sql<number>`count(*)`
+  })
+  .from(chatMessages)
+  .where(and(eq(chatMessages.toUserId, userId), eq(chatMessages.isRead, false)));
+  
+  return Number(result[0]?.count ?? 0);
+}
+
+export async function markMessagesAsRead(fromUserId: number, toUserId: number) {
+  const db = await getDb();
+  if (!db) return;
+  
+  await db.update(chatMessages)
+    .set({ isRead: true })
+    .where(and(
+      eq(chatMessages.fromUserId, fromUserId),
+      eq(chatMessages.toUserId, toUserId),
+      eq(chatMessages.isRead, false)
+    ));
+}
+
+// ─── Audit Log ───────────────────────────────────────────────────────────────
+export async function createAuditLog(data: {
+  userId: number;
+  userName: string | null;
+  userRole: string;
+  action: "soft_delete" | "restore" | "permanent_delete";
+  entityType: string;
+  entityId: number;
+  entityName?: string;
+  details?: any;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(auditLogs).values({
+    userId: data.userId,
+    userName: data.userName ?? "Unknown",
+    userRole: data.userRole,
+    action: data.action,
+    entityType: data.entityType,
+    entityId: data.entityId,
+    entityName: data.entityName ?? null,
+    details: data.details ?? null,
+  });
+}
+
+export async function getAuditLogs(filters: { entityType?: string; limit?: number; offset?: number } = {}) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions: any[] = [];
+  if (filters.entityType) conditions.push(eq(auditLogs.entityType, filters.entityType));
+  return db
+    .select()
+    .from(auditLogs)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(filters.limit ?? 100)
+    .offset(filters.offset ?? 0);
+}
+
+// ─── Trash Functions ─────────────────────────────────────────────────────────
+export async function getTrashItems(entityType?: string) {
+  const db = await getDb();
+  if (!db) return { leads: [], users: [], campaigns: [], activities: [], notes: [], deals: [] };
+  const result: any = {};
+
+  if (!entityType || entityType === "leads") {
+    const rows = await db.execute(sql`
+      SELECT l.id, l.name, l.phone, l.stage, l.leadQuality, l.campaignName, l.deletedAt, l.deletedBy,
+        u.name as deletedByName, o.name as ownerName
+      FROM leads l LEFT JOIN users u ON u.id = l.deletedBy LEFT JOIN users o ON o.id = l.ownerId
+      WHERE l.deletedAt IS NOT NULL ORDER BY l.deletedAt DESC
+    `);
+    result.leads = (rows as any)[0] ?? [];
+  }
+  if (!entityType || entityType === "users") {
+    const rows = await db.execute(sql`
+      SELECT u.id, u.name, u.email, u.role, u.deletedAt, u.deletedBy, d.name as deletedByName
+      FROM users u LEFT JOIN users d ON d.id = u.deletedBy
+      WHERE u.deletedAt IS NOT NULL ORDER BY u.deletedAt DESC
+    `);
+    result.users = (rows as any)[0] ?? [];
+  }
+  if (!entityType || entityType === "campaigns") {
+    const rows = await db.execute(sql`
+      SELECT c.id, c.name, c.platform, c.deletedAt, c.deletedBy, u.name as deletedByName
+      FROM campaigns c LEFT JOIN users u ON u.id = c.deletedBy
+      WHERE c.deletedAt IS NOT NULL ORDER BY c.deletedAt DESC
+    `);
+    result.campaigns = (rows as any)[0] ?? [];
+  }
+  if (!entityType || entityType === "activities") {
+    const rows = await db.execute(sql`
+      SELECT a.id, a.type, a.outcome, a.notes, a.deletedAt, a.deletedBy,
+        u.name as deletedByName, l.name as leadName
+      FROM activities a LEFT JOIN users u ON u.id = a.deletedBy LEFT JOIN leads l ON l.id = a.leadId
+      WHERE a.deletedAt IS NOT NULL ORDER BY a.deletedAt DESC
+    `);
+    result.activities = (rows as any)[0] ?? [];
+  }
+  if (!entityType || entityType === "deals") {
+    const rows = await db.execute(sql`
+      SELECT d.id, d.valueSar, d.status, d.dealType, d.deletedAt, d.deletedBy,
+        u.name as deletedByName, l.name as leadName
+      FROM deals d LEFT JOIN users u ON u.id = d.deletedBy LEFT JOIN leads l ON l.id = d.leadId
+      WHERE d.deletedAt IS NOT NULL ORDER BY d.deletedAt DESC
+    `);
+    result.deals = (rows as any)[0] ?? [];
+  }
+  if (!entityType || entityType === "notes") {
+    const rows = await db.execute(sql`
+      SELECT n.id, n.content, n.deletedAt, n.deletedBy, u.name as deletedByName, l.name as leadName
+      FROM internal_notes n LEFT JOIN users u ON u.id = n.deletedBy LEFT JOIN leads l ON l.id = n.leadId
+      WHERE n.deletedAt IS NOT NULL ORDER BY n.deletedAt DESC
+    `);
+    result.notes = (rows as any)[0] ?? [];
+  }
+  return result;
+}
+
+export async function getTrashStats() {
+  const db = await getDb();
+  if (!db) return { leads: 0, users: 0, campaigns: 0, activities: 0, deals: 0, notes: 0 };
+  const [l, u, c, a, d, n] = await Promise.all([
+    db.execute(sql`SELECT COUNT(*) as count FROM leads WHERE deletedAt IS NOT NULL`),
+    db.execute(sql`SELECT COUNT(*) as count FROM users WHERE deletedAt IS NOT NULL`),
+    db.execute(sql`SELECT COUNT(*) as count FROM campaigns WHERE deletedAt IS NOT NULL`),
+    db.execute(sql`SELECT COUNT(*) as count FROM activities WHERE deletedAt IS NOT NULL`),
+    db.execute(sql`SELECT COUNT(*) as count FROM deals WHERE deletedAt IS NOT NULL`),
+    db.execute(sql`SELECT COUNT(*) as count FROM internal_notes WHERE deletedAt IS NOT NULL`),
+  ]);
+  return {
+    leads: Number((l as any)[0]?.[0]?.count ?? 0),
+    users: Number((u as any)[0]?.[0]?.count ?? 0),
+    campaigns: Number((c as any)[0]?.[0]?.count ?? 0),
+    activities: Number((a as any)[0]?.[0]?.count ?? 0),
+    deals: Number((d as any)[0]?.[0]?.count ?? 0),
+    notes: Number((n as any)[0]?.[0]?.count ?? 0),
+  };
+}
+
+// ─── Restore Functions ───────────────────────────────────────────────────────
+export async function restoreLead(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(leads).set({ deletedAt: null, deletedBy: null } as any).where(eq(leads.id, id));
+}
+export async function restoreUser(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ deletedAt: null, deletedBy: null, isActive: true } as any).where(eq(users.id, id));
+}
+export async function restoreCampaign(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(campaigns).set({ deletedAt: null, deletedBy: null } as any).where(eq(campaigns.id, id));
+}
+export async function restoreActivity(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(activities).set({ deletedAt: null, deletedBy: null } as any).where(eq(activities.id, id));
+}
+export async function restoreDeal(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(deals).set({ deletedAt: null, deletedBy: null } as any).where(eq(deals.id, id));
+}
+export async function restoreInternalNote(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(internalNotes).set({ deletedAt: null, deletedBy: null } as any).where(eq(internalNotes.id, id));
+}
+
+// ─── Soft Delete Deal ────────────────────────────────────────────────────────
+export async function softDeleteDeal(id: number, deletedByUserId?: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(deals).set({ deletedAt: new Date(), deletedBy: deletedByUserId ?? null } as any).where(eq(deals.id, id));
+}
+
+// ─── Permanent Delete (password-protected, 1 year minimum) ──────────────────
+export async function permanentDeleteEntity(entityType: string, id: number): Promise<{ success: boolean; reason?: string }> {
+  const db = await getDb();
+  if (!db) return { success: false, reason: "Database not available" };
+  
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  
+  const tableMap: Record<string, any> = { leads, users, campaigns, activities, deals, internalNotes };
+  const table = tableMap[entityType];
+  if (!table) return { success: false, reason: "Invalid entity type" };
+  
+  const item = await db.select().from(table).where(eq(table.id, id)).limit(1);
+  if (!item[0]) return { success: false, reason: "Item not found" };
+  if (!item[0].deletedAt) return { success: false, reason: "Item is not in trash" };
+  if (new Date(item[0].deletedAt) > oneYearAgo) {
+    const deleteDate = new Date(item[0].deletedAt);
+    const eligibleDate = new Date(deleteDate);
+    eligibleDate.setFullYear(eligibleDate.getFullYear() + 1);
+    return { success: false, reason: `Cannot permanently delete yet. Eligible after \${eligibleDate.toISOString().split("T")[0]}` };
+  }
+  
+  await db.delete(table).where(eq(table.id, id));
+  return { success: true };
+}
+
+
+// ─── In-App Notifications ────────────────────────────────────────────────────
+export async function createInAppNotification(data: InsertInAppNotification): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.insert(inAppNotifications).values(data);
+  return result[0].insertId;
+}
+
+export async function createBulkInAppNotifications(items: InsertInAppNotification[]): Promise<void> {
+  const db = await getDb();
+  if (!db || items.length === 0) return;
+  await db.insert(inAppNotifications).values(items);
+}
+
+export async function getInAppNotifications(userId: number, limit: number = 30): Promise<InAppNotification[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(inAppNotifications)
+    .where(eq(inAppNotifications.userId, userId))
+    .orderBy(desc(inAppNotifications.createdAt))
+    .limit(limit);
+}
+
+export async function getUnreadNotificationCount(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db
+    .select({ count: count() })
+    .from(inAppNotifications)
+    .where(and(eq(inAppNotifications.userId, userId), eq(inAppNotifications.isRead, false)));
+  return result[0]?.count ?? 0;
+}
+
+export async function markNotificationRead(id: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(inAppNotifications)
+    .set({ isRead: true })
+    .where(and(eq(inAppNotifications.id, id), eq(inAppNotifications.userId, userId)));
+}
+
+export async function markAllNotificationsRead(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(inAppNotifications)
+    .set({ isRead: true })
+    .where(and(eq(inAppNotifications.userId, userId), eq(inAppNotifications.isRead, false)));
+}

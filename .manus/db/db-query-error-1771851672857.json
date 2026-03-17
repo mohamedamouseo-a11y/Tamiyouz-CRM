@@ -1,0 +1,13 @@
+{
+  "query": "CREATE TABLE `notification_subscribers` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`email` varchar(320) NOT NULL,\n\t`name` varchar(255),\n\t`frequency` enum('daily','weekly') NOT NULL DEFAULT 'daily',\n\t`dayOfWeek` int DEFAULT 1,\n\t`hourOfDay` int DEFAULT 8,\n\t`isActive` boolean NOT NULL DEFAULT true,\n\t`reportTypes` json DEFAULT ('[\"sla\",\"performance\",\"deals\"]'),\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `notification_subscribers_id` PRIMARY KEY(`id`),\n\tCONSTRAINT `notification_subscribers_email_unique` UNIQUE(`email`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user fgVDoa92CjzK918.root --database fNcEvLVXNRSDZsrJXgGzZW --execute CREATE TABLE `notification_subscribers` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`email` varchar(320) NOT NULL,\n\t`name` varchar(255),\n\t`frequency` enum('daily','weekly') NOT NULL DEFAULT 'daily',\n\t`dayOfWeek` int DEFAULT 1,\n\t`hourOfDay` int DEFAULT 8,\n\t`isActive` boolean NOT NULL DEFAULT true,\n\t`reportTypes` json DEFAULT ('[\"sla\",\"performance\",\"deals\"]'),\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `notification_subscribers_id` PRIMARY KEY(`id`),\n\tCONSTRAINT `notification_subscribers_email_unique` UNIQUE(`email`)\n);",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 9 column 61 near \"'[\"sla\",\"performance\",\"deals\"]'),",
+    "\t`createdAt` timestamp NOT NULL DEFAULT (now()),",
+    "\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,",
+    "\tCONSTRAINT `notification_subscribers_id` PRIMARY KEY(`id`),",
+    "\tCONSTRAINT `notification_subscribers_email_unique` UNIQUE(`email`)",
+    ")\""
+  ]
+}

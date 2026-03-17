@@ -1,0 +1,299 @@
+import { useState, useRef, useEffect, useCallback } from "react";
+import { trpc } from "@/lib/trpc";
+import { Bell, Check, CheckCheck, Calendar, UserPlus, AlertTriangle, ArrowRightLeft, AtSign, Info, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
+import { ar } from "date-fns/locale";
+
+interface Props {
+  isRTL: boolean;
+  primaryColor: string;
+}
+
+const typeIcons: Record<string, React.ReactNode> = {
+  meeting_reminder: <Calendar size={14} className="text-blue-500" />,
+  lead_assigned: <UserPlus size={14} className="text-green-500" />,
+  sla_breach: <AlertTriangle size={14} className="text-red-500" />,
+  lead_transfer: <ArrowRightLeft size={14} className="text-orange-500" />,
+  mention: <AtSign size={14} className="text-purple-500" />,
+  system: <Info size={14} className="text-gray-500" />,
+};
+
+const typeBgColors: Record<string, string> = {
+  meeting_reminder: "bg-blue-50 dark:bg-blue-950/30",
+  lead_assigned: "bg-green-50 dark:bg-green-950/30",
+  sla_breach: "bg-red-50 dark:bg-red-950/30",
+  lead_transfer: "bg-orange-50 dark:bg-orange-950/30",
+  mention: "bg-purple-50 dark:bg-purple-950/30",
+  system: "bg-gray-50 dark:bg-gray-950/30",
+};
+
+// ─── Sound helper ───────────────────────────────────────────────────────────
+function playNotificationSound() {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    // Play two-tone chime
+    const playTone = (freq: number, startTime: number, duration: number) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime + startTime);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime + startTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + startTime + duration);
+      osc.start(audioCtx.currentTime + startTime);
+      osc.stop(audioCtx.currentTime + startTime + duration);
+    };
+    playTone(880, 0, 0.15);
+    playTone(1100, 0.18, 0.15);
+    playTone(1320, 0.36, 0.25);
+  } catch (e) {
+    console.warn("[NotificationCenter] Could not play sound:", e);
+  }
+}
+
+// ─── Browser notification helper ────────────────────────────────────────────
+function showBrowserNotification(title: string, body: string, link?: string) {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    const notif = new Notification(title, {
+      body,
+      icon: "/favicon.ico",
+      tag: "crm-meeting-reminder",
+      requireInteraction: true,
+    });
+    if (link) {
+      notif.onclick = () => {
+        window.focus();
+        if (link.startsWith("http")) {
+          window.open(link, "_blank");
+        } else {
+          window.location.href = link;
+        }
+        notif.close();
+      };
+    }
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission();
+  }
+}
+
+// Track which notifications we already alerted for (to avoid repeat alerts on re-render)
+const alertedNotificationIds = new Set<number>();
+
+export default function NotificationCenter({ isRTL, primaryColor }: Props) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const { data: unreadCount = 0 } = trpc.inAppNotifications.unreadCount.useQuery(undefined, {
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  const { data: notifications = [], refetch } = trpc.inAppNotifications.list.useQuery(
+    { limit: 30 },
+    { refetchInterval: 15000 } // Always poll so we can detect new meeting reminders
+  );
+
+  const markRead = trpc.inAppNotifications.markRead.useMutation({
+    onSuccess: () => refetch(),
+  });
+
+  const markAllRead = trpc.inAppNotifications.markAllRead.useMutation({
+    onSuccess: () => refetch(),
+  });
+
+  // Request browser notification permission on mount
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // ─── Handle new meeting_reminder notifications with sound + popup ──────
+  useEffect(() => {
+    if (!notifications || notifications.length === 0) return;
+
+    for (const notif of notifications) {
+      // Only process unread meeting reminders we haven't alerted for yet
+      if (
+        notif.type === "meeting_reminder" &&
+        !notif.isRead &&
+        !alertedNotificationIds.has(notif.id)
+      ) {
+        alertedNotificationIds.add(notif.id);
+
+        const meta = notif.metadata as any;
+        const soundEnabled = meta?.soundEnabled ?? true;
+        const popupEnabled = meta?.popupEnabled ?? true;
+
+        if (soundEnabled) {
+          playNotificationSound();
+        }
+
+        if (popupEnabled) {
+          const title = isRTL ? (notif.titleAr || notif.title) : notif.title;
+          const body = isRTL ? (notif.bodyAr || notif.body || "") : (notif.body || "");
+          showBrowserNotification(title, body, notif.link || undefined);
+        }
+      }
+    }
+  }, [notifications, isRTL]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const handleNotificationClick = (notif: any) => {
+    if (!notif.isRead) {
+      markRead.mutate({ id: notif.id });
+    }
+    if (notif.link) {
+      if (notif.link.startsWith("http")) {
+        window.open(notif.link, "_blank");
+      } else {
+        window.location.href = notif.link;
+      }
+    }
+    setOpen(false);
+  };
+
+  const formatTime = (date: string | Date) => {
+    try {
+      return formatDistanceToNow(new Date(date), {
+        addSuffix: true,
+        locale: isRTL ? ar : undefined,
+      });
+    } catch {
+      return "";
+    }
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      {/* Bell Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="relative h-8 w-8"
+        onClick={() => setOpen(!open)}
+      >
+        <Bell size={16} />
+        {unreadCount > 0 && (
+          <span
+            className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 text-[10px] rounded-full flex items-center justify-center font-bold text-white"
+            style={{ background: primaryColor || "#ef4444" }}
+          >
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
+      </Button>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          className={cn(
+            "absolute top-full mt-2 w-[380px] max-h-[480px] bg-card border border-border rounded-xl shadow-xl z-50 flex flex-col overflow-hidden",
+            isRTL ? "left-0" : "right-0"
+          )}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Bell size={15} />
+              <span className="font-semibold text-sm">
+                {isRTL ? "الإشعارات" : "Notifications"}
+              </span>
+              {unreadCount > 0 && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                  {unreadCount}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              {unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                  onClick={() => markAllRead.mutate()}
+                  disabled={markAllRead.isPending}
+                >
+                  <CheckCheck size={12} />
+                  {isRTL ? "قراءة الكل" : "Mark all read"}
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setOpen(false)}
+              >
+                <X size={14} />
+              </Button>
+            </div>
+          </div>
+
+          {/* Notifications List */}
+          <div className="flex-1 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <Bell size={32} className="mb-3 opacity-20" />
+                <p className="text-sm">{isRTL ? "لا توجد إشعارات" : "No notifications yet"}</p>
+              </div>
+            ) : (
+              notifications.map((notif: any) => (
+                <div
+                  key={notif.id}
+                  className={cn(
+                    "flex gap-3 px-4 py-3 border-b border-border/50 cursor-pointer transition-colors hover:bg-muted/50",
+                    !notif.isRead && (typeBgColors[notif.type] || "bg-blue-50/50 dark:bg-blue-950/20")
+                  )}
+                  onClick={() => handleNotificationClick(notif)}
+                >
+                  {/* Icon */}
+                  <div className="mt-0.5 shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+                    {typeIcons[notif.type] || typeIcons.system}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <p className={cn("text-sm leading-snug", !notif.isRead && "font-semibold")}>
+                      {isRTL ? (notif.titleAr || notif.title) : notif.title}
+                    </p>
+                    {(notif.body || notif.bodyAr) && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                        {isRTL ? (notif.bodyAr || notif.body) : notif.body}
+                      </p>
+                    )}
+                    <p className="text-[10px] text-muted-foreground/60 mt-1">
+                      {formatTime(notif.createdAt)}
+                    </p>
+                  </div>
+
+                  {/* Unread indicator */}
+                  {!notif.isRead && (
+                    <div className="mt-2 shrink-0">
+                      <div className="w-2 h-2 rounded-full" style={{ background: primaryColor || "#3b82f6" }} />
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

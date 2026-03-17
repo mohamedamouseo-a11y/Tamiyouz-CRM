@@ -1,0 +1,258 @@
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import CRMLayout from "@/components/CRMLayout";
+import { trpc } from "@/lib/trpc";
+import { Users, TrendingUp, DollarSign, Activity, AlertTriangle, BarChart2 } from "lucide-react";
+
+const COLORS = ["#10b981", "#f59e0b", "#ef4444"];
+
+const CUSTOM_TOOLTIP_STYLE = {
+  backgroundColor: "rgba(15, 23, 42, 0.9)",
+  border: "1px solid rgba(99, 102, 241, 0.3)",
+  borderRadius: "12px",
+  color: "#f1f5f9",
+  fontSize: "12px",
+  padding: "10px 14px",
+  backdropFilter: "blur(8px)",
+};
+
+const TOOLTIP_ITEM_STYLE = {
+  color: "#f1f5f9",
+  fontSize: "12px",
+  fontWeight: 500,
+};
+
+const TOOLTIP_LABEL_STYLE = {
+  color: "#94a3b8",
+  fontSize: "11px",
+  fontWeight: 600,
+  marginBottom: "4px",
+};
+
+function KpiCard({
+  title,
+  value,
+  suffix = "",
+  icon: Icon,
+  gradient,
+}: {
+  title: string;
+  value: string | number;
+  suffix?: string;
+  icon: React.ElementType;
+  gradient: string;
+}) {
+  return (
+    <div className={`relative overflow-hidden rounded-2xl p-5 shadow-sm border border-white/10 ${gradient}`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-medium text-white/70">{title}</p>
+          <p className="mt-2 text-3xl font-bold text-white">
+            {value}
+            {suffix && <span className="text-xl ml-0.5">{suffix}</span>}
+          </p>
+        </div>
+        <div className="rounded-xl bg-white/20 p-2.5">
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+      </div>
+      <div className="absolute -bottom-4 -right-4 h-20 w-20 rounded-full bg-white/5" />
+      <div className="absolute -bottom-8 -right-8 h-28 w-28 rounded-full bg-white/5" />
+    </div>
+  );
+}
+
+function SectionCard({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon?: React.ElementType }) {
+  return (
+    <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center gap-2.5 px-5 py-4 border-b border-slate-100">
+        {Icon && (
+          <div className="rounded-lg bg-violet-50 p-1.5">
+            <Icon className="h-4 w-4 text-violet-600" />
+          </div>
+        )}
+        <h2 className="text-base font-semibold text-slate-800">{title}</h2>
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+}
+
+function HealthBadge({ score }: { score: number }) {
+  const cls =
+    score >= 70
+      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : score >= 40
+      ? "bg-amber-50 text-amber-700 border-amber-200"
+      : "bg-red-50 text-red-700 border-red-200";
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${cls}`}>
+      {score}
+    </span>
+  );
+}
+
+function PipelineBadge({ value, type }: { value: number; type: string }) {
+  const map: Record<string, string> = {
+    Pending: "bg-amber-50 text-amber-700",
+    InProgress: "bg-blue-50 text-blue-700",
+    Renewed: "bg-emerald-50 text-emerald-700",
+    Churned: "bg-red-50 text-red-700",
+  };
+  const cls = map[type] ?? "bg-slate-50 text-slate-600";
+  return (
+    <span className={`inline-flex items-center justify-center rounded-lg px-2.5 py-1 text-xs font-semibold min-w-[32px] ${cls}`}>
+      {value}
+    </span>
+  );
+}
+
+export default function AMLeadDashboard() {
+  const { data, isLoading } = trpc.amDashboard.getLeadStats.useQuery();
+
+  return (
+    <CRMLayout title="Team Dashboard">
+      <div className="p-6 space-y-6">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <KpiCard title="Total Active Clients" value={data?.kpis.totalActiveClients ?? 0} icon={Users} gradient="bg-gradient-to-br from-violet-600 to-indigo-700" />
+          <KpiCard title="Team Renewal Rate" value={data?.kpis.teamRenewalRate ?? 0} suffix="%" icon={TrendingUp} gradient="bg-gradient-to-br from-emerald-500 to-teal-600" />
+          <KpiCard title="Total Contract Value" value={Number(data?.kpis.totalContractValue ?? 0).toLocaleString()} icon={DollarSign} gradient="bg-gradient-to-br from-amber-500 to-orange-600" />
+          <KpiCard title="Team Avg. Health" value={data?.kpis.teamAvgHealthScore ?? 0} icon={Activity} gradient="bg-gradient-to-br from-sky-500 to-blue-600" />
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <SectionCard title="Team Performance" icon={BarChart2}>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data?.charts.teamPerformance ?? []} barSize={20} barGap={4}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" allowDecimals={false} tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={CUSTOM_TOOLTIP_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} cursor={{ fill: "rgba(99,102,241,0.05)" }} />
+                  <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ color: "#64748b", fontSize: "12px" }}>{v}</span>} />
+                  <Bar yAxisId="left" dataKey="activeClients" name="Active Clients" radius={[6, 6, 0, 0]} fill="url(#blueGrad)" />
+                  <Bar yAxisId="right" dataKey="renewalRate" name="Renewal Rate %" radius={[6, 6, 0, 0]} fill="url(#greenGrad)" />
+                  <defs>
+                    <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#6366f1" />
+                      <stop offset="100%" stopColor="#818cf8" />
+                    </linearGradient>
+                    <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="100%" stopColor="#34d399" />
+                    </linearGradient>
+                  </defs>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Portfolio Health" icon={Activity}>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={data?.charts.portfolioHealth ?? []}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={70}
+                    outerRadius={110}
+                    paddingAngle={5}
+                    strokeWidth={0}
+                  >
+                    {(data?.charts.portfolioHealth ?? []).map((entry: any, index: number) => (
+                      <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={CUSTOM_TOOLTIP_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} />
+                  <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ color: "#64748b", fontSize: "12px" }}>{v}</span>} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </SectionCard>
+        </div>
+
+        {/* Tables */}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <SectionCard title="High-Risk Clients" icon={AlertTriangle}>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Client</th>
+                    <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Account Manager</th>
+                    <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Health</th>
+                    <th className="pb-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Last Follow-up</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {(data?.tables.highRiskClients ?? []).map((client: any) => (
+                    <tr key={client.clientId} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3 pr-4 font-medium text-slate-800">{client.clientName}</td>
+                      <td className="py-3 pr-4 text-slate-500">{client.accountManager}</td>
+                      <td className="py-3 pr-4"><HealthBadge score={client.healthScore} /></td>
+                      <td className="py-3 text-slate-500">
+                        {client.lastFollowUp ? new Date(client.lastFollowUp).toLocaleDateString() : (
+                          <span className="text-red-400 text-xs font-medium">No follow-up</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {!isLoading && (data?.tables.highRiskClients?.length ?? 0) === 0 && (
+                    <tr>
+                      <td colSpan={4} className="py-10 text-center">
+                        <div className="flex flex-col items-center gap-2 text-slate-400">
+                          <AlertTriangle className="h-8 w-8 opacity-30" />
+                          <span className="text-sm">No high-risk clients</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Team Renewal Pipeline" icon={TrendingUp}>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="pb-3 pr-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Account Manager</th>
+                    <th className="pb-3 pr-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-400">Pending</th>
+                    <th className="pb-3 pr-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-400">In Progress</th>
+                    <th className="pb-3 pr-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-400">Renewed</th>
+                    <th className="pb-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-400">Churned</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {(data?.tables.teamRenewalPipelineSummary ?? []).map((row: any) => (
+                    <tr key={row.accountManager} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3 pr-4 font-medium text-slate-800">{row.accountManager}</td>
+                      <td className="py-3 pr-2 text-center"><PipelineBadge value={row.Pending} type="Pending" /></td>
+                      <td className="py-3 pr-2 text-center"><PipelineBadge value={row.InProgress} type="InProgress" /></td>
+                      <td className="py-3 pr-2 text-center"><PipelineBadge value={row.Renewed} type="Renewed" /></td>
+                      <td className="py-3 text-center"><PipelineBadge value={row.Churned} type="Churned" /></td>
+                    </tr>
+                  ))}
+                  {!isLoading && (data?.tables.teamRenewalPipelineSummary?.length ?? 0) === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-10 text-center">
+                        <div className="flex flex-col items-center gap-2 text-slate-400">
+                          <BarChart2 className="h-8 w-8 opacity-30" />
+                          <span className="text-sm">No pipeline data available</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
+        </div>
+      </div>
+    </CRMLayout>
+  );
+}

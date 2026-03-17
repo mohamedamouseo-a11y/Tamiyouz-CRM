@@ -1,0 +1,9 @@
+{
+  "query": "\nINSERT INTO pipeline_stages (name, nameAr, color, `order`, isDefault) VALUES\n('New', 'جديد', '#6366f1', 1, true),\n('Contacted', 'تم التواصل', '#3b82f6', 2, false),\n('Meeting', 'اجتماع', '#f59e0b', 3, false),\n('Offer Sent', 'تم إرسال العرض', '#8b5cf6', 4, false),\n('Won', 'مكتسب', '#22c55e', 5, false),\n('Lost', 'خسارة', '#ef4444', 6, false),\n('Follow Up', 'متابعة', '#06b6d4', 7, false);\n\nINSERT INTO sla_config (hoursThreshold, isEnabled) VALUES (24, true);\n\nINSERT INTO theme_settings (`key`, `value`) VALUES\n('primaryColor', '#1e3a5f'),\n('accentColor', '#f97316'),\n('successColor', '#22c55e'),\n('fontFamily', 'Cairo'),\n('logoUrl', ''),\n('appName', 'Tamiyouz CRM'),\n('appNameAr', 'تميز CRM');\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user fgVDoa92CjzK918.root --database fNcEvLVXNRSDZsrJXgGzZW --execute \nINSERT INTO pipeline_stages (name, nameAr, color, `order`, isDefault) VALUES\n('New', 'جديد', '#6366f1', 1, true),\n('Contacted', 'تم التواصل', '#3b82f6', 2, false),\n('Meeting', 'اجتماع', '#f59e0b', 3, false),\n('Offer Sent', 'تم إرسال العرض', '#8b5cf6', 4, false),\n('Won', 'مكتسب', '#22c55e', 5, false),\n('Lost', 'خسارة', '#ef4444', 6, false),\n('Follow Up', 'متابعة', '#06b6d4', 7, false);\n\nINSERT INTO sla_config (hoursThreshold, isEnabled) VALUES (24, true);\n\nINSERT INTO theme_settings (`key`, `value`) VALUES\n('primaryColor', '#1e3a5f'),\n('accentColor', '#f97316'),\n('successColor', '#22c55e'),\n('fontFamily', 'Cairo'),\n('logoUrl', ''),\n('appName', 'Tamiyouz CRM'),\n('appNameAr', 'تميز CRM');\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 2101
+}

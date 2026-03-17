@@ -1,0 +1,9 @@
+{
+  "query": "\nINSERT INTO users (openId, name, email, loginMethod, role, isActive, passwordHash, lastSignedIn, createdAt, updatedAt)\nVALUES (\n  'local_admin_tamiyouz',\n  'Mohamed Amou',\n  'mohamedamou.seo@gmail.com',\n  'email',\n  'Admin',\n  1,\n  '$2b$12$Z3zBsrtf8wi50MvTJa1K1Ob.w7QPCsiMYEGUTLHszlFaGGQQv0212',\n  NOW(),\n  NOW(),\n  NOW()\n)\nON DUPLICATE KEY UPDATE\n  name = 'Mohamed Amou',\n  role = 'Admin',\n  isActive = 1,\n  passwordHash = '$2b$12$Z3zBsrtf8wi50MvTJa1K1Ob.w7QPCsiMYEGUTLHszlFaGGQQv0212',\n  updatedAt = NOW();\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user fgVDoa92CjzK918.root --database fNcEvLVXNRSDZsrJXgGzZW --execute \nINSERT INTO users (openId, name, email, loginMethod, role, isActive, passwordHash, lastSignedIn, createdAt, updatedAt)\nVALUES (\n  'local_admin_tamiyouz',\n  'Mohamed Amou',\n  'mohamedamou.seo@gmail.com',\n  'email',\n  'Admin',\n  1,\n  '$2b$12$Z3zBsrtf8wi50MvTJa1K1Ob.w7QPCsiMYEGUTLHszlFaGGQQv0212',\n  NOW(),\n  NOW(),\n  NOW()\n)\nON DUPLICATE KEY UPDATE\n  name = 'Mohamed Amou',\n  role = 'Admin',\n  isActive = 1,\n  passwordHash = '$2b$12$Z3zBsrtf8wi50MvTJa1K1Ob.w7QPCsiMYEGUTLHszlFaGGQQv0212',\n  updatedAt = NOW();\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1505
+}

@@ -1,0 +1,345 @@
+import { useAuth } from "@/_core/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useThemeTokens } from "@/contexts/ThemeTokenContext";
+import { trpc } from "@/lib/trpc";
+import { getLoginUrl } from "@/const";
+import {
+  BarChart3,
+  Bell,
+  Briefcase,
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  FileSpreadsheet,
+  Globe,
+  LayoutDashboard,
+  LogOut,
+  Megaphone,
+  Menu,
+  Settings,
+  Trash2,
+  Users,
+  X,
+  Zap,
+  Calendar,
+  Filter,
+  Activity,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "wouter";
+import { cn } from "@/lib/utils";
+import NotificationCenter from "@/components/NotificationCenter";
+
+interface NavItem {
+  href: string;
+  labelKey: string;
+  icon: React.ReactNode;
+  roles?: string[];
+  badge?: number;
+}
+
+export default function CRMLayout({ children }: { children: React.ReactNode }) {
+  const { user, loading, isAuthenticated } = useAuth();
+  const { t, lang, setLang, isRTL } = useLanguage();
+  const { tokens } = useThemeTokens();
+  const [location, navigate] = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const logout = trpc.auth.logout.useMutation({
+    onSuccess: () => { window.location.href = "/login"; },
+  });
+
+  // SLA badge count
+  const { data: slaLeads } = trpc.leads.list.useQuery(
+    { slaBreached: true, limit: 1 },
+    { enabled: isAuthenticated }
+  );
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      window.location.href = getLoginUrl();
+    }
+  }, [loading, isAuthenticated]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground text-sm">{t("loading")}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) return null;
+
+  const role = user?.role ?? "SalesAgent";
+
+  const navItems: NavItem[] = [
+    {
+      href: "/dashboard",
+      labelKey: "dashboard",
+      icon: <LayoutDashboard size={18} />,
+    },
+    {
+      href: "/team-dashboard",
+      labelKey: "teamDashboard",
+      icon: <BarChart3 size={18} />,
+      roles: ["Admin", "SalesManager", "admin"],
+    },
+    {
+      href: "/sales-funnel",
+      labelKey: "salesFunnel",
+      icon: <Filter size={18} />,
+      roles: ["Admin", "SalesManager", "admin", "SalesAgent"],
+    },
+    {
+      href: "/task-sla",
+      labelKey: "taskSla",
+      icon: <ClipboardList size={18} />,
+      roles: ["Admin", "SalesManager", "admin", "SalesAgent"],
+    },
+    {
+      href: "/leads",
+      labelKey: "leads",
+      icon: <Users size={18} />,
+      badge: slaLeads?.total && slaLeads.total > 0 ? slaLeads.total : undefined,
+    },
+    {
+      href: "/campaigns",
+      labelKey: "campaigns",
+      icon: <Megaphone size={18} />,
+    },
+    {
+      href: "/campaign-analytics",
+      labelKey: "campaignAnalytics",
+      icon: <BarChart3 size={18} />,
+      roles: ["Admin", "SalesManager", "admin", "MediaBuyer"],
+    },
+    {
+      href: "/calendar",
+      labelKey: "calendar",
+      icon: <Calendar size={18} />,
+    },
+    {
+      href: "/clients",
+      labelKey: "clientPool",
+      icon: <Briefcase size={18} />,
+      roles: ["Admin", "admin", "AccountManager", "AccountManagerLead", "SalesManager"],
+    },
+    {
+      href: "/renewals",
+      labelKey: "renewals",
+      icon: <Activity size={18} />,
+      roles: ["Admin", "admin", "AccountManager", "AccountManagerLead"],
+    },
+    {
+      href: "/import",
+      labelKey: "importLeads",
+      icon: <FileSpreadsheet size={18} />,
+      roles: ["Admin", "admin"],
+    },
+    {
+      href: "/trash",
+      labelKey: "trash",
+      icon: <Trash2 size={18} />,
+      roles: ["Admin", "admin"],
+    },
+    {
+      href: "/audit-log",
+      labelKey: "auditLog",
+      icon: <ClipboardList size={18} />,
+      roles: ["Admin", "admin"],
+    },
+    {
+      href: "/admin",
+      labelKey: "settings",
+      icon: <Settings size={18} />,
+      roles: ["Admin", "admin"],
+    },
+  ];
+
+  const visibleNavItems = navItems.filter(
+    (item) => !item.roles || item.roles.includes(role)
+  );
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border">
+        {tokens.logoUrl ? (
+          <img src={tokens.logoUrl} alt="Logo" className="h-8 w-auto" />
+        ) : (
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+            style={{ background: tokens.accentColor }}
+          >
+            T
+          </div>
+        )}
+        {sidebarOpen && (
+          <div className="flex flex-col">
+            <span className="font-bold text-sidebar-foreground text-sm leading-tight">
+              {lang === "ar" ? tokens.appNameAr : tokens.appName}
+            </span>
+            <span className="text-xs text-sidebar-foreground/60">{t("tagline")}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+        {visibleNavItems.map((item) => {
+          const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+          return (
+            <Link key={item.href} href={item.href}>
+              <div
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                  !sidebarOpen && "justify-center px-2"
+                )}
+                onClick={() => setMobileOpen(false)}
+              >
+                <span className="shrink-0">{item.icon}</span>
+                {sidebarOpen && (
+                  <span className="flex-1 truncate">{t(item.labelKey as any)}</span>
+                )}
+                {sidebarOpen && item.badge && (
+                  <Badge variant="destructive" className="text-xs px-1.5 py-0 h-5">
+                    {item.badge}
+                  </Badge>
+                )}
+              </div>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* User Info */}
+      <div className="border-t border-sidebar-border p-3">
+        <div className={cn("flex items-center gap-2", !sidebarOpen && "justify-center")}>
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0"
+            style={{ background: tokens.primaryColor }}
+          >
+            {user?.name?.[0]?.toUpperCase() ?? "U"}
+          </div>
+          {sidebarOpen && (
+            <div className="flex-1 min-w-0">
+              <p className="text-sidebar-foreground text-sm font-medium truncate">{user?.name}</p>
+              <p className="text-sidebar-foreground/60 text-xs truncate">{t(role as any)}</p>
+            </div>
+          )}
+          {sidebarOpen && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+              onClick={() => logout.mutate()}
+            >
+              <LogOut size={14} />
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen bg-background overflow-hidden" dir={isRTL ? "rtl" : "ltr"}>
+      {/* Desktop Sidebar */}
+      <aside
+        className={cn(
+          "hidden md:flex flex-col bg-sidebar transition-all duration-300 shrink-0",
+          sidebarOpen ? "w-60" : "w-16"
+        )}
+      >
+        <SidebarContent />
+        {/* Collapse Toggle */}
+        <button
+          className={cn(
+            "absolute top-20 z-10 w-5 h-5 rounded-full bg-sidebar border border-sidebar-border flex items-center justify-center text-sidebar-foreground/60 hover:text-sidebar-foreground transition-all",
+            isRTL
+              ? sidebarOpen ? "left-[14.5rem]" : "left-[3.5rem]"
+              : sidebarOpen ? "right-[-0.625rem]" : "right-[-0.625rem]"
+          )}
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+        >
+          {isRTL
+            ? sidebarOpen ? <ChevronRight size={12} /> : <ChevronLeft size={12} />
+            : sidebarOpen ? <ChevronLeft size={12} /> : <ChevronRight size={12} />}
+        </button>
+      </aside>
+
+      {/* Mobile Sidebar Overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
+          <aside
+            className={cn(
+              "absolute top-0 h-full w-64 bg-sidebar flex flex-col",
+              isRTL ? "right-0" : "left-0"
+            )}
+          >
+            <SidebarContent />
+          </aside>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Bar */}
+        <header className="h-14 border-b border-border bg-card flex items-center px-4 gap-3 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            onClick={() => setMobileOpen(true)}
+          >
+            <Menu size={18} />
+          </Button>
+
+          <div className="flex-1" />
+
+          {/* Language Toggle */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs h-8"
+            onClick={() => setLang(lang === "ar" ? "en" : "ar")}
+          >
+            <Globe size={14} />
+            {lang === "ar" ? "EN" : "عربي"}
+          </Button>
+
+          {/* Notification Center */}
+          <NotificationCenter isRTL={isRTL} primaryColor={tokens.primaryColor} />
+
+          {/* SLA Alert Bell */}
+          {slaLeads && slaLeads.total > 0 && (
+            <Link href="/leads?slaBreached=true">
+              <Button variant="ghost" size="icon" className="relative h-8 w-8">
+                <Bell size={16} />
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center font-bold">
+                  {slaLeads.total > 9 ? "9+" : slaLeads.total}
+                </span>
+              </Button>
+            </Link>
+          )}
+        </header>
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}

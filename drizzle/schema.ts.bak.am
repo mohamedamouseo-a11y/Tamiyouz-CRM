@@ -1,0 +1,391 @@
+import {
+  boolean,
+  decimal,
+  int,
+  json,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/mysql-core";
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+export const users = mysqlTable("users", {
+  id: int("id").autoincrement().primaryKey(),
+  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  name: text("name"),
+  email: varchar("email", { length: 320 }),
+  loginMethod: varchar("loginMethod", { length: 64 }),
+  role: mysqlEnum("role", ["Admin", "SalesManager", "SalesAgent", "MediaBuyer", "user", "admin"])
+    .default("SalesAgent")
+    .notNull(),
+  teamId: int("teamId"),
+  isActive: boolean("isActive").default(true).notNull(),
+  passwordHash: varchar("passwordHash", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  // ── Soft Delete ──
+  deletedAt: timestamp("deletedAt"),
+  deletedBy: int("deletedBy"),
+});
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+
+// ─── Campaigns ────────────────────────────────────────────────────────────────
+export const campaigns = mysqlTable("campaigns", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  platform: mysqlEnum("platform", ["Messages", "LeadForm", "Meta", "Google", "Snapchat", "TikTok", "Other"])
+    .default("Meta")
+    .notNull(),
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+  notes: text("notes"),
+  roundRobinEnabled: boolean("roundRobinEnabled").default(false).notNull(),
+  roundRobinIndex: int("roundRobinIndex").default(0).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  // ── Soft Delete ──
+  deletedAt: timestamp("deletedAt"),
+  deletedBy: int("deletedBy"),
+});
+
+export type Campaign = typeof campaigns.$inferSelect;
+export type InsertCampaign = typeof campaigns.$inferInsert;
+
+// ─── Pipeline Stages ─────────────────────────────────────────────────────────
+export const pipelineStages = mysqlTable("pipeline_stages", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  nameAr: varchar("nameAr", { length: 100 }),
+  color: varchar("color", { length: 20 }).default("#6366f1").notNull(),
+  order: int("order").default(0).notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PipelineStage = typeof pipelineStages.$inferSelect;
+export type InsertPipelineStage = typeof pipelineStages.$inferInsert;
+
+// ─── Leads ────────────────────────────────────────────────────────────────────
+export const leads = mysqlTable("leads", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }),
+  phone: varchar("phone", { length: 30 }).notNull(),
+  country: varchar("country", { length: 100 }).default("Saudi Arabia"),
+  businessProfile: text("businessProfile"),
+  leadQuality: mysqlEnum("leadQuality", ["Hot", "Warm", "Cold", "Bad", "Unknown"])
+    .default("Unknown")
+    .notNull(),
+campaignName: varchar("campaignName", { length: 255 }),
+  adCreative: varchar("adCreative", { length: 255 }),
+  ownerId: int("ownerId"),
+  stage: varchar("stage", { length: 100 }).default("New").notNull(),
+  notes: text("notes"),
+  mediaBuyerNotes: text("mediaBuyerNotes"),
+  serviceIntroduced: text("serviceIntroduced"),
+  slaBreached: boolean("slaBreached").default(false).notNull(),
+  slaAlertedAt: timestamp("slaAlertedAt"),
+  isDuplicate: boolean("isDuplicate").default(false).notNull(),
+  duplicateOfId: int("duplicateOfId"),
+  // ── New fields for Lead Sources integration ──
+  externalId: varchar("externalId", { length: 255 }),
+  sourceId: int("sourceId"),
+  sourceMetadata: json("sourceMetadata"),
+  customFieldsData: json("customFieldsData"),
+  // ──────────────────────────────────────────────
+  leadTime: timestamp("leadTime"),
+  contactTime: timestamp("contactTime"),
+  priceOfferSent: boolean("priceOfferSent").default(false).notNull(),
+  priceOfferLink: text("priceOfferLink"),
+  priceOfferTime: timestamp("priceOfferTime"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  // ── Soft Delete ──
+  deletedAt: timestamp("deletedAt"),
+  deletedBy: int("deletedBy"),
+});
+
+export type Lead = typeof leads.$inferSelect;
+export type InsertLead = typeof leads.$inferInsert;
+
+// ─── Activities ───────────────────────────────────────────────────────────────
+export const activities = mysqlTable("activities", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("type", ["WhatsApp", "Call", "SMS", "Meeting", "Offer", "Email", "Note"])
+    .notNull(),
+  activityTime: timestamp("activityTime").defaultNow().notNull(),
+  outcome: mysqlEnum("outcome", ["Contacted", "NoAnswer", "Interested", "NotInterested", "Meeting", "Offer", "Won", "Lost", "Callback"])
+    .default("Contacted"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  // ── Soft Delete ──
+  deletedAt: timestamp("deletedAt"),
+  deletedBy: int("deletedBy"),
+});
+
+export type Activity = typeof activities.$inferSelect;
+export type InsertActivity = typeof activities.$inferInsert;
+
+// ─── Deals ────────────────────────────────────────────────────────────────────
+export const deals = mysqlTable("deals", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  valueSar: decimal("valueSar", { precision: 12, scale: 2 }),
+  status: mysqlEnum("status", ["Won", "Lost", "Pending"]).default("Pending").notNull(),
+  closedAt: timestamp("closedAt"),
+  dealType: mysqlEnum("dealType", ["New", "Contract", "Renewal", "Upsell"]).default("New"),
+  lossReason: text("lossReason"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  // ── Soft Delete ──
+  deletedAt: timestamp("deletedAt"),
+  deletedBy: int("deletedBy"),
+});
+
+export type Deal = typeof deals.$inferSelect;
+export type InsertDeal = typeof deals.$inferInsert;
+
+// ─── Custom Fields ────────────────────────────────────────────────────────────
+export const customFields = mysqlTable("custom_fields", {
+  id: int("id").autoincrement().primaryKey(),
+  entity: mysqlEnum("entity", ["Lead", "Deal", "Activity", "Campaign"]).notNull(),
+  fieldName: varchar("fieldName", { length: 100 }).notNull(),
+  fieldLabel: varchar("fieldLabel", { length: 100 }),
+  fieldLabelAr: varchar("fieldLabelAr", { length: 100 }),
+  fieldType: mysqlEnum("fieldType", ["text", "number", "date", "select", "boolean"]).notNull(),
+  options: json("options"),
+  isRequired: boolean("isRequired").default(false).notNull(),
+  order: int("order").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CustomField = typeof customFields.$inferSelect;
+export type InsertCustomField = typeof customFields.$inferInsert;
+
+// ─── Theme Settings ───────────────────────────────────────────────────────────
+export const themeSettings = mysqlTable("theme_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ThemeSetting = typeof themeSettings.$inferSelect;
+export type InsertThemeSetting = typeof themeSettings.$inferInsert;
+
+// ─── SLA Config ───────────────────────────────────────────────────────────────
+export const slaConfig = mysqlTable("sla_config", {
+  id: int("id").autoincrement().primaryKey(),
+  hoursThreshold: int("hoursThreshold").default(24).notNull(),
+  isEnabled: boolean("isEnabled").default(true).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SlaConfig = typeof slaConfig.$inferSelect;
+
+// ─── Password Reset Tokens ────────────────────────────────────────────────────
+export const passwordResetTokens = mysqlTable("password_reset_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
+
+// ─── Notification Subscribers ─────────────────────────────────────────────────
+export const notificationSubscribers = mysqlTable("notification_subscribers", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  name: varchar("name", { length: 255 }),
+  frequency: mysqlEnum("frequency", ["daily", "weekly"]).default("daily").notNull(),
+  dayOfWeek: int("dayOfWeek").default(1), // 0=Sun, 1=Mon ... 6=Sat (for weekly)
+  hourOfDay: int("hourOfDay").default(8), // 0-23 UTC hour to send
+  isActive: boolean("isActive").default(true).notNull(),
+  reportTypes: json("reportTypes").$type<string[]>().default(["sla", "performance", "deals"]),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type NotificationSubscriber = typeof notificationSubscribers.$inferSelect;
+export type InsertNotificationSubscriber = typeof notificationSubscribers.$inferInsert;
+
+// ─── Lead Sources (Google Sheets Integration) ─────────────────────────────────
+export const leadSources = mysqlTable("lead_sources", {
+  id: int("id").autoincrement().primaryKey(),
+  sourceName: varchar("sourceName", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["Connected", "PermissionMissing", "MappingError", "Disabled"])
+    .default("Disabled")
+    .notNull(),
+  isEnabled: boolean("isEnabled").default(false).notNull(),
+  sheetUrl: text("sheetUrl"),
+  spreadsheetId: varchar("spreadsheetId", { length: 255 }),
+  worksheetMode: mysqlEnum("worksheetMode", ["pick", "all"]).default("pick").notNull(),
+  worksheetName: varchar("worksheetName", { length: 255 }),
+  syncFrequencyMinutes: int("syncFrequencyMinutes").default(5).notNull(),
+  uniqueKeyPriority: mysqlEnum("uniqueKeyPriority", ["meta_lead_id", "phone"])
+    .default("meta_lead_id")
+    .notNull(),
+  assignmentRule: mysqlEnum("assignmentRule", ["round_robin", "fixed_owner", "by_campaign"])
+    .default("round_robin")
+    .notNull(),
+  fixedOwnerId: int("fixedOwnerId"),
+  fieldMapping: json("fieldMapping").$type<Record<string, string>>(),
+  lastSyncTime: timestamp("lastSyncTime"),
+  lastSyncResult: text("lastSyncResult"),
+  lastSyncRowCount: int("lastSyncRowCount").default(0),
+  lastSyncCursor: varchar("lastSyncCursor", { length: 255 }),
+  isDeleted: boolean("isDeleted").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type LeadSource = typeof leadSources.$inferSelect;
+export type InsertLeadSource = typeof leadSources.$inferInsert;
+
+// ─── Lead Source Sync Log ─────────────────────────────────────────────────────
+export const leadSourceSyncLog = mysqlTable("lead_source_sync_log", {
+  id: int("id").autoincrement().primaryKey(),
+  sourceId: int("sourceId").notNull(),
+  status: mysqlEnum("status", ["success", "error", "partial"]).notNull(),
+  rowsProcessed: int("rowsProcessed").default(0),
+  rowsImported: int("rowsImported").default(0),
+  rowsSkipped: int("rowsSkipped").default(0),
+  rowsError: int("rowsError").default(0),
+  errorMessage: text("errorMessage"),
+  details: json("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type LeadSourceSyncLog = typeof leadSourceSyncLog.$inferSelect;
+export type InsertLeadSourceSyncLog = typeof leadSourceSyncLog.$inferInsert;
+
+
+// ─── Backup Logs ──────────────────────────────────────────────────────────────
+export const backupLogs = mysqlTable("backup_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  triggeredBy: int("triggeredBy").notNull(), // User ID
+  startDate: timestamp("startDate").notNull(),
+  endDate: timestamp("endDate").notNull(),
+  format: mysqlEnum("format", ["json", "csv", "both"]).notNull(),
+  fileName: varchar("fileName", { length: 255 }).notNull(),
+  fileSize: decimal("fileSize", { precision: 15, scale: 0 }), // in bytes
+  driveFileId: varchar("driveFileId", { length: 255 }), // For future Google Drive integration
+  cleanupEnabled: boolean("cleanupEnabled").default(false).notNull(),
+  cleanupStatus: mysqlEnum("cleanupStatus", ["pending", "completed", "failed"]).default("pending"),
+  status: mysqlEnum("status", ["success", "partial", "error"]).notNull(),
+  recordCount: json("recordCount").$type<{
+    leads: number;
+    deals: number;
+    activities: number;
+  }>(),
+  recordsSkipped: json("recordsSkipped").$type<{
+    leads: number;
+    deals: number;
+    activities: number;
+  }>(),
+  errorLog: text("errorLog"), // JSON stringified array of errors
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type BackupLog = typeof backupLogs.$inferSelect;
+export type InsertBackupLog = typeof backupLogs.$inferInsert;
+
+// ─── Internal Notes ──────────────────────────────────────────────────────────
+export const internalNotes = mysqlTable("internal_notes", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  userId: int("userId").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  // ── Soft Delete ──
+  deletedAt: timestamp("deletedAt"),
+  deletedBy: int("deletedBy"),
+});
+
+export type InternalNote = typeof internalNotes.$inferSelect;
+export type InsertInternalNote = typeof internalNotes.$inferInsert;
+
+// ─── Lead Transfers ──────────────────────────────────────────────────────────
+export const leadTransfers = mysqlTable("lead_transfers", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  fromUserId: int("fromUserId").notNull(),
+  toUserId: int("toUserId").notNull(),
+  reason: text("reason"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type LeadTransfer = typeof leadTransfers.$inferSelect;
+export type InsertLeadTransfer = typeof leadTransfers.$inferInsert;
+
+// ─── Chat Messages ───────────────────────────────────────────────────────────
+export const chatMessages = mysqlTable("chat_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  fromUserId: int("fromUserId").notNull(),
+  toUserId: int("toUserId"),
+  roomId: varchar("roomId", { length: 255 }),
+  content: text("content").notNull(),
+  isRead: boolean("isRead").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  // ── Soft Delete ──
+  deletedAt: timestamp("deletedAt"),
+  deletedBy: int("deletedBy"),
+});
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;
+
+// ─── Audit Logs ──────────────────────────────────────────────────────────────
+export const auditLogs = mysqlTable("audit_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  userName: varchar("userName", { length: 255 }),
+  userRole: varchar("userRole", { length: 64 }),
+  action: varchar("action", { length: 64 }).notNull(),
+  entityType: varchar("entityType", { length: 64 }).notNull(),
+  entityId: int("entityId").notNull(),
+  entityName: varchar("entityName", { length: 255 }),
+  details: json("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+// ─── In-App Notifications ───────────────────────────────────────────────────
+export const inAppNotifications = mysqlTable("in_app_notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("type", ["meeting_reminder", "lead_assigned", "sla_breach", "lead_transfer", "mention", "system", "stage_change", "deal_won", "deal_lost", "activity_logged", "lead_quality_change", "duplicate_lead", "bulk_import"])
+    .default("system")
+    .notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  titleAr: varchar("titleAr", { length: 500 }),
+  body: text("body"),
+  bodyAr: text("bodyAr"),
+  isRead: boolean("isRead").default(false).notNull(),
+  link: varchar("link", { length: 500 }),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InAppNotification = typeof inAppNotifications.$inferSelect;
+export type InsertInAppNotification = typeof inAppNotifications.$inferInsert;

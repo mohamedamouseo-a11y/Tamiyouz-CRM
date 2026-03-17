@@ -1,0 +1,1 @@
+ALTER TABLE `pipeline_stages` ADD `isActive` boolean DEFAULT true NOT NULL;

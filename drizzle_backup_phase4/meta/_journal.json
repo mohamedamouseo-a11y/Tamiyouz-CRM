@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1771795798039,
+      "tag": "0000_little_mockingbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1771795944524,
+      "tag": "0001_amused_human_fly",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1771798199210,
+      "tag": "0002_wonderful_cyclops",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1771799493119,
+      "tag": "0003_organic_mandrill",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1771850706296,
+      "tag": "0004_dry_scarecrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1771851662093,
+      "tag": "0005_lucky_khan",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1771952219558,
+      "tag": "0006_medical_vision",
+      "breakpoints": true
+    }
+  ]
+}

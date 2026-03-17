@@ -1,0 +1,153 @@
+import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { backupService } from "./services/BackupService.js";
+import { restoreService } from "./services/RestoreService.js";
+import { archiveService } from "./services/ArchiveService.js";
+import { getDb } from "./db.js";
+import { backupLogs } from "../drizzle/schema.js";
+
+export const createBackupProcedure = async (input: {
+  startDate: string;
+  endDate: string;
+  format: "json" | "csv" | "both";
+  confirmed?: boolean;
+}, userId: number) => {
+  const start = new Date(input.startDate);
+  const end = new Date(input.endDate);
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    throw new Error("Invalid date format");
+  }
+
+  if (start > end) {
+    throw new Error("startDate must be before endDate");
+  }
+
+  // Check if range is more than 1 year
+  const daysDiff = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+  if (daysDiff > 365 && !input.confirmed) {
+    throw new Error(
+      `Date range exceeds 1 year (${Math.round(daysDiff)} days). Please confirm by setting confirmed: true`
+    );
+  }
+
+  // Generate backup
+  const backupResults = await backupService.generateBackup({
+    startDate: start,
+    endDate: end,
+    format: input.format,
+    includeCustomFields: true,
+  });
+
+  // Log backup operation
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+  
+  for (const result of backupResults) {
+    await db.insert(backupLogs).values({
+      triggeredBy: userId,
+      startDate: start,
+      endDate: end,
+      format: result.format as "json" | "csv" | "both",
+      fileName: result.fileName,
+      fileSize: String(result.fileSize),
+      cleanupEnabled: false,
+      cleanupStatus: "pending",
+      status: "success",
+      recordCount: result.recordCount,
+      recordsSkipped: { leads: 0, deals: 0, activities: 0 },
+    });
+  }
+
+  return {
+    success: true,
+    message: "Backup generated successfully",
+    backups: backupResults.map((r) => ({
+      fileName: r.fileName,
+      fileSize: r.fileSize,
+      format: r.format,
+      recordCount: r.recordCount,
+      downloadUrl: `/admin/backup/download/${r.fileName}`,
+    })),
+  };
+};
+
+export const getBackupsProcedure = async () => {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+  const backups = await db.select().from(backupLogs).orderBy(backupLogs.createdAt);
+
+  return backups.map((b) => ({
+    id: b.id,
+    fileName: b.fileName,
+    fileSize: Number(b.fileSize) || 0,
+    format: b.format,
+    startDate: b.startDate,
+    endDate: b.endDate,
+    status: b.status,
+    recordCount: b.recordCount,
+    createdAt: b.createdAt,
+    triggeredBy: b.triggeredBy,
+  }));
+};
+
+export const deleteBackupProcedure = async (id: number) => {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+  const backup = await db.select().from(backupLogs).where(eq(backupLogs.id, id));
+
+  if (backup.length === 0) {
+    throw new Error("Backup not found");
+  }
+
+  // Delete the backup file if it exists
+  try {
+    await backupService.deleteBackup(backup[0].fileName);
+  } catch (error) {
+    console.warn("Could not delete backup file:", error);
+  }
+
+  // Delete the backup log entry
+  const db2 = await getDb();
+  if (!db2) throw new Error("Database connection failed");
+  await db2.delete(backupLogs).where(eq(backupLogs.id, id));
+
+  return {
+    success: true,
+    message: "Backup deleted successfully",
+  };
+};
+
+
+
+export const archiveDataProcedure = async (input: {
+  startDate: string;
+  endDate: string;
+  cleanupMode: "archive" | "delete";
+  dryRun?: boolean;
+}) => {
+  const start = new Date(input.startDate);
+  const end = new Date(input.endDate);
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    throw new Error("Invalid date format");
+  }
+
+  if (start > end) {
+    throw new Error("startDate must be before endDate");
+  }
+
+  const result = await archiveService.archiveData({
+    startDate: start,
+    endDate: end,
+    cleanupMode: input.cleanupMode,
+    dryRun: input.dryRun,
+  });
+
+  return result;
+};
+
+export const getArchiveStatsProcedure = async () => {
+  const stats = await archiveService.getArchiveStats();
+  return stats;
+};
