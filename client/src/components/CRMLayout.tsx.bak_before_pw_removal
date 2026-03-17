@@ -31,14 +31,17 @@ import {
   Activity,
   Moon,
   Sun,
+  Key,
   ChevronUp,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import NotificationCenter from "@/components/NotificationCenter";
 import RakanWidget from "@/components/RakanWidget";
 
@@ -58,7 +61,41 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
-
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  
+  const changePasswordMutation = trpc.changePassword.useMutation({
+    onSuccess: () => {
+      toast.success("تم تغيير كلمة المرور بنجاح");
+      setShowPasswordDialog(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordError("");
+    },
+    onError: (error) => {
+      setPasswordError(error.message || "حدث خطأ أثناء تغيير كلمة المرور");
+    },
+  });
+  const handleChangePassword = () => {
+    setPasswordError("");
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError("يرجى ملء جميع الحقول");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError("كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("كلمة المرور الجديدة غير متطابقة");
+      return;
+    }
+    changePasswordMutation.mutate({ currentPassword, newPassword });
+  };
   const logout = trpc.auth.logout.useMutation({
     onSuccess: () => { window.location.href = "/login"; },
   });
@@ -315,6 +352,11 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="end" className="w-48">
+                <DropdownMenuItem onClick={() => setShowPasswordDialog(true)}>
+                  <Key className="mr-2 h-4 w-4" />
+                  تغيير كلمة المرور
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => logout.mutate()} className="text-red-500 focus:text-red-500">
                   <LogOut className="mr-2 h-4 w-4" />
                   تسجيل الخروج
@@ -324,7 +366,64 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
           )}
         </div>
       </div>
-
+      {/* Change Password Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={(open) => {
+        setShowPasswordDialog(open);
+        if (!open) {
+          setCurrentPassword("");
+          setNewPassword("");
+          setConfirmPassword("");
+          setPasswordError("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-md" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle>تغيير كلمة المرور</DialogTitle>
+            <DialogDescription>أدخل كلمة المرور الحالية والجديدة</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {passwordError && (
+              <div className="text-red-500 text-sm bg-red-50 dark:bg-red-950 p-3 rounded-lg">{passwordError}</div>
+            )}
+            <div className="space-y-2">
+              <Label>كلمة المرور الحالية</Label>
+              <Input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="أدخل كلمة المرور الحالية"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>كلمة المرور الجديدة</Label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="أدخل كلمة المرور الجديدة (6 أحرف على الأقل)"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>تأكيد كلمة المرور الجديدة</Label>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="أعد إدخال كلمة المرور الجديدة"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>إلغاء</Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={changePasswordMutation.isPending}
+            >
+              {changePasswordMutation.isPending ? "جاري التغيير..." : "تغيير كلمة المرور"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 
