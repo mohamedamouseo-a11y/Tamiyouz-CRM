@@ -201,6 +201,7 @@ import {
   changeCampaignBudget as changeMetaCampaignBudget,
   fetchAllCampaignInsights as fetchAllMetaCampaignInsights,
 } from "./services/MetaService";
+import { MetaLeadgenService } from "./services/MetaLeadgenService";
 import { getMetaCombinedAnalytics } from "./services/metaCombinedAnalyticsService";
 import { getTikTokCampaignAnalytics } from "./services/tiktok/tiktokCampaignsService";
 import { getTikTokIntegration, upsertTikTokIntegration, deleteTikTokIntegration, getTikTokAdAccounts, addTikTokAdAccount, selectTikTokAdAccount, updateTikTokAdAccountToken, deleteTikTokAdAccount, syncTikTokCampaigns, getActiveTikTokAdAccount } from "./services/tiktok/tiktokSettingsService";
@@ -2924,6 +2925,65 @@ byLeadStageChanges: protectedProcedure
         }
         return fetchAllMetaCampaignInsights(active.id, input.datePreset);
       }),
+
+    // ─── Meta Leadgen Webhook Integration ──────────────────────────────────────
+    leadgen: router({
+      getConfigs: protectedProcedure.query(async () => {
+        return MetaLeadgenService.getLeadgenConfigs();
+      }),
+
+      getStats: protectedProcedure.query(async () => {
+        return MetaLeadgenService.getLeadgenStats();
+      }),
+
+      upsertConfig: mediaBuyerOrAdminProcedure
+        .input(z.object({
+          id: z.number().optional(),
+          pageId: z.string().min(1),
+          pageName: z.string().optional().nullable(),
+          pageAccessToken: z.string().min(1),
+          isEnabled: z.union([z.boolean(), z.number()]).optional(),
+          assignmentRule: z.enum(["round_robin", "fixed_owner", "by_campaign"]).optional(),
+          fixedOwnerId: z.number().optional().nullable(),
+          fieldMapping: z.record(z.string()).optional().nullable(),
+        }))
+        .mutation(async ({ input }) => {
+          return MetaLeadgenService.upsertLeadgenConfig(input);
+        }),
+
+      deleteConfig: mediaBuyerOrAdminProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          return MetaLeadgenService.deleteLeadgenConfig(input.id);
+        }),
+
+      testConnection: mediaBuyerOrAdminProcedure
+        .input(z.object({
+          pageId: z.string().min(1),
+          accessToken: z.string().min(1),
+        }))
+        .mutation(async ({ input }) => {
+          return MetaLeadgenService.testPageConnection(input.pageId, input.accessToken);
+        }),
+
+      subscribeWebhook: mediaBuyerOrAdminProcedure
+        .input(z.object({
+          pageId: z.string().min(1),
+          accessToken: z.string().min(1),
+        }))
+        .mutation(async ({ input }) => {
+          return MetaLeadgenService.subscribePageWebhook(input.pageId, input.accessToken);
+        }),
+
+      getForms: mediaBuyerOrAdminProcedure
+        .input(z.object({
+          pageId: z.string().min(1),
+          accessToken: z.string().min(1),
+        }))
+        .query(async ({ input }) => {
+          return MetaLeadgenService.fetchLeadgenForms(input.pageId, input.accessToken);
+        }),
+    }),
   }),
   tiktok: router({
     campaigns: router({

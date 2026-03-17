@@ -17,7 +17,6 @@ import { startMeetingReminderScheduler } from "../meetingReminder";
 import { setupChat } from "../services/chat";
 import { startNotificationEngine } from "../notificationEngine";
 import { backupService } from "../services/BackupService";
-import { MetaLeadgenService } from "../services/MetaLeadgenService";
 import { restoreService } from "../services/RestoreService";
 import { promises as fs } from "fs";
 
@@ -166,58 +165,6 @@ async function startServer() {
       }
     }
   });
-  // ── Meta Leadgen Webhook ──────────────────────────────────────────────────
-  // GET: Webhook verification (Meta sends a challenge)
-  app.get("/api/meta/webhook", async (req, res) => {
-    try {
-      const mode = req.query["hub.mode"] as string;
-      const token = req.query["hub.verify_token"] as string;
-      const challenge = req.query["hub.challenge"] as string;
-
-      if (mode === "subscribe" && token) {
-        const config = await MetaLeadgenService.findConfigByVerifyToken(token);
-        if (config) {
-          console.log("[MetaLeadgen] Webhook verified for page:", config.pageId);
-          res.status(200).send(challenge);
-          return;
-        }
-      }
-
-      console.warn("[MetaLeadgen] Webhook verification failed");
-      res.status(403).send("Forbidden");
-    } catch (err: any) {
-      console.error("[MetaLeadgen] Webhook verification error:", err);
-      res.status(500).send("Error");
-    }
-  });
-
-  // POST: Receive leadgen webhook events
-  app.post("/api/meta/webhook", async (req, res) => {
-    try {
-      // Validate signature if present
-      const signature = req.headers["x-hub-signature-256"] as string | undefined;
-      const rawBody = JSON.stringify(req.body);
-
-      const isValid = await MetaLeadgenService.validateWebhookSignature(rawBody, signature);
-      if (!isValid) {
-        console.warn("[MetaLeadgen] Invalid webhook signature");
-        res.status(403).send("Invalid signature");
-        return;
-      }
-
-      // Process the webhook asynchronously
-      const result = await MetaLeadgenService.processLeadgenWebhook(req.body);
-      console.log(`[MetaLeadgen] Webhook processed: ${result.processed} leads, ${result.skipped} skipped`);
-
-      // Always respond 200 to Meta quickly
-      res.status(200).json({ status: "ok", ...result });
-    } catch (err: any) {
-      console.error("[MetaLeadgen] Webhook processing error:", err);
-      // Still respond 200 to prevent Meta from retrying
-      res.status(200).json({ status: "error", message: err.message });
-    }
-  });
-
   // tRPC API
   app.use(
     "/api/trpc",
