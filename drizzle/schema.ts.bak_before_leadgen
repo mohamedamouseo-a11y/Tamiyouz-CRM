@@ -102,7 +102,7 @@ export const clients = mysqlTable("clients", {
 	dealId: int(),
 	businessProfile: text(),
 	group: varchar({ length: 255 }),
-	planStatus: mysqlEnum(['Active','Paused','Cancelled','Pending','Hold']).default('Active').notNull(),
+	planStatus: mysqlEnum(['Active','Paused','Cancelled','Pending']).default('Active').notNull(),
 	renewalStatus: mysqlEnum(['Renewed','Pending','Expired','Cancelled']).default('Pending').notNull(),
 	accountManagerId: int(),
 	competentPerson: varchar({ length: 255 }),
@@ -820,31 +820,6 @@ export type MetaAdAccount = typeof metaAdAccounts.$inferSelect;
 export type InsertMetaAdAccount = typeof metaAdAccounts.$inferInsert;
 export type MetaCampaignSnapshot = typeof metaCampaignSnapshots.$inferSelect;
 export type InsertMetaCampaignSnapshot = typeof metaCampaignSnapshots.$inferInsert;
-
-// ─── Meta Leadgen Webhook Config ──────────────────────────────────────────────
-export const metaLeadgenConfig = mysqlTable("meta_leadgen_config", {
-	id: int().autoincrement().notNull(),
-	pageId: varchar("page_id", { length: 255 }).notNull(),
-	pageName: varchar("page_name", { length: 255 }),
-	pageAccessToken: text("page_access_token").notNull(),
-	webhookVerifyToken: varchar("webhook_verify_token", { length: 255 }),
-	isEnabled: tinyint("is_enabled").default(1).notNull(),
-	assignmentRule: mysqlEnum("assignment_rule", ["round_robin", "fixed_owner", "by_campaign"]).default("round_robin").notNull(),
-	fixedOwnerId: int("fixed_owner_id"),
-	fieldMapping: json("field_mapping"),
-	totalLeadsReceived: int("total_leads_received").default(0).notNull(),
-	lastLeadReceivedAt: timestamp("last_lead_received_at", { mode: "string" }),
-	createdAt: timestamp("created_at", { mode: "string" }).default(sql`(now())`).notNull(),
-	updatedAt: timestamp("updated_at", { mode: "string" }).default(sql`(now())`).onUpdateNow().notNull(),
-},
-(table) => [
-	primaryKey({ columns: [table.id], name: "meta_leadgen_config_id"}),
-	index("idx_meta_leadgen_config_page_id").on(table.pageId),
-	index("idx_meta_leadgen_config_is_enabled").on(table.isEnabled),
-]);
-
-export type MetaLeadgenConfig = typeof metaLeadgenConfig.$inferSelect;
-export type InsertMetaLeadgenConfig = typeof metaLeadgenConfig.$inferInsert;
 
 // ─── TikTok Ads Integration ──────────────────────────────────────────────────
 
