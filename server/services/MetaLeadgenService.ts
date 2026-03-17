@@ -2,7 +2,7 @@ import axios from "axios";
 import crypto from "crypto";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
-import { db } from "../db";
+import { getDb } from "../db";
 import {
   campaigns,
   leads,
@@ -103,6 +103,7 @@ function mapMetaFields(
 }
 
 async function getActiveSalesAgents() {
+  const db = await getDb();
   return db
     .select({ id: users.id, name: users.name, teamId: users.teamId })
     .from(users)
@@ -111,7 +112,7 @@ async function getActiveSalesAgents() {
 
 async function assignRoundRobinLead(agentIds: number[]) {
   if (!agentIds.length) return null;
-
+  const db = await getDb();
   const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(leads);
   const nextIndex = Number(count || 0) % agentIds.length;
   return agentIds[nextIndex] ?? null;
@@ -119,7 +120,7 @@ async function assignRoundRobinLead(agentIds: number[]) {
 
 async function assignByCampaign(campaignName?: string | null) {
   if (!campaignName) return null;
-
+  const db = await getDb();
   const [campaign] = await db
     .select({ id: campaigns.id, roundRobinIndex: campaigns.roundRobinIndex, roundRobinEnabled: campaigns.roundRobinEnabled })
     .from(campaigns)
@@ -157,7 +158,7 @@ async function assignOwner(config: LeadgenConfigRow, campaignName?: string | nul
 
 async function verifyWebhookSignature(rawBody: string, signatureHeader?: string | null) {
   if (!signatureHeader) return true;
-
+  const db = await getDb();
   const [integration] = await db.select().from(metaIntegrations).where(eq(metaIntegrations.isActive, 1)).limit(1);
   if (!integration?.appSecret) return true;
 
@@ -177,10 +178,12 @@ export class MetaLeadgenService {
   }
 
   static async getLeadgenConfigs() {
+    const db = await getDb();
     return db.select().from(metaLeadgenConfig);
   }
 
   static async getLeadgenStats() {
+    const db = await getDb();
     const configs = await db.select().from(metaLeadgenConfig);
     const totalPages = configs.length;
     const enabledPages = configs.filter((c) => c.isEnabled).length;
@@ -211,6 +214,7 @@ export class MetaLeadgenService {
       fieldMapping: input.fieldMapping ?? {},
     };
 
+    const db = await getDb();
     if (input.id) {
       await db.update(metaLeadgenConfig).set(payload).where(eq(metaLeadgenConfig.id, input.id));
       const [row] = await db.select().from(metaLeadgenConfig).where(eq(metaLeadgenConfig.id, input.id)).limit(1);
@@ -230,11 +234,13 @@ export class MetaLeadgenService {
   }
 
   static async deleteLeadgenConfig(id: number) {
+    const db = await getDb();
     await db.delete(metaLeadgenConfig).where(eq(metaLeadgenConfig.id, id));
     return { success: true };
   }
 
   static async findConfigByVerifyToken(token: string) {
+    const db = await getDb();
     const [config] = await db
       .select()
       .from(metaLeadgenConfig)
@@ -318,6 +324,7 @@ export class MetaLeadgenService {
           continue;
         }
 
+        const db = await getDb();
         const [config] = await db
           .select()
           .from(metaLeadgenConfig)
