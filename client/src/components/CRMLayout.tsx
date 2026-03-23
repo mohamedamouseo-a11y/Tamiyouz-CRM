@@ -35,7 +35,7 @@ import {
   Sun,
   ChevronUp,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +61,21 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const sidebarNavRef = useRef<HTMLElement>(null);
+  const sidebarScrollPos = useRef(0);
+
+  // Preserve sidebar scroll position across navigations
+  const handleNavScroll = useCallback(() => {
+    if (sidebarNavRef.current) {
+      sidebarScrollPos.current = sidebarNavRef.current.scrollTop;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (sidebarNavRef.current) {
+      sidebarNavRef.current.scrollTop = sidebarScrollPos.current;
+    }
+  });
 
   const logout = trpc.auth.logout.useMutation({
     onSuccess: () => { window.location.href = "/login"; },
@@ -257,9 +272,9 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto scrollbar-thin">
+      <nav ref={sidebarNavRef} onScroll={handleNavScroll} className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto scrollbar-thin">
         {visibleNavItems.map((item) => {
-          const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+          const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href + "/") && !visibleNavItems.some(other => other.href !== item.href && other.href.startsWith(item.href) && (location === other.href || location.startsWith(other.href + "/"))));
           return (
             <Link key={item.href} href={item.href}>
               <div

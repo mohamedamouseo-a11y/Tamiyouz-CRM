@@ -575,6 +575,11 @@ export const translations = {
     requestNotFound: "الطلب غير موجود",
     requestNotFoundHint: "قد يكون الطلب محذوفًا أو ليس لديك صلاحية الوصول.",
     backToSupportCenter: "العودة لمركز الدعم",
+    supportCenterTableHint: "عرض وتتبع جميع طلبات الدعم الخاصة بك",
+    noSupportRequestsYet: "لا توجد طلبات دعم بعد",
+    createYourFirstRequest: "أنشئ أول طلب دعم لك",
+    supportRequestDialogDescription: "أرسل طلب دعم جديد وسيتم الرد عليك في أقرب وقت.",
+    suggestions: "اقتراحات",
     accessDenied: "الوصول مرفوض",
   },
   en: {
@@ -1151,6 +1156,11 @@ export const translations = {
     requestNotFound: "Request Not Found",
     requestNotFoundHint: "The request may have been deleted or you don't have access.",
     backToSupportCenter: "Back to Support Center",
+    supportCenterTableHint: "View and track all your support requests",
+    noSupportRequestsYet: "No support requests yet",
+    createYourFirstRequest: "Create your first support request",
+    supportRequestDialogDescription: "Submit a new support request and we'll get back to you soon.",
+    suggestions: "Suggestions",
     accessDenied: "Access Denied",
   },
 } as const;
