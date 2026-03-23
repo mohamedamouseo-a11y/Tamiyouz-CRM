@@ -1,6 +1,6 @@
-import { storagePut } from "./storage";
+import { storageDelete, storagePut } from "./storage";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -173,6 +173,7 @@ import {
   bulkUpsertUserNotificationPreferences,
   getNotificationSoundConfig,
   updateNotificationSoundConfig,
+  getDb,
 } from "./db";
 import { buildReportEmail } from "./emailReports";
 import { createLeadSourcesRouter } from "./leadSourcesRouter";
@@ -243,6 +244,53 @@ const accountManagerProcedure = protectedProcedure.use(({ ctx, next }) => {
   }
   return next({ ctx });
 });
+
+const PRIMARY_SUPER_ADMIN_EMAIL = "admin@tamiyouz.com";
+const MAX_SUPPORT_SCREENSHOTS = 5;
+const MAX_SUPPORT_SCREENSHOT_SIZE_BYTES = 5 * 1024 * 1024;
+
+const supportRequestTypeSchema = z.enum(["Ticket", "Suggestion"]);
+const supportCategorySchema = z.enum(["Bug", "Complaint", "Access", "Data", "Feature", "Improvement", "Other"]);
+const supportPrioritySchema = z.enum(["Low", "Medium", "High"]);
+const supportStatusSchema = z.enum(["New", "UnderReview", "WaitingUser", "Resolved", "Closed", "Rejected"]);
+const supportScreenshotInputSchema = z.object({
+  fileName: z.string().min(1).max(255),
+  fileBase64: z.string().min(1),
+  contentType: z.string().min(1),
+  fileSize: z.number().int().positive().max(MAX_SUPPORT_SCREENSHOT_SIZE_BYTES).optional(),
+});
+
+function isPrimarySuperAdmin(user: { email?: string | null }): boolean {
+  return String(user.email ?? "").toLowerCase() === PRIMARY_SUPER_ADMIN_EMAIL;
+}
+
+const superAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!isPrimarySuperAdmin(ctx.user)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Only the primary super admin can access this resource" });
+  }
+  return next({ ctx });
+});
+
+function sanitizeUploadedFileName(fileName: string): string {
+  const cleaned = fileName.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_").slice(-120);
+  return cleaned || `file-${Date.now()}.bin`;
+}
+
+async function getPrimarySuperAdminOrThrow() {
+  const user = await getUserByEmail(PRIMARY_SUPER_ADMIN_EMAIL);
+  if (!user) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `Primary super admin account (${PRIMARY_SUPER_ADMIN_EMAIL}) was not found`,
+    });
+  }
+  return user;
+}
+
+function buildSupportRequestCode(): string {
+  return `SC-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`;
+}
+
 
 // ─── App Router ───────────────────────────────────────────────────────────────
 
@@ -2734,6 +2782,329 @@ byLeadStageChanges: protectedProcedure
       }),
   }),
 
+
+
+  // ─── Support Center ───────────────────────────────────────────────────────
+  supportCenter: router({
+    myRequests: protectedProcedure
+      .input(z.object({ status: supportStatusSchema.optional(), requestType: supportRequestTypeSchema.optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const { supportRequests } = await import("../drizzle/schema");
+        const conditions = [eq(supportRequests.createdBy, ctx.user.id)];
+        if (input?.status) conditions.push(eq(supportRequests.status, input.status));
+        if (input?.requestType) conditions.push(eq(supportRequests.requestType, input.requestType));
+        const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+        return getDb()
+          .then((db) => {
+            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+            return db.select().from(supportRequests).where(whereClause).orderBy(desc(supportRequests.lastActivityAt));
+          });
+      }),
+
+    adminInbox: superAdminProcedure
+      .input(z.object({ status: supportStatusSchema.optional(), requestType: supportRequestTypeSchema.optional() }).optional())
+      .query(async ({ input }) => {
+        const { supportRequests } = await import("../drizzle/schema");
+        const conditions: any[] = [];
+        if (input?.status) conditions.push(eq(supportRequests.status, input.status));
+        if (input?.requestType) conditions.push(eq(supportRequests.requestType, input.requestType));
+
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        if (conditions.length === 0) {
+          return db.select().from(supportRequests).orderBy(desc(supportRequests.lastActivityAt));
+        }
+
+        return db.select().from(supportRequests).where(and(...conditions)).orderBy(desc(supportRequests.lastActivityAt));
+      }),
+
+    byId: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { supportRequests, supportRequestMessages, supportRequestAttachments } = await import("../drizzle/schema");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        const rows = await db.select().from(supportRequests).where(eq(supportRequests.id, input.id)).limit(1);
+        const request = rows[0];
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Support request not found" });
+        }
+
+        if (!isPrimarySuperAdmin(ctx.user) && request.createdBy !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const [messages, attachments] = await Promise.all([
+          db.select().from(supportRequestMessages).where(eq(supportRequestMessages.requestId, input.id)).orderBy(asc(supportRequestMessages.createdAt)),
+          db.select().from(supportRequestAttachments).where(eq(supportRequestAttachments.requestId, input.id)).orderBy(desc(supportRequestAttachments.createdAt)),
+        ]);
+
+        return { request, messages, attachments };
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        requestType: supportRequestTypeSchema,
+        category: supportCategorySchema,
+        subject: z.string().min(3).max(255),
+        description: z.string().min(10),
+        priority: supportPrioritySchema.default("Medium"),
+        screenRecordingLink: z.string().url().max(2000).nullable().optional(),
+        screenshots: z.array(supportScreenshotInputSchema).max(MAX_SUPPORT_SCREENSHOTS).default([]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        const { supportRequests, supportRequestAttachments } = await import("../drizzle/schema");
+        const superAdmin = await getPrimarySuperAdminOrThrow();
+        const code = buildSupportRequestCode();
+
+        const insertResult = await db.insert(supportRequests).values({
+          code,
+          requestType: input.requestType,
+          category: input.category,
+          subject: input.subject,
+          description: input.description,
+          priority: input.priority,
+          status: "New",
+          screenRecordingLink: input.screenRecordingLink ?? null,
+          createdBy: ctx.user.id,
+          superAdminId: superAdmin.id,
+        } as any);
+
+        const requestId = insertResult[0].insertId;
+        const attachmentRows: Array<Record<string, unknown>> = [];
+
+        for (const screenshot of input.screenshots) {
+          if (!screenshot.contentType.toLowerCase().startsWith("image/")) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Only image screenshots are allowed" });
+          }
+
+          const buffer = Buffer.from(screenshot.fileBase64, "base64");
+          if (!buffer.length || buffer.length > MAX_SUPPORT_SCREENSHOT_SIZE_BYTES) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Screenshot is empty or exceeds the 5 MB limit" });
+          }
+
+          const safeFileName = sanitizeUploadedFileName(screenshot.fileName);
+          const storageKey = `support-center/${requestId}/${Date.now()}-${safeFileName}`;
+          const uploaded = await storagePut(storageKey, buffer, screenshot.contentType);
+
+          attachmentRows.push({
+            requestId,
+            fileName: safeFileName,
+            fileUrl: uploaded.url,
+            storageKey: uploaded.key,
+            fileSize: buffer.length,
+            fileType: screenshot.contentType,
+            uploadedBy: ctx.user.id,
+          });
+        }
+
+        if (attachmentRows.length > 0) {
+          await db.insert(supportRequestAttachments).values(attachmentRows as any);
+        }
+
+        await createInAppNotification({
+          userId: superAdmin.id,
+          type: "system",
+          title: `${input.requestType} ${code}`,
+          body: `${ctx.user.name ?? ctx.user.email ?? "A user"} submitted: ${input.subject}`,
+          link: `/support-center/${requestId}`,
+          metadata: {
+            requestId,
+            code,
+            requestType: input.requestType,
+            createdBy: ctx.user.id,
+          },
+        } as any);
+
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "create",
+          entityType: "support_request",
+          entityId: requestId,
+          entityName: code,
+          details: {
+            requestType: input.requestType,
+            category: input.category,
+            priority: input.priority,
+            screenshotsCount: input.screenshots.length,
+          },
+        });
+
+        return { success: true, id: requestId, code };
+      }),
+
+    reply: protectedProcedure
+      .input(z.object({
+        requestId: z.number(),
+        message: z.string().min(1),
+        status: supportStatusSchema.optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { supportRequests, supportRequestMessages } = await import("../drizzle/schema");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        const rows = await db.select().from(supportRequests).where(eq(supportRequests.id, input.requestId)).limit(1);
+        const request = rows[0];
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Support request not found" });
+        }
+
+        const isSuperAdmin = isPrimarySuperAdmin(ctx.user);
+        if (!isSuperAdmin && request.createdBy !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        if (!isSuperAdmin && input.status) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the super admin can change status directly" });
+        }
+
+        await db.insert(supportRequestMessages).values({
+          requestId: input.requestId,
+          userId: ctx.user.id,
+          message: input.message,
+          isFromSuperAdmin: isSuperAdmin ? 1 : 0,
+        } as any);
+
+        const nextStatus = isSuperAdmin
+          ? (input.status ?? (request.status === "New" || request.status === "UnderReview" ? "WaitingUser" : request.status))
+          : (request.status === "WaitingUser" ? "UnderReview" : request.status);
+
+        await db.update(supportRequests).set({
+          status: nextStatus,
+          lastActivityAt: new Date(),
+          closedAt: nextStatus === "Resolved" || nextStatus === "Closed" ? new Date() : null,
+          closedBy: nextStatus === "Resolved" || nextStatus === "Closed" ? ctx.user.id : null,
+        } as any).where(eq(supportRequests.id, input.requestId));
+
+        const notificationUserId = isSuperAdmin ? request.createdBy : request.superAdminId;
+        if (notificationUserId !== ctx.user.id) {
+          await createInAppNotification({
+            userId: notificationUserId,
+            type: "system",
+            title: `Update on ${request.code}`,
+            body: isSuperAdmin ? "The super admin replied to your request" : "The requester added a new reply",
+            link: `/support-center/${request.id}`,
+            metadata: {
+              requestId: request.id,
+              code: request.code,
+              status: nextStatus,
+            },
+          } as any);
+        }
+
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "update",
+          entityType: "support_request_reply",
+          entityId: input.requestId,
+          entityName: request.code,
+          details: {
+            isSuperAdmin,
+            status: nextStatus,
+          },
+        });
+
+        return { success: true, status: nextStatus };
+      }),
+
+    updateStatus: superAdminProcedure
+      .input(z.object({
+        requestId: z.number(),
+        status: supportStatusSchema,
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { supportRequests } = await import("../drizzle/schema");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        const rows = await db.select().from(supportRequests).where(eq(supportRequests.id, input.requestId)).limit(1);
+        const request = rows[0];
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Support request not found" });
+        }
+
+        await db.update(supportRequests).set({
+          status: input.status,
+          lastActivityAt: new Date(),
+          closedAt: input.status === "Resolved" || input.status === "Closed" ? new Date() : null,
+          closedBy: input.status === "Resolved" || input.status === "Closed" ? ctx.user.id : null,
+        } as any).where(eq(supportRequests.id, input.requestId));
+
+        if (request.createdBy !== ctx.user.id) {
+          await createInAppNotification({
+            userId: request.createdBy,
+            type: "system",
+            title: `Status changed for ${request.code}`,
+            body: `Your request is now ${input.status}`,
+            link: `/support-center/${request.id}`,
+            metadata: {
+              requestId: request.id,
+              code: request.code,
+              status: input.status,
+            },
+          } as any);
+        }
+
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "update",
+          entityType: "support_request_status",
+          entityId: input.requestId,
+          entityName: request.code,
+          details: {
+            previousStatus: request.status,
+            newStatus: input.status,
+          },
+        });
+
+        return { success: true };
+      }),
+
+    deleteAttachment: superAdminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { supportRequestAttachments } = await import("../drizzle/schema");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        const rows = await db.select().from(supportRequestAttachments).where(eq(supportRequestAttachments.id, input.id)).limit(1);
+        const attachment = rows[0];
+        if (!attachment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Attachment not found" });
+        }
+
+        await storageDelete(attachment.storageKey);
+        await db.delete(supportRequestAttachments).where(eq(supportRequestAttachments.id, input.id));
+
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "delete",
+          entityType: "support_request_attachment",
+          entityId: input.id,
+          entityName: attachment.fileName,
+          details: {
+            requestId: attachment.requestId,
+            storageKey: attachment.storageKey,
+          },
+        });
+
+        return { success: true };
+      }),
+  }),
 
   // ─── Notification Preferences (per-user) ──────────────────────────────────
   notificationPreferences: router({
