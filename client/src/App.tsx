@@ -37,6 +37,9 @@ import NotificationSettings from "./pages/NotificationSettings";
 import MetaCampaigns from "./pages/MetaCampaigns";
 import MetaCombinedPage from "./pages/MetaCombinedPage";
 import TikTokCampaignsPage from "./pages/TikTokCampaignsPage";
+import SupportCenter from "./pages/SupportCenter";
+import SupportAdminInbox from "./pages/SupportAdminInbox";
+import SupportRequestDetail from "./pages/SupportRequestDetail";
 import { InnoCallProvider } from "./contexts/InnoCallProvider";
 function Router() {
   return (
@@ -68,6 +71,9 @@ function Router() {
       <Route path="/csat/:clientId" component={CSATSurvey} />
       <Route path="/notification-settings" component={NotificationSettings} />
       <Route path="/help-center" component={HelpCenter} />
+      <Route path="/support-center" component={SupportCenter} />
+      <Route path="/support-center/admin" component={SupportAdminInbox} />
+      <Route path="/support-center/:id" component={SupportRequestDetail} />
       <Route path="/meta-campaigns" component={MetaCampaigns} />
       <Route path="/meta-combined" component={MetaCombinedPage} />
       <Route path="/tiktok-campaigns" component={TikTokCampaignsPage} />

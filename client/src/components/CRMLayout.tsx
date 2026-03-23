@@ -17,6 +17,8 @@ import {
   FileSpreadsheet,
   Globe,
   HelpCircle,
+  Inbox,
+  LifeBuoy,
   LayoutDashboard,
   LogOut,
   Megaphone,
@@ -48,6 +50,7 @@ interface NavItem {
   icon: React.ReactNode;
   roles?: string[];
   badge?: number;
+  visible?: boolean;
 }
 
 export default function CRMLayout({ children }: { children: React.ReactNode }) {
@@ -212,10 +215,21 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
       icon: <Settings size={18} />,
       roles: ["Admin", "admin", "SalesManager", "SalesAgent", "MediaBuyer", "AccountManager", "AccountManagerLead"],
     },
+    {
+      href: "/support-center",
+      labelKey: "supportCenter",
+      icon: <LifeBuoy size={18} />,
+    },
+    {
+      href: "/support-center/admin",
+      labelKey: "supportAdmin",
+      icon: <Inbox size={18} />,
+      visible: String(user?.email ?? "").toLowerCase() === "admin@tamiyouz.com",
+    },
   ];
 
   const visibleNavItems = navItems.filter(
-    (item) => !item.roles || item.roles.includes(role)
+    (item) => (item.visible ?? true) && (!item.roles || item.roles.includes(role))
   );
 
   const SidebarContent = () => (
