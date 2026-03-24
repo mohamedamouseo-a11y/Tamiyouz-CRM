@@ -228,7 +228,7 @@ export class MetaLeadgenService {
       totalLeadsReceived: 0,
     });
 
-    const insertedId = Number((insertResult as any).insertId);
+    const insertedId = Number((insertResult as any)[0]?.insertId ?? 0);
     const [row] = await db.select().from(metaLeadgenConfig).where(eq(metaLeadgenConfig.id, insertedId)).limit(1);
     return row;
   }
