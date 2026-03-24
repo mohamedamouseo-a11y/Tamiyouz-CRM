@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import {
   Briefcase,
   Search,
@@ -23,6 +24,7 @@ import {
   Clock,
   UserCheck,
   BarChart3,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
@@ -109,6 +111,12 @@ export default function ClientPool() {
     onSuccess: async () => {
       setAddDialogOpen(false);
       resetAddForm();
+      await refetch();
+    },
+  });
+
+  const deleteClientM = trpc.accountManagement.deleteClient.useMutation({
+    onSuccess: async () => {
       await refetch();
     },
   });
@@ -560,12 +568,42 @@ export default function ClientPool() {
                         <FileText className="w-3 h-3" />
                         Created: {new Date(client.createdAt).toLocaleDateString()}
                       </div>
-                      <Link href={`/clients/${client.id}`}>
-                        <Button variant="outline" size="sm" className="gap-1">
-                          <FileText className="w-3 h-3" />
-                          View Profile
-                        </Button>
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
+                              <Trash2 className="w-3 h-3" />
+                              Delete
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Client</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete <strong>{client.businessProfile || client.competentPerson || `Client #${client.id}`}</strong>? This client will be moved to the trash and can be restored later.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-red-600 hover:bg-red-700"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  await deleteClientM.mutateAsync({ id: client.id });
+                                }}
+                              >
+                                {deleteClientM.isPending ? "Deleting..." : "Delete"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                        <Link href={`/clients/${client.id}`}>
+                          <Button variant="outline" size="sm" className="gap-1">
+                            <FileText className="w-3 h-3" />
+                            View Profile
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 )}

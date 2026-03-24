@@ -2160,7 +2160,7 @@ byLeadStageChanges: protectedProcedure
         return { success: true };
       }),
 
-    deleteClient: adminProcedure
+    deleteClient: accountManagerProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await deleteClient(input.id, ctx.user.id);
