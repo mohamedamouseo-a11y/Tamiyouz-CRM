@@ -19,7 +19,7 @@ import CRMLayout from "../components/CRMLayout";
 import { trpc } from "@/lib/trpc";
 
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, AlertTriangle, Clock, CheckCircle2, XCircle, FileText, TrendingUp, DollarSign, CalendarClock } from "lucide-react";
+import { RefreshCw, AlertTriangle, Clock, CheckCircle2, XCircle, FileText, TrendingUp, DollarSign, CalendarClock, AlertOctagon } from "lucide-react";
 
 function fmtDate(value: unknown) {
   if (!value) return "—";
@@ -36,6 +36,7 @@ function fmtMoney(value: unknown) {
 }
 
 type StageKey =
+  | "overdue"
   | "due90"
   | "due60"
   | "due30"
@@ -45,6 +46,16 @@ type StageKey =
   | "Lost";
 
 const columnConfig: { key: StageKey; title: string; icon: React.ElementType; gradient: string; headerBg: string; badgeBg: string; borderColor: string; emptyBg: string }[] = [
+  {
+    key: "overdue",
+    title: "Overdue",
+    icon: AlertOctagon,
+    gradient: "from-rose-50 to-white",
+    headerBg: "bg-rose-50",
+    badgeBg: "bg-rose-100 text-rose-700",
+    borderColor: "border-rose-200",
+    emptyBg: "border-rose-200 bg-rose-50/50",
+  },
   {
     key: "due90",
     title: "Due in 90 days",
@@ -97,7 +108,7 @@ const columnConfig: { key: StageKey; title: string; icon: React.ElementType; gra
   },
   {
     key: "Won",
-    title: "Won",
+    title: "Renewed",
     icon: CheckCircle2,
     gradient: "from-emerald-50 to-white",
     headerBg: "bg-emerald-50",
@@ -141,8 +152,9 @@ function bucketFor(item: any): StageKey {
   if (stage !== "New") return stage;
   const d = daysUntil(item.endDate);
   if (d === null) return "due90";
-  if (d <= 30 && d >= 1) return "due30";
-  if (d <= 60 && d >= 31) return "due60";
+  if (d < 0) return "overdue";
+  if (d <= 30) return "due30";
+  if (d <= 60) return "due60";
   return "due90";
 }
 
@@ -350,6 +362,7 @@ export default function RenewalPipeline() {
 
   const grouped = React.useMemo(() => {
     const g: Record<StageKey, string[]> = {
+      overdue: [],
       due90: [],
       due60: [],
       due30: [],
@@ -381,7 +394,12 @@ export default function RenewalPipeline() {
       return sum + (Number(item?.charges) || 0);
     }, 0);
 
-    return { total, totalValue, urgentCount, wonCount, wonValue };
+    const overdueCount = items.filter(r => {
+      const d = daysUntil(r.endDate);
+      return d !== null && d < 0;
+    }).length;
+
+    return { total, totalValue, urgentCount, wonCount, wonValue, overdueCount };
   }, [items, grouped, byId]);
 
   function findColumnForId(id: string): StageKey | null {
@@ -408,7 +426,11 @@ export default function RenewalPipeline() {
     if (fromCol === toCol) return;
 
     let stage: any = "New";
-    if (toCol === "Negotiation" || toCol === "SentOffer" || toCol === "Won" || toCol === "Lost") {
+    if (toCol === "Won") {
+      stage = "Renewed";
+    } else if (toCol === "Lost") {
+      stage = "NotRenewed";
+    } else if (toCol === "Negotiation" || toCol === "SentOffer") {
       stage = toCol;
     } else {
       stage = "New";
@@ -436,7 +458,7 @@ export default function RenewalPipeline() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <KpiCard
             title="Total Renewals"
             value={stats.total}
@@ -453,6 +475,13 @@ export default function RenewalPipeline() {
             iconBg="bg-white/20"
           />
           <KpiCard
+            title="Overdue"
+            value={stats.overdueCount}
+            icon={AlertOctagon}
+            gradient="bg-gradient-to-br from-rose-500 to-red-600"
+            iconBg="bg-white/20"
+          />
+          <KpiCard
             title="Urgent (30 days)"
             value={stats.urgentCount}
             icon={AlertTriangle}
@@ -460,7 +489,7 @@ export default function RenewalPipeline() {
             iconBg="bg-white/20"
           />
           <KpiCard
-            title="Won Renewals"
+            title="Renewed"
             value={stats.wonCount}
             suffix={stats.wonValue > 0 ? `(${fmtMoney(stats.wonValue)} SAR)` : ""}
             icon={TrendingUp}
@@ -477,7 +506,7 @@ export default function RenewalPipeline() {
           </div>
         ) : (
           <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
               {columnConfig.map((c) => (
                 <Column key={c.key} config={c} ids={grouped[c.key]} byId={byId} />
               ))}
