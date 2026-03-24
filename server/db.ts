@@ -2995,7 +2995,7 @@ export async function getAMLeadDashboardStats() {
   const activeClientIds = new Set(activeClients.map((c) => c.id));
   const teamContracts = allContracts.filter((c) => activeClientIds.has(c.clientId));
 
-  const renewedContracts = teamContracts.filter((c) => c.contractRenewalStatus === "Renewed").length;
+  const renewedContracts = teamContracts.filter((c) => c.contractRenewalStatus === "Renewed" || c.contractRenewalStatus === "Won").length;
   const renewalBase = teamContracts.filter(
     (c) => c.status === "Expired" || c.contractRenewalStatus === "Renewed" || c.contractRenewalStatus === "Won",
   ).length;
