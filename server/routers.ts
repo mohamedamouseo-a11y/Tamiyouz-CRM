@@ -3316,7 +3316,7 @@ byLeadStageChanges: protectedProcedure
           isEnabled: z.union([z.boolean(), z.number()]).optional(),
           assignmentRule: z.enum(["round_robin", "fixed_owner", "by_campaign"]).optional(),
           fixedOwnerId: z.number().optional().nullable(),
-          fieldMapping: z.record(z.string()).optional().nullable(),
+          fieldMapping: z.record(z.string(), z.string()).optional().nullable(),
         }))
         .mutation(async ({ input }) => {
           return MetaLeadgenService.upsertLeadgenConfig(input);
