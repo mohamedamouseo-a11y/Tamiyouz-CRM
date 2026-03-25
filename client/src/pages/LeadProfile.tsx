@@ -113,6 +113,56 @@ const fitStatusConfig: Record<string, { label: string; icon: string; color: stri
   "Not Fit": { label: "Not Fit", icon: "❌", color: "text-red-700", bg: "bg-red-50 border-red-200" },
   Pending: { label: "Pending", icon: "⏳", color: "text-yellow-700", bg: "bg-yellow-50 border-yellow-200" },
 };
+// ── Lead Classification: Lead → Prospect → Opportunity ──
+type ClassificationType = "Lead" | "Prospect" | "Opportunity";
+interface ClassificationConfig {
+  label: string;
+  labelAr: string;
+  color: string;
+  bg: string;
+  border: string;
+  icon: string;
+}
+const classificationConfig: Record<ClassificationType, ClassificationConfig> = {
+  Lead: { label: "Lead", labelAr: "عميل محتمل", color: "#3b82f6", bg: "bg-blue-50", border: "border-blue-300", icon: "🔵" },
+  Prospect: { label: "Prospect", labelAr: "عميل مهتم", color: "#f59e0b", bg: "bg-amber-50", border: "border-amber-300", icon: "🟡" },
+  Opportunity: { label: "Opportunity", labelAr: "فرصة بيع", color: "#22c55e", bg: "bg-green-50", border: "border-green-300", icon: "🟢" },
+};
+
+function getLeadClassification(
+  stage: string,
+  activitiesCount: number,
+  leadQuality: string | null | undefined,
+  fitStatus: string | null | undefined,
+  hasDeal: boolean,
+  priceOfferSent: boolean,
+  lastContactDays: number | null
+): ClassificationType {
+  const q = leadQuality ?? "Unknown";
+  const fs = fitStatus ?? "Pending";
+
+  // Check Opportunity first (highest priority)
+  let oppScore = 0;
+  if (["Proposal Delivered", "Won"].includes(stage)) oppScore++;
+  if (hasDeal) oppScore++;
+  if (activitiesCount >= 3) oppScore++;
+  if (q === "Hot") oppScore++;
+  if (priceOfferSent) oppScore++;
+  if (oppScore >= 2) return "Opportunity";
+
+  // Check Prospect
+  let prospScore = 0;
+  if (["Leads", "Meeting Scheduled"].includes(stage)) prospScore++;
+  if (activitiesCount >= 2) prospScore++;
+  if (["Warm", "Hot"].includes(q)) prospScore++;
+  if (fs === "Fit") prospScore++;
+  if (lastContactDays !== null && lastContactDays <= 7) prospScore++;
+  if (prospScore >= 2) return "Prospect";
+
+  // Default: Lead
+  return "Lead";
+}
+
 
 function toDate(value?: string | Date | null) {
   if (!value) return null;
@@ -506,6 +556,16 @@ export default function LeadProfile() {
   const lastActivityDate = lastActivity?.activityDate ?? null;
   const leadCreatedAt = toDate(lead?.createdAt) ?? new Date();
   const leadScore = getLeadScore(activities?.length ?? 0, lead?.leadQuality, Boolean(deal), (lead as any)?.fitStatus);
+  const leadClassification = getLeadClassification(
+    lead?.stage ?? "New",
+    activities?.length ?? 0,
+    lead?.leadQuality,
+    (lead as any)?.fitStatus,
+    Boolean(deal),
+    Boolean(lead?.priceOfferSent),
+    daysSinceLastContact
+  );
+  const classConfig = classificationConfig[leadClassification];
   const slaThresholdHours = Number((slaConfig as any)?.hoursThreshold ?? 24);
   const slaEnabled = Boolean((slaConfig as any)?.isEnabled ?? true);
   const slaReferenceDate = lastActivityDate ?? leadCreatedAt;

@@ -26,6 +26,27 @@ import { CountrySelect } from "@/components/CountrySelect";
 import { countries, getCountryByName } from "@/lib/countries-data";
 
 const LEAD_QUALITIES = ["Hot", "Warm", "Cold", "Bad", "Unknown"];
+
+// ── Lead Classification: Lead → Prospect → Opportunity ──
+type ClassificationType = "Lead" | "Prospect" | "Opportunity";
+const classificationConfig: Record<ClassificationType, { label: string; labelAr: string; color: string; bg: string; border: string; icon: string }> = {
+  Lead: { label: "Lead", labelAr: "عميل محتمل", color: "#3b82f6", bg: "bg-blue-50", border: "border-blue-300", icon: "🔵" },
+  Prospect: { label: "Prospect", labelAr: "عميل مهتم", color: "#f59e0b", bg: "bg-amber-50", border: "border-amber-300", icon: "🟡" },
+  Opportunity: { label: "Opportunity", labelAr: "فرصة بيع", color: "#22c55e", bg: "bg-green-50", border: "border-green-300", icon: "🟢" },
+};
+function getLeadClassificationSimple(stage: string, quality: string | null | undefined, fitStatus: string | null | undefined): ClassificationType {
+  const q = quality ?? "Unknown";
+  const fs = fitStatus ?? "Pending";
+  // Simplified version for list view (no activity/deal data available)
+  if (["Proposal Delivered", "Won"].includes(stage)) return "Opportunity";
+  if (["Proposal Delivered"].includes(stage) && q === "Hot") return "Opportunity";
+  if (["Meeting Scheduled"].includes(stage) && ["Hot", "Warm"].includes(q)) return "Prospect";
+  if (["Leads"].includes(stage) && fs === "Fit") return "Prospect";
+  if (["Meeting Scheduled"].includes(stage)) return "Prospect";
+  if (["Leads"].includes(stage) && ["Hot", "Warm"].includes(q)) return "Prospect";
+  return "Lead";
+}
+
 const STAGES = ["New", "Contacted", "Meeting", "Offer Sent", "Won", "Lost", "Follow Up"];
 
 export default function LeadsList() {
@@ -371,6 +392,7 @@ export default function LeadsList() {
                       <th className="text-start px-4 py-3 font-medium text-muted-foreground">{t("phone")}</th>
                       <th className="text-start px-4 py-3 font-medium text-muted-foreground">{t("leadQuality")}</th>
                       <th className="text-start px-4 py-3 font-medium text-muted-foreground">{t("stage")}</th>
+                      <th className="text-start px-4 py-3 font-medium text-muted-foreground">{isRTL ? "التصنيف" : "Classification"}</th>
                       <th className="text-start px-4 py-3 font-medium text-muted-foreground">{t("campaign")}</th>
                       <th className="text-start px-4 py-3 font-medium text-muted-foreground">{isRTL ? "المسؤول" : "Sales Agent"}</th>
                       <th className="text-start px-4 py-3 font-medium text-muted-foreground">{isRTL ? "تاريخ التواصل" : "Contact Date"}</th>
