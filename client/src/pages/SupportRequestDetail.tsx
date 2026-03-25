@@ -5,6 +5,7 @@ import CRMLayout from "@/components/CRMLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -13,14 +14,17 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
 import {
   ArrowLeft,
+  Edit3,
   ExternalLink,
   FileVideo,
   Image as ImageIcon,
   Loader2,
   MessageSquare,
+  Save,
   Send,
   ShieldCheck,
   Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useLocation, useParams } from "wouter";
@@ -64,6 +68,8 @@ type SupportAttachmentLike = {
 
 const PRIMARY_SUPER_ADMIN_EMAIL = "admin@tamiyouz.com";
 const STATUS_OPTIONS: RequestStatus[] = ["New", "UnderReview", "WaitingUser", "Resolved", "Closed", "Rejected"];
+const SUPPORT_CATEGORIES: RequestCategory[] = ["Bug", "Complaint", "Access", "Data", "Feature", "Improvement", "Other"];
+const SUPPORT_PRIORITIES: RequestPriority[] = ["Low", "Medium", "High"];
 
 const statusClassMap: Record<RequestStatus, string> = {
   New: "border-blue-200 bg-blue-50 text-blue-700",
@@ -107,6 +113,19 @@ export default function SupportRequestDetail() {
   const [replyStatus, setReplyStatus] = React.useState<RequestStatus | "">("");
   const [standaloneStatus, setStandaloneStatus] = React.useState<RequestStatus | "">("");
 
+  // Edit mode state
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editForm, setEditForm] = React.useState({
+    subject: "",
+    description: "",
+    category: "" as RequestCategory,
+    priority: "" as RequestPriority,
+    screenRecordingLink: "",
+  });
+
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+
   const detailQuery = supportCenter.byId.useQuery(
     { id: requestId },
     { enabled: Number.isFinite(requestId) && requestId > 0 }
@@ -117,11 +136,16 @@ export default function SupportRequestDetail() {
       setReplyMessage("");
       setReplyStatus("");
       toast.success(isRTL ? "تم إرسال الرد" : "Reply sent successfully");
-      await Promise.all([
-        utils.supportCenter?.byId.invalidate?.({ id: requestId }),
-        utils.supportCenter?.myRequests.invalidate?.(),
-        utils.supportCenter?.adminInbox.invalidate?.(),
-      ]);
+      try {
+        await utils.supportCenter.invalidate();
+      } catch {
+        await Promise.all([
+          utils.supportCenter?.byId.invalidate?.({ id: requestId }),
+          utils.supportCenter?.myRequests.invalidate?.(),
+          utils.supportCenter?.adminInbox.invalidate?.(),
+        ]);
+      }
+      await detailQuery.refetch();
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -137,11 +161,51 @@ export default function SupportRequestDetail() {
   const updateStatusMutation = supportCenter.updateStatus.useMutation({
     onSuccess: async () => {
       toast.success(isRTL ? "تم تحديث الحالة" : "Status updated successfully");
-      await Promise.all([
-        utils.supportCenter?.byId.invalidate?.({ id: requestId }),
-        utils.supportCenter?.myRequests.invalidate?.(),
-        utils.supportCenter?.adminInbox.invalidate?.(),
-      ]);
+      try {
+        await utils.supportCenter.invalidate();
+      } catch {
+        await Promise.all([
+          utils.supportCenter?.byId.invalidate?.({ id: requestId }),
+          utils.supportCenter?.myRequests.invalidate?.(),
+          utils.supportCenter?.adminInbox.invalidate?.(),
+        ]);
+      }
+      await detailQuery.refetch();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // Edit mutation (for ticket creator)
+  const editMutation = supportCenter.edit.useMutation({
+    onSuccess: async () => {
+      toast.success(isRTL ? "تم تحديث الطلب بنجاح" : "Request updated successfully");
+      setIsEditing(false);
+      try {
+        await utils.supportCenter.invalidate();
+      } catch {
+        await Promise.all([
+          utils.supportCenter?.byId.invalidate?.({ id: requestId }),
+          utils.supportCenter?.myRequests.invalidate?.(),
+        ]);
+      }
+      await detailQuery.refetch();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // Delete mutation (for admin only)
+  const deleteMutation = supportCenter.delete.useMutation({
+    onSuccess: async () => {
+      toast.success(isRTL ? "تم حذف الطلب بنجاح" : "Request deleted successfully");
+      try {
+        await utils.supportCenter.invalidate();
+      } catch {
+        await Promise.all([
+          utils.supportCenter?.myRequests.invalidate?.(),
+          utils.supportCenter?.adminInbox.invalidate?.(),
+        ]);
+      }
+      navigate("/support-center");
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -161,6 +225,50 @@ export default function SupportRequestDetail() {
       setStandaloneStatus(request.status);
     }
   }, [request?.status]);
+
+  // Check if current user is the creator
+  const isCreator = request?.createdBy === user?.id;
+  // Can edit only if creator and status is New or UnderReview
+  const canEdit = isCreator && request && ["New", "UnderReview"].includes(request.status);
+
+  const startEditing = () => {
+    if (!request) return;
+    setEditForm({
+      subject: request.subject,
+      description: request.description,
+      category: request.category,
+      priority: request.priority,
+      screenRecordingLink: request.screenRecordingLink || "",
+    });
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (editForm.subject.trim().length < 3) {
+      toast.error(isRTL ? "العنوان قصير جدًا" : "Subject is too short");
+      return;
+    }
+    if (editForm.description.trim().length < 10) {
+      toast.error(isRTL ? "الوصف يجب أن يكون أوضح" : "Description must be at least 10 characters");
+      return;
+    }
+    await editMutation.mutateAsync({
+      id: requestId,
+      subject: editForm.subject.trim(),
+      description: editForm.description.trim(),
+      category: editForm.category,
+      priority: editForm.priority,
+      screenRecordingLink: editForm.screenRecordingLink.trim() || null,
+    });
+  };
+
+  const handleDelete = async () => {
+    await deleteMutation.mutateAsync({ id: requestId });
+  };
 
   const handleReply = async () => {
     if (!replyMessage.trim()) {
@@ -236,38 +344,87 @@ export default function SupportRequestDetail() {
             </div>
           </div>
 
-          {isSuperAdmin && (
-            <Card className="w-full md:max-w-sm">
-              <CardContent className="space-y-3 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <ShieldCheck size={16} className="text-primary" />
-                  {t("adminActions")}
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("updateStatus")}</Label>
-                  <div className="flex gap-2">
-                    <Select value={standaloneStatus} onValueChange={(value) => setStandaloneStatus(value as RequestStatus)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("status")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map((status) => (
-                          <SelectItem key={status} value={status}>{t(status)}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="outline"
-                      onClick={handleStatusUpdate}
-                      disabled={!standaloneStatus || standaloneStatus === request.status || updateStatusMutation.isPending}
-                    >
-                      {updateStatusMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : t("save")}
-                    </Button>
+          <div className="flex flex-col gap-3 md:items-end">
+            {/* Edit button for creator */}
+            {canEdit && !isEditing && (
+              <Button variant="outline" className="gap-2" onClick={startEditing}>
+                <Edit3 size={16} />
+                {isRTL ? "تعديل الطلب" : "Edit Request"}
+              </Button>
+            )}
+
+            {/* Admin actions card */}
+            {isSuperAdmin && (
+              <Card className="w-full md:max-w-sm">
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <ShieldCheck size={16} className="text-primary" />
+                    {t("adminActions")}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  <div className="space-y-2">
+                    <Label>{t("updateStatus")}</Label>
+                    <div className="flex gap-2">
+                      <Select value={standaloneStatus} onValueChange={(value) => setStandaloneStatus(value as RequestStatus)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("status")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((status) => (
+                            <SelectItem key={status} value={status}>{t(status)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        onClick={handleStatusUpdate}
+                        disabled={!standaloneStatus || standaloneStatus === request.status || updateStatusMutation.isPending}
+                      >
+                        {updateStatusMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : t("save")}
+                      </Button>
+                    </div>
+                  </div>
+                  <Separator />
+                  {/* Delete button for admin */}
+                  {!showDeleteConfirm ? (
+                    <Button
+                      variant="destructive"
+                      className="w-full gap-2"
+                      onClick={() => setShowDeleteConfirm(true)}
+                    >
+                      <Trash2 size={16} />
+                      {isRTL ? "حذف الطلب" : "Delete Request"}
+                    </Button>
+                  ) : (
+                    <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                      <p className="text-sm font-medium text-destructive">
+                        {isRTL ? "هل أنت متأكد من حذف هذا الطلب؟ لا يمكن التراجع." : "Are you sure? This action cannot be undone."}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="flex-1 gap-2"
+                          onClick={handleDelete}
+                          disabled={deleteMutation.isPending}
+                        >
+                          {deleteMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          {isRTL ? "تأكيد الحذف" : "Confirm Delete"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => setShowDeleteConfirm(false)}
+                        >
+                          {isRTL ? "إلغاء" : "Cancel"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
@@ -277,27 +434,98 @@ export default function SupportRequestDetail() {
                 <CardTitle>{t("requestDetails")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
-                <div>
-                  <p className="mb-2 text-sm font-medium">{t("description")}</p>
-                  <div className="rounded-xl border bg-muted/20 p-4 text-sm leading-7 whitespace-pre-wrap">
-                    {request.description}
+                {isEditing ? (
+                  /* ─── Edit Mode ─── */
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>{isRTL ? "العنوان" : "Subject"}</Label>
+                      <Input
+                        value={editForm.subject}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, subject: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("description")}</Label>
+                      <Textarea
+                        value={editForm.description}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))}
+                        className="min-h-[150px]"
+                      />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>{isRTL ? "التصنيف" : "Category"}</Label>
+                        <Select value={editForm.category} onValueChange={(v) => setEditForm((prev) => ({ ...prev, category: v as RequestCategory }))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SUPPORT_CATEGORIES.map((cat) => (
+                              <SelectItem key={cat} value={cat}>{t(cat)}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{isRTL ? "الأولوية" : "Priority"}</Label>
+                        <Select value={editForm.priority} onValueChange={(v) => setEditForm((prev) => ({ ...prev, priority: v as RequestPriority }))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SUPPORT_PRIORITIES.map((p) => (
+                              <SelectItem key={p} value={p}>{t(p)}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("screenRecordingLink")}</Label>
+                      <Input
+                        type="url"
+                        value={editForm.screenRecordingLink}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, screenRecordingLink: e.target.value }))}
+                        placeholder="https://loom.com/..."
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button className="gap-2" onClick={handleSaveEdit} disabled={editMutation.isPending}>
+                        {editMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        {isRTL ? "حفظ التعديلات" : "Save Changes"}
+                      </Button>
+                      <Button variant="outline" className="gap-2" onClick={cancelEditing} disabled={editMutation.isPending}>
+                        <X size={16} />
+                        {isRTL ? "إلغاء" : "Cancel"}
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* ─── View Mode ─── */
+                  <>
+                    <div>
+                      <p className="mb-2 text-sm font-medium">{t("description")}</p>
+                      <div className="rounded-xl border bg-muted/20 p-4 text-sm leading-7 whitespace-pre-wrap">
+                        {request.description}
+                      </div>
+                    </div>
 
-                {request.screenRecordingLink && (
-                  <div>
-                    <p className="mb-2 text-sm font-medium">{t("screenRecordingLink")}</p>
-                    <a
-                      href={request.screenRecordingLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-primary transition hover:bg-primary/5"
-                    >
-                      <FileVideo size={16} />
-                      <span className="truncate">{request.screenRecordingLink}</span>
-                      <ExternalLink size={14} />
-                    </a>
-                  </div>
+                    {request.screenRecordingLink && (
+                      <div>
+                        <p className="mb-2 text-sm font-medium">{t("screenRecordingLink")}</p>
+                        <a
+                          href={request.screenRecordingLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-primary transition hover:bg-primary/5"
+                        >
+                          <FileVideo size={16} />
+                          <span className="truncate">{request.screenRecordingLink}</span>
+                          <ExternalLink size={14} />
+                        </a>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <Separator />

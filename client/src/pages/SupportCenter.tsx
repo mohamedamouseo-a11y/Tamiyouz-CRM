@@ -120,6 +120,7 @@ export default function SupportCenter() {
   const [statusFilter, setStatusFilter] = React.useState<RequestStatus | "all">("all");
   const [typeFilter, setTypeFilter] = React.useState<RequestType | "all">("all");
   const [submitting, setSubmitting] = React.useState(false);
+  const submittingRef = React.useRef(false);
   const [form, setForm] = React.useState({
     requestType: "Ticket" as RequestType,
     category: "Bug" as RequestCategory,
@@ -155,7 +156,15 @@ export default function SupportCenter() {
         description: "",
         screenRecordingLink: "",
       });
-      await utils.supportCenter?.myRequests.invalidate?.();
+      // Force refetch the list to show the new ticket immediately
+      try {
+        await utils.supportCenter.invalidate();
+      } catch {
+        // fallback: invalidate specific queries
+        await utils.supportCenter?.myRequests.invalidate?.();
+      }
+      // Also explicitly refetch to ensure data is fresh
+      await requestsQuery.refetch();
       if (result?.code) {
         toast.success(`${isRTL ? "رقم الطلب" : "Request code"}: ${result.code}`);
       }
@@ -230,6 +239,8 @@ export default function SupportCenter() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // Guard against double submission using both state and ref
+    if (submitting || submittingRef.current || createMutation.isPending) return;
     if (form.subject.trim().length < 3) {
       toast.error(isRTL ? "العنوان قصير جدًا" : "Subject is too short");
       return;
@@ -240,6 +251,7 @@ export default function SupportCenter() {
     }
 
     setSubmitting(true);
+    submittingRef.current = true;
     try {
       const screenshots: ScreenshotPayload[] = await Promise.all(
         files.map(async (file) => ({
@@ -263,6 +275,7 @@ export default function SupportCenter() {
       toast.error(message);
     } finally {
       setSubmitting(false);
+      submittingRef.current = false;
     }
   };
 

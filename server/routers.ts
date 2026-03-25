@@ -3117,6 +3117,88 @@ byLeadStageChanges: protectedProcedure
 
         return { success: true };
       }),
+    // Edit a support request (only by the creator, and only if status is New or UnderReview)
+    edit: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        subject: z.string().min(3).max(255).optional(),
+        description: z.string().min(10).optional(),
+        category: supportCategorySchema.optional(),
+        priority: supportPrioritySchema.optional(),
+        screenRecordingLink: z.string().url().max(2000).nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const { supportRequests } = await import("../drizzle/schema");
+        const rows = await db.select().from(supportRequests).where(eq(supportRequests.id, input.id)).limit(1);
+        const request = rows[0];
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Request not found" });
+        }
+        // Only the creator can edit
+        if (request.createdBy !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the request creator can edit this ticket" });
+        }
+        // Only editable if status is New or UnderReview
+        if (!["New", "UnderReview"].includes(request.status)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "This ticket can no longer be edited" });
+        }
+        const updates: Record<string, any> = {};
+        if (input.subject !== undefined) updates.subject = input.subject;
+        if (input.description !== undefined) updates.description = input.description;
+        if (input.category !== undefined) updates.category = input.category;
+        if (input.priority !== undefined) updates.priority = input.priority;
+        if (input.screenRecordingLink !== undefined) updates.screenRecordingLink = input.screenRecordingLink;
+        if (Object.keys(updates).length === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No fields to update" });
+        }
+        await db.update(supportRequests).set(updates).where(eq(supportRequests.id, input.id));
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "update",
+          entityType: "support_request",
+          entityId: input.id,
+          entityName: input.subject || request.subject,
+          details: { updatedFields: Object.keys(updates) },
+        });
+        return { success: true };
+      }),
+    // Delete a support request (super admin only)
+    delete: superAdminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const { supportRequests, supportRequestMessages, supportRequestAttachments } = await import("../drizzle/schema");
+        const rows = await db.select().from(supportRequests).where(eq(supportRequests.id, input.id)).limit(1);
+        const request = rows[0];
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Request not found" });
+        }
+        // Delete attachments storage files first
+        const attachments = await db.select().from(supportRequestAttachments).where(eq(supportRequestAttachments.requestId, input.id));
+        for (const att of attachments) {
+          try { await storageDelete(att.storageKey); } catch {}
+        }
+        // Delete related records then the request
+        await db.delete(supportRequestAttachments).where(eq(supportRequestAttachments.requestId, input.id));
+        await db.delete(supportRequestMessages).where(eq(supportRequestMessages.requestId, input.id));
+        await db.delete(supportRequests).where(eq(supportRequests.id, input.id));
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "delete",
+          entityType: "support_request",
+          entityId: input.id,
+          entityName: request.subject,
+          details: { code: request.code, deletedAttachments: attachments.length },
+        });
+        return { success: true };
+      }),
   }),
 
   // ─── Notification Preferences (per-user) ──────────────────────────────────
