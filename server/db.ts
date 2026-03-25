@@ -1032,6 +1032,14 @@ export async function getAgentStats(userId: number, dateFrom?: Date, dateTo?: Da
       : db.select({ count: sql<number>`count(*)` }).from(leads).where(and(eq(leads.ownerId, userId), eq(leads.slaBreached, true), isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to))),
   ]);
   const dealsData = (myDeals as any)[0]?.[0] ?? { count: 0, totalValue: 0 };
+  
+  // Revenue breakdown by currency
+  const revenueBreakdownQuery = isMediaBuyer
+    ? db.execute(sql\`SELECT COALESCE(d.currency, SAR) as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.deletedAt IS NULL AND d.status = Won AND d.createdAt BETWEEN \${from} AND \${to} GROUP BY d.currency\`)
+    : db.execute(sql\`SELECT COALESCE(d.currency, SAR) as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.ownerId = \${userId} AND d.status = Won AND d.createdAt BETWEEN \${from} AND \${to} GROUP BY d.currency\`);
+  const breakdownRows = (await revenueBreakdownQuery as any)[0] ?? [];
+  const revenueBreakdown = Array.isArray(breakdownRows) ? breakdownRows.map((r: any) => ({ currency: r.currency || "SAR", total: Number(r.total || 0) })) : [];
+  
   // Conversion rate queries
   const meetingStages = ['Meeting Scheduled', 'Proposal Delivered', 'Won'];
   const contactedStages = ['Contacted', 'Leads', 'Meeting Scheduled', 'Proposal Delivered', 'Won', 'Contact Again'];
@@ -1152,10 +1160,16 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
   // SLA breached count (date-filtered)
   const slaBreachedCount = await db.select({ count: sql<number>`count(*)` }).from(leads).where(and(eq(leads.slaBreached, true), isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to)));
 
+  // Revenue breakdown by currency for team
+  const teamBreakdownQuery = await db.execute(sql`SELECT COALESCE(d.currency, 'SAR') as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.deletedAt IS NULL AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to} GROUP BY d.currency`);
+  const teamBreakdownRows = (teamBreakdownQuery as any)[0] ?? [];
+  const revenueBreakdown = Array.isArray(teamBreakdownRows) ? teamBreakdownRows.map((r: any) => ({ currency: r.currency || "SAR", total: Number(r.total || 0) })) : [];
+
   return {
     totalLeads: Number(totalLeads[0]?.count ?? 0),
     wonDeals,
     totalRevenue,
+    revenueBreakdown,
     slaBreached: Number(slaBreachedCount[0]?.count ?? 0),
     dealStats: dealRows,
     leadsByStage: stageRows.map((r: any) => ({ stage: r.stage, count: Number(r.count) })),
