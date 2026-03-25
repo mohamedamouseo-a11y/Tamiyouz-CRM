@@ -1008,8 +1008,8 @@ export async function getAgentStats(userId: number, dateFrom?: Date, dateTo?: Da
     db.select({ count: sql<number>`count(*)` }).from(leads).where(and(...leadConditions)),
     db.select({ count: sql<number>`count(*)` }).from(activities).where(and(...activityConditions)),
     isMediaBuyer
-      ? db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(d.valueSar), 0) as totalValue FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.deletedAt IS NULL AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to}`)
-      : db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(d.valueSar), 0) as totalValue FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.ownerId = ${userId} AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to}`),
+      ? db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(d.valueBase), 0) as totalValue FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.deletedAt IS NULL AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to}`)
+      : db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(d.valueBase), 0) as totalValue FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.ownerId = ${userId} AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to}`),
     isMediaBuyer
       ? db.select({ count: sql<number>`count(*)` }).from(leads).where(and(eq(leads.slaBreached, true), isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to)))
       : db.select({ count: sql<number>`count(*)` }).from(leads).where(and(eq(leads.ownerId, userId), eq(leads.slaBreached, true), isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to))),
@@ -1056,7 +1056,7 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
   const [totalLeads, totalDeals, stageBreakdown, agentPerformance] = await Promise.all([
     db.select({ count: sql<number>`count(*)` }).from(leads).where(and(isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to))),
     db.execute(sql`
-      SELECT status, COUNT(*) as count, COALESCE(SUM(valueSar), 0) as totalValue
+      SELECT status, COUNT(*) as count, COALESCE(SUM(valueBase), 0) as totalValue
       FROM deals WHERE createdAt BETWEEN ${from} AND ${to} GROUP BY status
     `),
     db.execute(sql`
@@ -1094,7 +1094,7 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
       LEFT JOIN (
         SELECT l2.ownerId,
           COUNT(d.id) as wonDeals,
-          COALESCE(SUM(d.valueSar), 0) as revenue
+          COALESCE(SUM(d.valueBase), 0) as revenue
         FROM deals d
         JOIN leads l2 ON l2.id = d.leadId AND l2.deletedAt IS NULL
         WHERE d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to}
@@ -1260,14 +1260,14 @@ export async function getSalesFunnelData(dateFrom?: Date, dateTo?: Date, userRol
   // 5. Deal values
   const [dealRows] = isAgent
     ? await db.execute(sql`
-        SELECT d.status, COUNT(*) AS count, COALESCE(SUM(d.valueSar), 0) AS totalValue, COALESCE(AVG(d.valueSar), 0) AS avgValue
+        SELECT d.status, COUNT(*) AS count, COALESCE(SUM(d.valueBase), 0) AS totalValue, COALESCE(AVG(d.valueBase), 0) AS avgValue
         FROM deals d JOIN leads l ON l.id = d.leadId
         WHERE d.deletedAt IS NULL AND l.ownerId = ${agentId}
           AND d.createdAt >= ${from} AND d.createdAt <= ${to}
         GROUP BY d.status
       `) as any
     : await db.execute(sql`
-        SELECT d.status, COUNT(*) AS count, COALESCE(SUM(d.valueSar), 0) AS totalValue, COALESCE(AVG(d.valueSar), 0) AS avgValue
+        SELECT d.status, COUNT(*) AS count, COALESCE(SUM(d.valueBase), 0) AS totalValue, COALESCE(AVG(d.valueBase), 0) AS avgValue
         FROM deals d WHERE d.deletedAt IS NULL
           AND d.createdAt >= ${from} AND d.createdAt <= ${to}
         GROUP BY d.status
@@ -1717,7 +1717,7 @@ export async function getReportData(dateFrom?: Date, dateTo?: Date) {
 
   // Won deals in period
   const wonDealsResult = await db
-    .select({ count: sql<number>`count(*)`, total: sql<number>`COALESCE(SUM(valueSar), 0)` })
+    .select({ count: sql<number>`count(*)`, total: sql<number>`COALESCE(SUM(valueBase), 0)` })
     .from(deals)
     .where(and(eq(deals.status, "Won"), gte(deals.createdAt, from), lte(deals.createdAt, to)));
   const wonDeals = Number(wonDealsResult[0]?.count ?? 0);

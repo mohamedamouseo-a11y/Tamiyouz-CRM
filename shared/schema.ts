@@ -998,5 +998,3 @@ uniqueIndex("exchange_rates_pair_uq").on(table.fromCurrency, table.toCurrency),
 
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
 export type InsertExchangeRate = typeof exchangeRates.$inferInsert;
-export type Deal = typeof deals.$inferSelect;
-export type InsertDeal = typeof deals.$inferInsert;
