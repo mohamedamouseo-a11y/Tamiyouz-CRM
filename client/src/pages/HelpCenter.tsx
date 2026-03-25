@@ -529,6 +529,20 @@ const sections: HelpSection[] = [
         { questionKey: "helpPasswordResetQ2", answerKey: "helpPasswordResetA2" },
       ],
     },
+    {
+      id: "currency" ,
+      slug: "currency" ,
+      titleKey: "helpCurrency" ,
+      icon: <DollarSign className="h-5 w-5" />,
+      color: "#16a34a" ,
+      items: [
+        { questionKey: "helpCurrencyQ1", answerKey: "helpCurrencyA1" },
+        { questionKey: "helpCurrencyQ2", answerKey: "helpCurrencyA2" },
+        { questionKey: "helpCurrencyQ3", answerKey: "helpCurrencyA3" },
+        { questionKey: "helpCurrencyQ4", answerKey: "helpCurrencyA4" },
+        { questionKey: "helpCurrencyQ5", answerKey: "helpCurrencyA5" },
+      ],
+    },
 ];
 
 export default function HelpCenter() {
