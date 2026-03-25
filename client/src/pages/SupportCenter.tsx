@@ -20,7 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
-import { AlertCircle, ExternalLink, Image as ImageIcon, Inbox, LifeBuoy, Loader2, Plus, Sparkles } from "lucide-react";
+import { AlertCircle, Clipboard, ExternalLink, Image as ImageIcon, Inbox, LifeBuoy, Loader2, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useLocation } from "wouter";
 
@@ -178,28 +178,55 @@ export default function SupportCenter() {
     return { total, openItems, resolved, suggestions };
   }, [requests]);
 
+  const addImageFiles = React.useCallback(
+    (incoming: File[]) => {
+      const imageOnly = incoming.filter((f) => f.type.startsWith("image/"));
+      if (imageOnly.length !== incoming.length) {
+        toast.error(isRTL ? "يُسمح فقط برفع الصور" : "Only image files are allowed");
+      }
+      const oversized = imageOnly.find((f) => f.size > MAX_FILE_SIZE);
+      if (oversized) {
+        toast.error(isRTL ? "الحد الأقصى للصورة الواحدة 5MB" : "Each screenshot must be 5MB or less");
+        return;
+      }
+      setFiles((prev) => {
+        const next = [...prev, ...imageOnly].slice(0, MAX_FILES);
+        if (prev.length + imageOnly.length > MAX_FILES) {
+          toast.error(isRTL ? "الحد الأقصى 5 صور" : "You can upload up to 5 screenshots only");
+        }
+        return next;
+      });
+    },
+    [isRTL]
+  );
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(event.target.files ?? []);
     if (!selected.length) return;
-
-    const imageOnly = selected.filter((file) => file.type.startsWith("image/"));
-    if (imageOnly.length !== selected.length) {
-      toast.error(isRTL ? "يُسمح فقط برفع الصور" : "Only image files are allowed");
-    }
-
-    const oversized = imageOnly.find((file) => file.size > MAX_FILE_SIZE);
-    if (oversized) {
-      toast.error(isRTL ? "الحد الأقصى للصورة الواحدة 5MB" : "Each screenshot must be 5MB or less");
-      return;
-    }
-
-    const next = [...files, ...imageOnly].slice(0, MAX_FILES);
-    if (files.length + imageOnly.length > MAX_FILES) {
-      toast.error(isRTL ? "الحد الأقصى 5 صور" : "You can upload up to 5 screenshots only");
-    }
-    setFiles(next);
+    addImageFiles(selected);
     event.target.value = "";
   };
+
+  // Handle paste from clipboard (Ctrl+V)
+  const handlePaste = React.useCallback(
+    (event: React.ClipboardEvent) => {
+      const items = Array.from(event.clipboardData?.items ?? []);
+      const imageItems = items.filter((item) => item.type.startsWith("image/"));
+      if (!imageItems.length) return;
+      event.preventDefault();
+      const pastedFiles = imageItems
+        .map((item) => item.getAsFile())
+        .filter((f): f is File => f !== null)
+        .map((f) => {
+          // Give pasted images a readable name with timestamp
+          const ext = f.type.split("/")[1] || "png";
+          return new File([f], `screenshot-${Date.now()}.${ext}`, { type: f.type });
+        });
+      addImageFiles(pastedFiles);
+      toast.success(isRTL ? `تم لصق ${pastedFiles.length} صورة` : `Pasted ${pastedFiles.length} image(s)`);
+    },
+    [addImageFiles, isRTL]
+  );
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -494,6 +521,17 @@ export default function SupportCenter() {
               </div>
 
               <Input id="screenshots" type="file" accept="image/*" multiple onChange={handleFileChange} />
+
+              {/* Paste zone for clipboard screenshots */}
+              <div
+                onPaste={handlePaste}
+                tabIndex={0}
+                className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/10 px-4 py-3 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 focus:border-primary/40 focus:bg-primary/5 focus:outline-none"
+                onClick={(e) => (e.currentTarget as HTMLDivElement).focus()}
+              >
+                <Clipboard size={16} />
+                <span>{isRTL ? "اضغط هنا ثم Ctrl+V للصق صورة من الحافظة" : "Click here then Ctrl+V to paste a screenshot"}</span>
+              </div>
 
               {files.length > 0 && (
                 <div className="grid gap-2 sm:grid-cols-2">
