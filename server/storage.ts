@@ -1,122 +1,90 @@
-// Preconfigured storage helpers for Manus WebDev templates
-// Uses the Biz-provided storage proxy (Authorization: Bearer <token>)
+// Local file storage implementation for self-hosted Tamiyouz CRM
+// Replaces the Manus Forge proxy with local disk storage served via Express
+import path from "node:path";
+import fs from "node:fs";
+import crypto from "node:crypto";
 
-import { ENV } from './_core/env';
+// Base directory for uploaded files
+const UPLOADS_DIR = path.resolve(process.cwd(), "uploads");
 
-type StorageConfig = { baseUrl: string; apiKey: string };
-
-function getStorageConfig(): StorageConfig {
-  const baseUrl = ENV.forgeApiUrl;
-  const apiKey = ENV.forgeApiKey;
-
-  if (!baseUrl || !apiKey) {
-    throw new Error(
-      "Storage proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
-    );
+// Ensure the uploads directory exists
+function ensureUploadsDir(subDir?: string): string {
+  const dir = subDir ? path.join(UPLOADS_DIR, subDir) : UPLOADS_DIR;
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
-
-  return { baseUrl: baseUrl.replace(/\/+$/, ""), apiKey };
-}
-
-function buildUploadUrl(baseUrl: string, relKey: string): URL {
-  const url = new URL("v1/storage/upload", ensureTrailingSlash(baseUrl));
-  url.searchParams.set("path", normalizeKey(relKey));
-  return url;
-}
-
-async function buildDownloadUrl(
-  baseUrl: string,
-  relKey: string,
-  apiKey: string
-): Promise<string> {
-  const downloadApiUrl = new URL(
-    "v1/storage/downloadUrl",
-    ensureTrailingSlash(baseUrl)
-  );
-  downloadApiUrl.searchParams.set("path", normalizeKey(relKey));
-  const response = await fetch(downloadApiUrl, {
-    method: "GET",
-    headers: buildAuthHeaders(apiKey),
-  });
-  return (await response.json()).url;
-}
-
-function ensureTrailingSlash(value: string): string {
-  return value.endsWith("/") ? value : `${value}/`;
+  return dir;
 }
 
 function normalizeKey(relKey: string): string {
   return relKey.replace(/^\/+/, "");
 }
 
-function toFormData(
-  data: Buffer | Uint8Array | string,
-  contentType: string,
-  fileName: string
-): FormData {
-  const blob =
-    typeof data === "string"
-      ? new Blob([data], { type: contentType })
-      : new Blob([data as any], { type: contentType });
-  const form = new FormData();
-  form.append("file", blob, fileName || "file");
-  return form;
-}
-
-function buildAuthHeaders(apiKey: string): HeadersInit {
-  return { Authorization: `Bearer ${apiKey}` };
-}
-
+/**
+ * Store a file locally on disk.
+ * Returns the relative key and a URL path that can be served by Express.
+ */
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
-  contentType = "application/octet-stream"
+  _contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
-  const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);
-  const uploadUrl = buildUploadUrl(baseUrl, key);
-  const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: buildAuthHeaders(apiKey),
-    body: formData,
-  });
+  const filePath = path.join(UPLOADS_DIR, key);
+  const dir = path.dirname(filePath);
 
-  if (!response.ok) {
-    const message = await response.text().catch(() => response.statusText);
-    throw new Error(
-      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
-    );
+  // Ensure directory exists
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
-  const url = (await response.json()).url;
+
+  // Write file to disk
+  const buffer = typeof data === "string" ? Buffer.from(data) : Buffer.from(data);
+  fs.writeFileSync(filePath, buffer);
+
+  // Return URL path that will be served by Express static middleware
+  const url = `/uploads/${key}`;
   return { key, url };
 }
 
-export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
-  const { baseUrl, apiKey } = getStorageConfig();
+/**
+ * Get the URL for a stored file.
+ */
+export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
   const key = normalizeKey(relKey);
-  return {
-    key,
-    url: await buildDownloadUrl(baseUrl, key, apiKey),
-  };
+  const url = `/uploads/${key}`;
+  return { key, url };
 }
 
-
+/**
+ * Delete a stored file from disk.
+ */
 export async function storageDelete(relKey: string): Promise<{ key: string }> {
-  const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);
-  const deleteUrl = buildUploadUrl(baseUrl, key);
-  const response = await fetch(deleteUrl, {
-    method: "DELETE",
-    headers: buildAuthHeaders(apiKey),
-  });
+  const filePath = path.join(UPLOADS_DIR, key);
 
-  if (!response.ok && response.status !== 404) {
-    const message = await response.text().catch(() => response.statusText);
-    throw new Error(
-      `Storage delete failed (${response.status} ${response.statusText}): ${message}`
-    );
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+
+  // Clean up empty parent directories
+  let dir = path.dirname(filePath);
+  while (dir !== UPLOADS_DIR && dir.startsWith(UPLOADS_DIR)) {
+    try {
+      const entries = fs.readdirSync(dir);
+      if (entries.length === 0) {
+        fs.rmdirSync(dir);
+        dir = path.dirname(dir);
+      } else {
+        break;
+      }
+    } catch {
+      break;
+    }
   }
 
   return { key };
 }
+
+// Initialize uploads directory on module load
+ensureUploadsDir();
