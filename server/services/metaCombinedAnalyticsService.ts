@@ -247,7 +247,7 @@ export async function getMetaCombinedAnalytics(
       switch (deal.status) {
         case "Won":
           wonDeals++;
-          totalRevenue += parseFloat(deal.valueSar || "0");
+          totalRevenue += parseFloat(deal.valueBase || deal.valueSar || "0");
           break;
         case "Lost":
           lostDeals++;

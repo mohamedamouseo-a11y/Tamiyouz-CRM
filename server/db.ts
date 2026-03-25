@@ -82,6 +82,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { notifyNewLead, notifyLeadAssigned, notifySLABreach, notifyStageChange, notifyDealWon, notifyDealLost, notifyActivityLogged, notifyLeadQualityChange, notifyLeadTransfer, notifyDuplicateLead } from "./notificationEngine";
+import { convertMoney, normalizeCurrency, BASE_CURRENCY } from "./lib/currency";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -647,7 +648,11 @@ export async function getDealsByUser(userId: number): Promise<Deal[]> {
 export async function createDeal(data: InsertDeal): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(deals).values(data);
+  // Multi-currency: calculate valueBase before insert
+  const dealCurrency = normalizeCurrency((data as any).currency);
+  const dealValue = String((data as any).valueSar || 0);
+  const valueBase = await convertMoney(dealValue, dealCurrency, BASE_CURRENCY);
+  const result = await db.insert(deals).values({ ...data, currency: dealCurrency, valueBase } as any);
   const dealId = (result as any)[0]?.insertId ?? 0;
   // Update lead stage based on deal status
   if (data.status === "Won") {
@@ -672,6 +677,15 @@ export async function createDeal(data: InsertDeal): Promise<number> {
 export async function updateDeal(id: number, data: Partial<InsertDeal>): Promise<void> {
   const db = await getDb();
   if (!db) return;
+  // Multi-currency: recalculate valueBase if value or currency changed
+  if ((data as any).valueSar !== undefined || (data as any).currency !== undefined) {
+    const [existing] = await db.select({ valueSar: deals.valueSar, currency: deals.currency }).from(deals).where(eq(deals.id, id)).limit(1);
+    const nextCurrency = normalizeCurrency((data as any).currency ?? existing?.currency);
+    const nextValue = String((data as any).valueSar ?? existing?.valueSar ?? 0);
+    const nextValueBase = await convertMoney(nextValue, nextCurrency, BASE_CURRENCY);
+    (data as any).currency = nextCurrency;
+    (data as any).valueBase = nextValueBase;
+  }
   await db.update(deals).set(data).where(eq(deals.id, id));
   // Update lead stage if deal status changed
   if (data.status && data.leadId) {

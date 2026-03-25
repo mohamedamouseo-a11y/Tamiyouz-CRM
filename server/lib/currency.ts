@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../db";
-import { exchangeRates } from "../../shared/schema";
+import { exchangeRates } from "../../drizzle/schema";
 
 export const BASE_CURRENCY = "SAR";
 

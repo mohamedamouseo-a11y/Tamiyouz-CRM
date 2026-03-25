@@ -1,4 +1,4 @@
-import { mysqlTable, mysqlSchema, AnyMySqlColumn, primaryKey, int, mysqlEnum, timestamp, text, varchar, json, decimal, index, datetime, unique, tinyint, boolean } from "drizzle-orm/mysql-core"
+import { mysqlTable, mysqlSchema, AnyMySqlColumn, primaryKey, int, mysqlEnum, timestamp, text, varchar, json, decimal, index, datetime, unique, tinyint, boolean, uniqueIndex } from "drizzle-orm/mysql-core"
 import { sql } from "drizzle-orm"
 
 export const activities = mysqlTable("activities", {
@@ -180,6 +180,8 @@ export const deals = mysqlTable("deals", {
 	id: int().autoincrement().notNull(),
 	leadId: int(),
 	valueSar: decimal({ precision: 12, scale: 2 }),
+	currency: varchar({ length: 10 }).default("SAR").notNull(),
+	valueBase: decimal({ precision: 12, scale: 2 }).default("0.00").notNull(),
 	status: mysqlEnum(['Won','Lost','Pending']).default('Pending').notNull(),
 	closedAt: timestamp({ mode: 'string' }),
 	dealType: mysqlEnum(['New','Contract','Renewal','Upsell']).default('New'),
@@ -306,7 +308,6 @@ export const leads = mysqlTable("leads", {
 	country: varchar({ length: 100 }).default('Saudi Arabia'),
 	businessProfile: text(),
 	leadQuality: mysqlEnum(['Hot','Warm','Cold','Bad','Unknown']).default('Unknown').notNull(),
-	fitStatus: mysqlEnum("fit_status", ['Fit','Not Fit','Pending']).default('Pending').notNull(),
 	campaignName: varchar({ length: 255 }),
 	adCreative: varchar({ length: 255 }),
 	ownerId: int(),
@@ -557,6 +558,7 @@ export const upsellOpportunities = mysqlTable("upsell_opportunities", {
 	servicePackageId: int(),
 	title: varchar({ length: 255 }).notNull(),
 	potentialValue: decimal({ precision: 12, scale: 2 }),
+	currency: varchar({ length: 10 }).default("SAR").notNull(),
 	status: mysqlEnum(['Prospecting','ProposalSent','Negotiation','Won','Lost']).default('Prospecting'),
 	notes: text(),
 
@@ -981,3 +983,18 @@ export type TikTokAdAccount = typeof tiktokAdAccounts.$inferSelect;
 export type InsertTikTokAdAccount = typeof tiktokAdAccounts.$inferInsert;
 export type TikTokCampaignSnapshot = typeof tiktokCampaignSnapshots.$inferSelect;
 export type InsertTikTokCampaignSnapshot = typeof tiktokCampaignSnapshots.$inferInsert;
+
+export const exchangeRates = mysqlTable("exchange_rates", {
+id: int().autoincrement().notNull(),
+fromCurrency: varchar({ length: 10 }).notNull(),
+toCurrency: varchar({ length: 10 }).notNull(),
+rate: decimal({ precision: 18, scale: 8 }).notNull(),
+updatedAt: timestamp({ mode: "string" }).defaultNow().onUpdateNow().notNull(),
+},
+(table) => [
+primaryKey({ columns: [table.id], name: "exchange_rates_id" }),
+uniqueIndex("exchange_rates_pair_uq").on(table.fromCurrency, table.toCurrency),
+]);
+
+export type ExchangeRate = typeof exchangeRates.$inferSelect;
+export type InsertExchangeRate = typeof exchangeRates.$inferInsert;
