@@ -45,6 +45,7 @@ type SupportRequestLike = {
   status: RequestStatus;
   screenRecordingLink?: string | null;
   createdBy?: number | null;
+  createdByName?: string | null;
   createdAt?: string | Date | null;
   updatedAt?: string | Date | null;
   lastActivityAt?: string | Date | null;
@@ -342,7 +343,7 @@ export default function SupportRequestDetail() {
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">{request.subject}</h1>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {t(request.requestType)} • {t(request.category)} • {t("createdAt")} {formatDateTime(request.createdAt, lang)}
+                  {(request as any).createdByName && <><span className="font-medium text-foreground">{(request as any).createdByName}</span> • </>}{t(request.requestType)} • {t(request.category)} • {t("createdAt")} {formatDateTime(request.createdAt, lang)}
                 </p>
               </div>
             </div>
