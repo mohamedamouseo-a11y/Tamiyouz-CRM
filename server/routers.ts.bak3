@@ -1,6 +1,6 @@
 import { storageDelete, storagePut } from "./storage";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, gte } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -2859,19 +2859,6 @@ byLeadStageChanges: protectedProcedure
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
         const { supportRequests, supportRequestAttachments } = await import("../drizzle/schema");
-        // Deduplication: reject if same user submitted same subject within last 30 seconds
-        const thirtySecondsAgo = new Date(Date.now() - 30_000);
-        const recentDuplicates = await db.select({ id: supportRequests.id })
-          .from(supportRequests)
-          .where(and(
-            eq(supportRequests.createdBy, ctx.user.id),
-            eq(supportRequests.subject, input.subject),
-            gte(supportRequests.createdAt, thirtySecondsAgo),
-          ))
-          .limit(1);
-        if (recentDuplicates.length > 0) {
-          throw new TRPCError({ code: "CONFLICT", message: "A similar request was just submitted. Please wait before submitting again." });
-        }
         const superAdmin = await getPrimarySuperAdminOrThrow();
         const code = buildSupportRequestCode();
 
