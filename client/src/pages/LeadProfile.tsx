@@ -1254,7 +1254,7 @@ export default function LeadProfile() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-2xl font-bold text-foreground">
-                        {deal.valueSar ? `${Number(deal.valueSar).toLocaleString()} ${t("currency")}` : "—"}
+                        {deal.valueSar ? `${Number(deal.valueSar).toLocaleString()} ${(deal as any).currency || "SAR"}` : "—"}
                       </span>
                       <span
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
@@ -1507,8 +1507,19 @@ export default function LeadProfile() {
           </DialogHeader>
           <form onSubmit={dealHandleSubmit(onCreateDeal)} className="space-y-4">
             <div>
-              <Label>{t("dealValue")} ({t("currency")})</Label>
+              <Label>{t("dealValue")}</Label>
               <Input {...dealRegister("valueSar")} type="number" placeholder="0" dir="ltr" />
+            </div>
+            <div>
+              <Label>{isRTL ? "العملة" : "Currency"}</Label>
+              <Select defaultValue="SAR" onValueChange={(v) => dealSetValue("currency", v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SAR">{isRTL ? "ريال سعودي (SAR)" : "Saudi Riyal (SAR)"}</SelectItem>
+                  <SelectItem value="EGP">{isRTL ? "جنيه مصري (EGP)" : "Egyptian Pound (EGP)"}</SelectItem>
+                  <SelectItem value="USD">{isRTL ? "دولار أمريكي (USD)" : "US Dollar (USD)"}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>{t("dealStatus")}</Label>

@@ -384,7 +384,7 @@ export default function SalesFunnelDashboard() {
                           </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
-                          {isRTL ? "القيمة" : "Value"}: {deal.value.toLocaleString()} {isRTL ? "ر.س (محول)" : "SAR (conv.)"}
+                          {isRTL ? "القيمة" : "Value"}: {deal.value.toLocaleString()} {deal.currency || "SAR"}
                         </div>
                         {deal.avg > 0 && (
                           <div className="text-xs text-muted-foreground">
