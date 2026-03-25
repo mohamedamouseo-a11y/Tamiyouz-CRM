@@ -2809,6 +2809,7 @@ byLeadStageChanges: protectedProcedure
       .input(z.object({ status: supportStatusSchema.optional(), requestType: supportRequestTypeSchema.optional() }).optional())
       .query(async ({ input }) => {
         const { supportRequests } = await import("../drizzle/schema");
+        const { users } = await import("../drizzle/schema");
         const conditions: any[] = [];
         if (input?.status) conditions.push(eq(supportRequests.status, input.status));
         if (input?.requestType) conditions.push(eq(supportRequests.requestType, input.requestType));
@@ -2816,11 +2817,28 @@ byLeadStageChanges: protectedProcedure
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
+        const baseQuery = db.select({
+          id: supportRequests.id,
+          code: supportRequests.code,
+          requestType: supportRequests.requestType,
+          subject: supportRequests.subject,
+          priority: supportRequests.priority,
+          status: supportRequests.status,
+          createdAt: supportRequests.createdAt,
+          updatedAt: supportRequests.updatedAt,
+          lastActivityAt: supportRequests.lastActivityAt,
+          createdBy: supportRequests.createdBy,
+          requesterName: users.name,
+          createdByName: users.name,
+        })
+        .from(supportRequests)
+        .leftJoin(users, eq(supportRequests.createdBy, users.id));
+
         if (conditions.length === 0) {
-          return db.select().from(supportRequests).orderBy(desc(supportRequests.lastActivityAt));
+          return baseQuery.orderBy(desc(supportRequests.lastActivityAt));
         }
 
-        return db.select().from(supportRequests).where(and(...conditions)).orderBy(desc(supportRequests.lastActivityAt));
+        return baseQuery.where(and(...conditions)).orderBy(desc(supportRequests.lastActivityAt));
       }),
 
     byId: protectedProcedure
@@ -2830,7 +2848,26 @@ byLeadStageChanges: protectedProcedure
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
-        const rows = await db.select().from(supportRequests).where(eq(supportRequests.id, input.id)).limit(1);
+        const { users } = await import("../drizzle/schema");
+        const rows = await db.select({
+          id: supportRequests.id,
+          code: supportRequests.code,
+          requestType: supportRequests.requestType,
+          category: supportRequests.category,
+          subject: supportRequests.subject,
+          description: supportRequests.description,
+          priority: supportRequests.priority,
+          status: supportRequests.status,
+          screenRecordingLink: supportRequests.screenRecordingLink,
+          createdBy: supportRequests.createdBy,
+          superAdminId: supportRequests.superAdminId,
+          closedAt: supportRequests.closedAt,
+          closedBy: supportRequests.closedBy,
+          lastActivityAt: supportRequests.lastActivityAt,
+          createdAt: supportRequests.createdAt,
+          updatedAt: supportRequests.updatedAt,
+          createdByName: users.name,
+        }).from(supportRequests).leftJoin(users, eq(supportRequests.createdBy, users.id)).where(eq(supportRequests.id, input.id)).limit(1);
         const request = rows[0];
         if (!request) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Support request not found" });
@@ -3209,7 +3246,26 @@ byLeadStageChanges: protectedProcedure
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
         const { supportRequests } = await import("../drizzle/schema");
-        const rows = await db.select().from(supportRequests).where(eq(supportRequests.id, input.id)).limit(1);
+        const { users } = await import("../drizzle/schema");
+        const rows = await db.select({
+          id: supportRequests.id,
+          code: supportRequests.code,
+          requestType: supportRequests.requestType,
+          category: supportRequests.category,
+          subject: supportRequests.subject,
+          description: supportRequests.description,
+          priority: supportRequests.priority,
+          status: supportRequests.status,
+          screenRecordingLink: supportRequests.screenRecordingLink,
+          createdBy: supportRequests.createdBy,
+          superAdminId: supportRequests.superAdminId,
+          closedAt: supportRequests.closedAt,
+          closedBy: supportRequests.closedBy,
+          lastActivityAt: supportRequests.lastActivityAt,
+          createdAt: supportRequests.createdAt,
+          updatedAt: supportRequests.updatedAt,
+          createdByName: users.name,
+        }).from(supportRequests).leftJoin(users, eq(supportRequests.createdBy, users.id)).where(eq(supportRequests.id, input.id)).limit(1);
         const request = rows[0];
         if (!request) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Request not found" });
@@ -3251,7 +3307,26 @@ byLeadStageChanges: protectedProcedure
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
         const { supportRequests, supportRequestMessages, supportRequestAttachments } = await import("../drizzle/schema");
-        const rows = await db.select().from(supportRequests).where(eq(supportRequests.id, input.id)).limit(1);
+        const { users } = await import("../drizzle/schema");
+        const rows = await db.select({
+          id: supportRequests.id,
+          code: supportRequests.code,
+          requestType: supportRequests.requestType,
+          category: supportRequests.category,
+          subject: supportRequests.subject,
+          description: supportRequests.description,
+          priority: supportRequests.priority,
+          status: supportRequests.status,
+          screenRecordingLink: supportRequests.screenRecordingLink,
+          createdBy: supportRequests.createdBy,
+          superAdminId: supportRequests.superAdminId,
+          closedAt: supportRequests.closedAt,
+          closedBy: supportRequests.closedBy,
+          lastActivityAt: supportRequests.lastActivityAt,
+          createdAt: supportRequests.createdAt,
+          updatedAt: supportRequests.updatedAt,
+          createdByName: users.name,
+        }).from(supportRequests).leftJoin(users, eq(supportRequests.createdBy, users.id)).where(eq(supportRequests.id, input.id)).limit(1);
         const request = rows[0];
         if (!request) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Request not found" });
