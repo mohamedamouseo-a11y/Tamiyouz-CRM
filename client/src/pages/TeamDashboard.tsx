@@ -86,6 +86,9 @@ export default function TeamDashboard() {
                 <div className="text-2xl font-bold text-foreground">
                   {isLoading ? <div className="h-8 w-16 bg-muted rounded animate-pulse" /> : card.value}
                 </div>
+                {(card as any).subtitle && (
+                  <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate" title={(card as any).subtitle}>{(card as any).subtitle}</p>
+                )}
                 <p className="text-xs text-muted-foreground mt-1">{card.title}</p>
               </CardContent>
             </Card></Link>

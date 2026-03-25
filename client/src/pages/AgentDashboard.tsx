@@ -202,6 +202,9 @@ export default function AgentDashboard() {
                       card.value
                     )}
                   </div>
+                  {(card as any).subtitle && (
+                    <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate" title={(card as any).subtitle}>{(card as any).subtitle}</p>
+                  )}
                   <p className="text-xs text-muted-foreground mt-1">{card.title}</p>
                 </CardContent>
               </Card>
