@@ -733,6 +733,14 @@ export default function LeadProfile() {
                           </span>
                         );
                       })()}
+                      {/* Lead Classification Badge */}
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-bold ${classConfig.bg} ${classConfig.border}`}
+                        style={{ color: classConfig.color }}
+                      >
+                        <span>{classConfig.icon}</span>
+                        <span>{isRTL ? classConfig.labelAr : classConfig.label}</span>
+                      </span>
                     </div>
 
                     <p className="text-muted-foreground text-sm mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
