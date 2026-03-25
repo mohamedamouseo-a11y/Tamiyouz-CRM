@@ -1,16 +1,40 @@
-import { storageDelete, storagePut } from "./storage";
-import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, gte } from "drizzle-orm";
-import { z } from "zod";
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
-import { rakanRouter } from "./rakanRouter";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createSessionToken } from "./auth";
-import bcrypt from "bcryptjs";
-import { nanoid } from "nanoid";
 import {
+  getExchangeRates,
+  upsertExchangeRate, storageDelete, storagePut } from "./storage";
+import {
+  getExchangeRates,
+  upsertExchangeRate, TRPCError } from "@trpc/server";
+import {
+  getExchangeRates,
+  upsertExchangeRate, and, asc, desc, eq, gte } from "drizzle-orm";
+import {
+  getExchangeRates,
+  upsertExchangeRate, z } from "zod";
+import {
+  getExchangeRates,
+  upsertExchangeRate, COOKIE_NAME } from "@shared/const";
+import {
+  getExchangeRates,
+  upsertExchangeRate, getSessionCookieOptions } from "./_core/cookies";
+import {
+  getExchangeRates,
+  upsertExchangeRate, systemRouter } from "./_core/systemRouter";
+import {
+  getExchangeRates,
+  upsertExchangeRate, rakanRouter } from "./rakanRouter";
+import {
+  getExchangeRates,
+  upsertExchangeRate, protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import {
+  getExchangeRates,
+  upsertExchangeRate, createSessionToken } from "./auth";
+import bcrypt from "bcryptjs";
+import {
+  getExchangeRates,
+  upsertExchangeRate, nanoid } from "nanoid";
+import {
+  getExchangeRates,
+  upsertExchangeRate,
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
@@ -18,8 +42,12 @@ import {
   listCalendarEvents,
   getFreeBusy,
 } from "./googleCalendar";
-import { buildPasswordResetEmail, sendEmail } from "./email";
 import {
+  getExchangeRates,
+  upsertExchangeRate, buildPasswordResetEmail, sendEmail } from "./email";
+import {
+  getExchangeRates,
+  upsertExchangeRate,
   assignLeadRoundRobin,
   bulkCreateLeads,
   checkAndUpdateSLA,
@@ -175,17 +203,27 @@ import {
   updateNotificationSoundConfig,
   getDb,
 } from "./db";
-import { buildReportEmail } from "./emailReports";
-import { createLeadSourcesRouter } from "./leadSourcesRouter";
 import {
+  getExchangeRates,
+  upsertExchangeRate, buildReportEmail } from "./emailReports";
+import {
+  getExchangeRates,
+  upsertExchangeRate, createLeadSourcesRouter } from "./leadSourcesRouter";
+import {
+  getExchangeRates,
+  upsertExchangeRate,
   createBackupProcedure,
   getBackupsProcedure,
   deleteBackupProcedure,
   archiveDataProcedure,
   getArchiveStatsProcedure,
 } from "./backup_procedures";
-import { getConversationMetaForUser } from "./services/chat";
 import {
+  getExchangeRates,
+  upsertExchangeRate, getConversationMetaForUser } from "./services/chat";
+import {
+  getExchangeRates,
+  upsertExchangeRate,
   getMetaIntegration,
   upsertMetaIntegration,
   deleteMetaIntegration as deleteMetaIntegrationFn,
@@ -202,10 +240,18 @@ import {
   changeCampaignBudget as changeMetaCampaignBudget,
   fetchAllCampaignInsights as fetchAllMetaCampaignInsights,
 } from "./services/MetaService";
-import { MetaLeadgenService } from "./services/MetaLeadgenService";
-import { getMetaCombinedAnalytics } from "./services/metaCombinedAnalyticsService";
-import { getTikTokCampaignAnalytics } from "./services/tiktok/tiktokCampaignsService";
-import { getTikTokIntegration, upsertTikTokIntegration, deleteTikTokIntegration, getTikTokAdAccounts, addTikTokAdAccount, selectTikTokAdAccount, updateTikTokAdAccountToken, deleteTikTokAdAccount, syncTikTokCampaigns, getActiveTikTokAdAccount } from "./services/tiktok/tiktokSettingsService";
+import {
+  getExchangeRates,
+  upsertExchangeRate, MetaLeadgenService } from "./services/MetaLeadgenService";
+import {
+  getExchangeRates,
+  upsertExchangeRate, getMetaCombinedAnalytics } from "./services/metaCombinedAnalyticsService";
+import {
+  getExchangeRates,
+  upsertExchangeRate, getTikTokCampaignAnalytics } from "./services/tiktok/tiktokCampaignsService";
+import {
+  getExchangeRates,
+  upsertExchangeRate, getTikTokIntegration, upsertTikTokIntegration, deleteTikTokIntegration, getTikTokAdAccounts, addTikTokAdAccount, selectTikTokAdAccount, updateTikTokAdAccountToken, deleteTikTokAdAccount, syncTikTokCampaigns, getActiveTikTokAdAccount } from "./services/tiktok/tiktokSettingsService";
 
 // ─── Role Guards ──────────────────────────────────────────────────────────────
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -963,6 +1009,7 @@ export const appRouter = router({
         z.object({
           leadId: z.number(),
           valueSar: z.string().optional(),
+          currency: z.string().default("SAR").optional(),
           status: z.enum(["Won", "Lost", "Pending"]).default("Pending"),
           dealType: z.enum(["New", "Contract", "Renewal", "Upsell"]).optional(),
           lossReason: z.string().optional(),
@@ -987,6 +1034,7 @@ export const appRouter = router({
           id: z.number(),
           leadId: z.number().optional(),
           valueSar: z.string().optional(),
+          currency: z.string().optional(),
           status: z.enum(["Won", "Lost", "Pending"]).optional(),
           closedAt: z.date().optional(),
           dealType: z.enum(["New", "Contract", "Renewal", "Upsell"]).optional(),
@@ -3659,4 +3707,22 @@ byLeadStageChanges: protectedProcedure
   }),
   rakan: rakanRouter,
 });
+// ─── Exchange Rates ──────────────────────────────────────────────────────────
+  exchangeRates: router({
+    list: adminProcedure.query(async () => {
+      return getExchangeRates();
+    }),
+    upsert: adminProcedure
+      .input(z.object({
+        fromCurrency: z.string(),
+        toCurrency: z.string(),
+        rate: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        await upsertExchangeRate(input.fromCurrency, input.toCurrency, input.rate);
+        return { success: true };
+      }),
+  }),
+});
+
 export type AppRouter = typeof appRouter;

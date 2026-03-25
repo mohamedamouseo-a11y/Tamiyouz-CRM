@@ -79,6 +79,9 @@ import {
   UserNotificationPreference,
   notificationSoundConfig,
   NotificationSoundConfig,
+  exchangeRates,
+  ExchangeRate,
+  InsertExchangeRate,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { notifyNewLead, notifyLeadAssigned, notifySLABreach, notifyStageChange, notifyDealWon, notifyDealLost, notifyActivityLogged, notifyLeadQualityChange, notifyLeadTransfer, notifyDuplicateLead } from "./notificationEngine";
@@ -3985,4 +3988,22 @@ export async function updateNotificationSoundConfig(soundFileUrl: string | null,
   } else {
     await db.insert(notificationSoundConfig).values({ soundFileUrl, soundFileName, uploadedBy } as any);
   }
+}
+
+
+// ─── Exchange Rates ──────────────────────────────────────────────────────────
+export async function getExchangeRates(): Promise<ExchangeRate[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(exchangeRates);
+}
+
+export async function upsertExchangeRate(fromCurrency: string, toCurrency: string, rate: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql\`
+    INSERT INTO exchange_rates (fromCurrency, toCurrency, rate)
+    VALUES (\${fromCurrency}, \${toCurrency}, \${rate})
+    ON DUPLICATE KEY UPDATE rate = VALUES(rate), updatedAt = CURRENT_TIMESTAMP
+  \`);
 }
