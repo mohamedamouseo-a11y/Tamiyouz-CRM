@@ -442,7 +442,7 @@ export default function ClientPool() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-foreground truncate">
-                        {client.businessProfile || client.competentPerson || `Client #${client.id}`}
+                        {client.leadName || client.competentPerson || client.group || `Client #${client.id}`}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {client.leadId ? `Lead #${client.leadId}` : "Manual"} {client.group ? ` \u2022 ${client.group}` : ""}
@@ -580,7 +580,7 @@ export default function ClientPool() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete Client</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to delete <strong>{client.businessProfile || client.competentPerson || `Client #${client.id}`}</strong>? This client will be moved to the trash and can be restored later.
+                                Are you sure you want to delete <strong>{client.leadName || client.competentPerson || client.group || `Client #${client.id}`}</strong>? This client will be moved to the trash and can be restored later.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
