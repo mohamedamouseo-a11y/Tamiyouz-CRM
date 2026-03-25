@@ -455,6 +455,17 @@ export default function LeadsList() {
                       </span>
                         </td>
                         <td className="px-4 py-3">
+                          {(() => {
+                            const cls = getLeadClassificationSimple(lead.stage, lead.leadQuality, (lead as any).fitStatus);
+                            const cfg = classificationConfig[cls];
+                            return (
+                              <span className="text-xs font-bold" style={{ color: cfg.color }}>
+                                {isRTL ? cfg.labelAr : cfg.label}
+                              </span>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-4 py-3">
                           <span
                             className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white"
                             style={{ background: stageColor[lead.stage] ?? "#6366f1" }}

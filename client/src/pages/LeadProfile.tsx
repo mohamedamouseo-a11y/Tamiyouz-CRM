@@ -52,6 +52,7 @@ import {
   Users,
   Eye,
   XCircle,
+  Activity,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
