@@ -962,6 +962,7 @@ export const appRouter = router({
         z.object({
           leadId: z.number(),
           valueSar: z.string().optional(),
+          currency: z.string().optional().default("SAR"),
           status: z.enum(["Won", "Lost", "Pending"]).default("Pending"),
           dealType: z.enum(["New", "Contract", "Renewal", "Upsell"]).optional(),
           lossReason: z.string().optional(),
@@ -986,6 +987,7 @@ export const appRouter = router({
           id: z.number(),
           leadId: z.number().optional(),
           valueSar: z.string().optional(),
+          currency: z.string().optional(),
           status: z.enum(["Won", "Lost", "Pending"]).optional(),
           closedAt: z.date().optional(),
           dealType: z.enum(["New", "Contract", "Renewal", "Upsell"]).optional(),
