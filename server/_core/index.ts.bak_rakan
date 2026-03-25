@@ -53,13 +53,6 @@ async function startServer() {
     mkdirSync(uploadsDir, { recursive: true });
   }
   app.use("/uploads", express.static(uploadsDir));
-  // Rakan report downloads
-  const downloadsDir = path.resolve(process.cwd(), "public", "downloads");
-  if (!existsSync(downloadsDir)) {
-    const { mkdirSync } = await import("fs");
-    mkdirSync(downloadsDir, { recursive: true });
-  }
-  app.use("/downloads", express.static(downloadsDir));
 
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
