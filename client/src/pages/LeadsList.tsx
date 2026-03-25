@@ -615,6 +615,17 @@ export default function LeadsList() {
                   </Select>
                 </div>
                 <div className="space-y-2">
+                  <Label className="text-sm font-medium">{isRTL ? "حالة الملاءمة" : "Fit Status"}</Label>
+                  <Select onValueChange={(v) => setValue("fitStatus", v as any)} defaultValue="Pending">
+                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Fit">{isRTL ? "✅ مناسب" : "✅ Fit"}</SelectItem>
+                      <SelectItem value="Not Fit">{isRTL ? "❌ غير مناسب" : "❌ Not Fit"}</SelectItem>
+                      <SelectItem value="Pending">{isRTL ? "⏳ قيد المراجعة" : "⏳ Pending"}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label className="text-sm font-medium">{t("stage")}</Label>
                   <Select onValueChange={(v) => setValue("stage", v)} defaultValue="New">
                     <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>

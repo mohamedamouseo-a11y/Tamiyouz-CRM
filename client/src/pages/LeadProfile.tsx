@@ -935,6 +935,17 @@ export default function LeadProfile() {
                             </Select>
                           </div>
                           <div>
+                            <Label className="text-xs">{isRTL ? "حالة الملاءمة" : "Fit Status"}</Label>
+                            <Select defaultValue={(lead as any).fitStatus ?? "Pending"} onValueChange={(v) => setValue("fitStatus", v as any)}>
+                              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Fit">{isRTL ? "✅ مناسب" : "✅ Fit"}</SelectItem>
+                                <SelectItem value="Not Fit">{isRTL ? "❌ غير مناسب" : "❌ Not Fit"}</SelectItem>
+                                <SelectItem value="Pending">{isRTL ? "⏳ قيد المراجعة" : "⏳ Pending"}</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
                             <Label className="text-xs">{t("stage")}</Label>
                             <Select defaultValue={lead.stage} onValueChange={(v) => setValue("stage", v)}>
                               <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
