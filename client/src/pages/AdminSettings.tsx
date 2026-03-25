@@ -12,7 +12,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useThemeTokens } from "@/contexts/ThemeTokenContext";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Bell, Clock, Copy, Edit, Eye, EyeOff, FileSpreadsheet, GripVertical, Key, Mail, Palette, Plus, RefreshCw, Save, Send, Settings, Shield, Sliders, Trash2, Users, Check, Archive, SlidersHorizontal, Megaphone, Sparkles, Webhook } from "lucide-react";
+import { Bell, Clock, Copy, Edit, Eye, EyeOff, FileSpreadsheet, GripVertical, Key, Mail, Palette, Plus, RefreshCw, Save, Send, Settings, Shield, Sliders, Trash2, Users, Check, Archive, SlidersHorizontal, Megaphone, Sparkles, Webhook , DollarSign} from "lucide-react";
 import NotificationSettingsContent from "@/components/NotificationSettingsContent";
 import NotificationsTab from "@/components/NotificationsTab";
 import MeetingNotificationSettings from "@/components/MeetingNotificationSettings";
@@ -21,6 +21,7 @@ import BackupTab from "@/components/BackupTab";
 import MetaSettingsTab from "@/components/MetaSettingsTab";
 import TikTokSettingsTab from "@/components/tiktok/TikTokSettingsTab";
 import MetaLeadgenSettingsTab from "@/components/MetaLeadgenSettingsTab";
+import CurrencySettingsTab from "@/components/CurrencySettingsTab";
 import RakanSettingsTab from "@/components/RakanSettingsTab";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -410,6 +411,10 @@ export default function AdminSettings() {
               <Sparkles size={13} className="text-violet-500 data-[state=active]:text-white" />
               <span>{isRTL ? "راكان AI" : "Rakan AI"}</span>
             </TabsTrigger>
+            {isAdmin && <TabsTrigger value="currency" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
+              <DollarSign size={13} />
+              <span>{isRTL ? "العملات" : "Currency"}</span>
+            </TabsTrigger>}
           </TabsList>
 
           {/* ── Preferences Tab (visible to all roles) ── */}
@@ -845,6 +850,11 @@ export default function AdminSettings() {
           <TabsContent value="rakan" className="mt-4">
             <RakanSettingsTab />
           </TabsContent>
+
+          {/* ── Currency / Exchange Rates Tab ── */}
+          {isAdmin && <TabsContent value="currency" className="mt-4">
+            <CurrencySettingsTab />
+          </TabsContent>}
         </Tabs>
       </div>
       {/* Add/Edit User Dialog */}

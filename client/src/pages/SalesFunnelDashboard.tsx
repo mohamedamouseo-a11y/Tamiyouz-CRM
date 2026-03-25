@@ -388,7 +388,7 @@ export default function SalesFunnelDashboard() {
                         </div>
                         {deal.avg > 0 && (
                           <div className="text-xs text-muted-foreground">
-                            {isRTL ? "المتوسط" : "Avg"}: {Math.round(deal.avg).toLocaleString()} {isRTL ? "ر.س" : "SAR"}
+                            {isRTL ? "المتوسط" : "Avg"}: {Math.round(deal.avg).toLocaleString()} {isRTL ? "ر.س (محول)" : "SAR (base)"}
                           </div>
                         )}
                       </div>
