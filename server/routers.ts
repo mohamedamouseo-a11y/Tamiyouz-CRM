@@ -556,6 +556,7 @@ export const appRouter = router({
         z.object({
           stage: z.string().optional(),
           leadQuality: z.string().optional(),
+          fitStatus: z.string().optional(),
           campaignName: z.string().optional(),
           dateFrom: z.date().optional(),
           dateTo: z.date().optional(),
@@ -601,6 +602,7 @@ export const appRouter = router({
           country: z.string().optional(),
           businessProfile: z.string().optional(),
           leadQuality: z.enum(["Hot", "Warm", "Cold", "Bad", "Unknown"]).default("Unknown"),
+          fitStatus: z.enum(["Fit", "Not Fit", "Pending"]).default("Pending"),
           campaignName: z.string().optional(),
           adCreative: z.string().optional(),
           ownerId: z.number().optional(),

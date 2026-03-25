@@ -38,6 +38,7 @@ export default function LeadsList() {
   const [search, setSearch] = useState(() => sessionStorage.getItem("leads_search") || "");
   const [stage, setStage] = useState<string>(() => sessionStorage.getItem("leads_stage") || "all");
   const [quality, setQuality] = useState<string>(() => sessionStorage.getItem("leads_quality") || "all");
+  const [fitStatusFilter, setFitStatusFilter] = useState<string>(() => sessionStorage.getItem("leads_fitStatus") || "all");
   const [campaign, setCampaign] = useState<string>(urlParams.get("campaign") ?? "");
   const [slaBreached, setSlaBreached] = useState(urlParams.get("slaBreached") === "true");
   const [page, setPage] = useState(0);
@@ -53,6 +54,7 @@ export default function LeadsList() {
   useEffect(() => { sessionStorage.setItem("leads_search", search); }, [search]);
   useEffect(() => { sessionStorage.setItem("leads_stage", stage); }, [stage]);
   useEffect(() => { sessionStorage.setItem("leads_quality", quality); }, [quality]);
+  useEffect(() => { sessionStorage.setItem("leads_fitStatus", fitStatusFilter); }, [fitStatusFilter]);
   useEffect(() => { sessionStorage.setItem("leads_ownerId", ownerId); }, [ownerId]);
   async function handleExport() {
     setExporting(true);
@@ -61,6 +63,7 @@ export default function LeadsList() {
       params.set("limit", String(exportLimit));
       if (stage !== "all") params.set("stage", stage);
       if (quality !== "all") params.set("leadQuality", quality);
+      if (fitStatusFilter !== "all") params.set("fitStatus", fitStatusFilter);
       if (campaign) params.set("campaignName", campaign);
       if (slaBreached) params.set("slaBreached", "true");
       if (search) params.set("search", search);
@@ -94,6 +97,7 @@ export default function LeadsList() {
     search: search || undefined,
     stage: stage !== "all" ? stage : undefined,
     leadQuality: quality !== "all" ? quality : undefined,
+    fitStatus: fitStatusFilter !== "all" ? fitStatusFilter : undefined,
     campaignName: campaign || undefined,
     slaBreached: slaBreached || undefined,
     ownerId: ownerId !== "all" ? Number(ownerId) : undefined,
@@ -281,6 +285,17 @@ export default function LeadsList() {
                 </SelectContent>
               </Select>
 
+              <Select value={fitStatusFilter} onValueChange={(v) => { setFitStatusFilter(v); setPage(0); }}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder={isRTL ? "حالة الملاءمة" : "Fit Status"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("all")}</SelectItem>
+                  <SelectItem value="Fit">✅ Fit</SelectItem>
+                  <SelectItem value="Not Fit">❌ Not Fit</SelectItem>
+                  <SelectItem value="Pending">⏳ Pending</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={campaign || "all"} onValueChange={(v) => { setCampaign(v === "all" ? "" : v); setPage(0); }}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder={t("campaign")} />
@@ -317,7 +332,7 @@ export default function LeadsList() {
                 {t("slaAlerts")}
               </Button>
 
-              {(search || stage !== "all" || quality !== "all" || campaign || slaBreached || dateRange || ownerId !== "all") && (
+              {(search || stage !== "all" || quality !== "all" || fitStatusFilter !== "all" || campaign || slaBreached || dateRange || ownerId !== "all") && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -706,6 +721,7 @@ export default function LeadsList() {
               <div className="text-xs bg-muted rounded-md p-3 space-y-1">
                 <p className="font-medium text-foreground">{isRTL ? "الفلاتر المفعلة:" : "Active filters:"}</p>
                 {stage !== "all" && <p>• {t("stage")}: {stage}</p>}
+                {fitStatusFilter !== "all" && <p>• {isRTL ? "حالة الملاءمة" : "Fit Status"}: {fitStatusFilter}</p>}
                 {quality !== "all" && <p>• {t("leadQuality")}: {quality}</p>}
                 {campaign && <p>• {t("campaign")}: {campaign}</p>}
                 {ownerId !== "all" && <p>• {isRTL ? "المسؤول" : "Sales Agent"}: {users?.find((u: any) => u.id === Number(ownerId))?.name ?? ownerId}</p>}
