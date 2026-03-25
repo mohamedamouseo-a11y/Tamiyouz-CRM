@@ -692,7 +692,8 @@ export default function LeadProfile() {
           </div>
         )}
 
-        <Card>
+        <Card className="overflow-hidden border-0 shadow-sm">
+          <div className="h-1" style={{ background: `linear-gradient(90deg, ${classConfig.color}, ${stageColor[lead.stage] ?? tokens.primaryColor})` }} />
           <CardContent className="p-5 md:p-6 space-y-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="space-y-4 flex-1 min-w-0">
@@ -735,10 +736,7 @@ export default function LeadProfile() {
                         );
                       })()}
                       {/* Lead Classification Badge - text only */}
-                      <span
-                        className="text-sm font-bold tracking-wide uppercase"
-                        style={{ color: classConfig.color }}
-                      >
+                      <span className="text-sm font-bold" style={{ color: classConfig.color }}>
                         {isRTL ? classConfig.labelAr : classConfig.label}
                       </span>
                     </div>
