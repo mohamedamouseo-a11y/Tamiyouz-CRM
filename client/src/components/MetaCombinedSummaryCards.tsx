@@ -1,3 +1,4 @@
+import { fmtMoney, BASE_CURRENCY } from "@/lib/fmtMoney";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -74,9 +75,9 @@ export default function MetaCombinedSummaryCards({
       icon: <DollarSign size={20} />,
       labelAr: "إجمالي الإنفاق",
       labelEn: "Total Spend",
-      value: `${formatCurrency(summary.totalSpend)} SAR`,
-      subAr: `CPL: ${summary.averageCPL.toFixed(1)} SAR`,
-      subEn: `CPL: ${summary.averageCPL.toFixed(1)} SAR`,
+      value: fmtMoney(summary.totalSpend, BASE_CURRENCY),
+      subAr: `CPL: ${fmtMoney(summary.averageCPL, BASE_CURRENCY)}`,
+      subEn: `CPL: ${fmtMoney(summary.averageCPL, BASE_CURRENCY)}`,
       color: "text-red-600",
       bg: "bg-red-50 dark:bg-red-950/30",
     },
@@ -84,7 +85,7 @@ export default function MetaCombinedSummaryCards({
       icon: <TrendingUp size={20} />,
       labelAr: "إجمالي الإيرادات",
       labelEn: "Total Revenue",
-      value: `${formatCurrency(summary.totalRevenue)} SAR`,
+      value: fmtMoney(summary.totalRevenue, BASE_CURRENCY),
       subAr: `ROI: ${summary.overallROI.toFixed(1)}%`,
       subEn: `ROI: ${summary.overallROI.toFixed(1)}%`,
       color: "text-green-600",

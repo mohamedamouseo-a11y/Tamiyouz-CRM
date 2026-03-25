@@ -1,3 +1,4 @@
+import { fmtMoney, BASE_CURRENCY } from "@/lib/fmtMoney";
 import { useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -183,7 +184,7 @@ export default function MetaCombinedCharts({
               />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip
-                formatter={(value: number) => `${value.toLocaleString()} SAR`}
+                formatter={(value: number) => fmtMoney(value, BASE_CURRENCY)}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar

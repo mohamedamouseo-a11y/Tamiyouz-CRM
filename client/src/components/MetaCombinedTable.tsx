@@ -1,3 +1,4 @@
+import { fmtMoney, BASE_CURRENCY } from "@/lib/fmtMoney";
 import { useState, useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -237,7 +238,7 @@ export default function MetaCombinedTable({
                       {getStatusBadge(c.status)}
                     </TableCell>
                     <TableCell className="text-xs text-center font-mono">
-                      {formatCurrency(c.spend)}
+                      {fmtMoney(c.spend, BASE_CURRENCY)}
                     </TableCell>
                     <TableCell className="text-xs text-center">
                       {formatNum(c.totalLeads)}
@@ -254,7 +255,7 @@ export default function MetaCombinedTable({
                       </span>
                     </TableCell>
                     <TableCell className="text-xs text-center font-mono">
-                      {formatCurrency(c.totalRevenue)}
+                      {fmtMoney(c.totalRevenue, BASE_CURRENCY)}
                     </TableCell>
                     <TableCell className="text-xs text-center">
                       <span

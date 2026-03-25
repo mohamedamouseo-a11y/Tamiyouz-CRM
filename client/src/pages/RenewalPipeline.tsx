@@ -1,3 +1,4 @@
+import { fmtMoney as fmtMoneyShared, BASE_CURRENCY } from "@/lib/fmtMoney";
 import * as React from "react";
 
 import {
@@ -275,7 +276,7 @@ function Column({
           <div>
             <div className="text-sm font-semibold text-slate-700">{config.title}</div>
             {totalValue > 0 && (
-              <div className="text-[10px] text-slate-500 mt-0.5">{fmtMoney(totalValue)} SAR</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">{fmtMoneyShared(totalValue, BASE_CURRENCY)}</div>
             )}
           </div>
         </div>
@@ -469,7 +470,7 @@ export default function RenewalPipeline() {
           <KpiCard
             title="Total Value"
             value={fmtMoney(stats.totalValue)}
-            suffix="SAR"
+            suffix="(SAR)"
             icon={DollarSign}
             gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
             iconBg="bg-white/20"
@@ -491,7 +492,7 @@ export default function RenewalPipeline() {
           <KpiCard
             title="Renewed"
             value={stats.wonCount}
-            suffix={stats.wonValue > 0 ? `(${fmtMoney(stats.wonValue)} SAR)` : ""}
+            suffix={stats.wonValue > 0 ? `(${fmtMoneyShared(stats.wonValue, BASE_CURRENCY)})` : ""}
             icon={TrendingUp}
             gradient="bg-gradient-to-br from-sky-500 to-blue-600"
             iconBg="bg-white/20"
