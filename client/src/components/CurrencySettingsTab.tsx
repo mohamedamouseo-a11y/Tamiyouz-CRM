@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { DollarSign, Save, RefreshCw } from "lucide-react";
+import { DollarSign, Save, RefreshCw, CloudDownload, Clock } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 interface ExchangeRate {
@@ -17,16 +18,20 @@ interface ExchangeRate {
 
 export default function CurrencySettingsTab() {
   const [rates, setRates] = useState<Record<string, string>>({});
+  const [lastUpdated, setLastUpdated] = useState<Record<string, string>>({});
 
   const { data: exchangeRates, isLoading } = trpc.exchangeRates.list.useQuery();
 
   useEffect(() => {
     if (exchangeRates && Array.isArray(exchangeRates)) {
       const rateMap: Record<string, string> = {};
+      const updatedMap: Record<string, string> = {};
       (exchangeRates as ExchangeRate[]).forEach((r: ExchangeRate) => {
         rateMap[`${r.fromCurrency}_${r.toCurrency}`] = r.rate;
+        updatedMap[`${r.fromCurrency}_${r.toCurrency}`] = r.updatedAt;
       });
       setRates(rateMap);
+      setLastUpdated(updatedMap);
     }
   }, [exchangeRates]);
 
@@ -53,6 +58,29 @@ export default function CurrencySettingsTab() {
     },
   });
 
+  const autoSyncMutation = trpc.exchangeRates.autoSync.useMutation({
+    onSuccess: (data) => {
+      utils.exchangeRates.list.invalidate();
+      if (data.updated && data.updated.length > 0) {
+        toast.success(
+          isRTL
+            ? `تم تحديث ${data.updated.length} سعر صرف من الإنترنت`
+            : `Updated ${data.updated.length} exchange rate(s) from live API`
+        );
+      }
+      if (data.failed && data.failed.length > 0) {
+        toast.error(
+          isRTL
+            ? `فشل تحديث: ${data.failed.join(", ")}`
+            : `Failed to update: ${data.failed.join(", ")}`
+        );
+      }
+    },
+    onError: () => {
+      toast.error(isRTL ? "فشل التحديث التلقائي" : "Auto-sync failed");
+    },
+  });
+
   const handleSave = (from: string, to: string) => {
     const key = `${from}_${to}`;
     const rate = parseFloat(rates[key] || "0");
@@ -63,14 +91,63 @@ export default function CurrencySettingsTab() {
     updateMutation.mutate({ fromCurrency: from, toCurrency: to, rate: rate.toString() });
   };
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString(isRTL ? "ar-SA" : "en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   const currencyPairs = [
-    { from: "EGP", to: "SAR", label: "جنيه مصري → ريال سعودي", labelEn: "Egyptian Pound → Saudi Riyal" },
-    { from: "USD", to: "SAR", label: "دولار أمريكي → ريال سعودي", labelEn: "US Dollar → Saudi Riyal" },
-    { from: "SAR", to: "SAR", label: "ريال سعودي (العملة الأساسية)", labelEn: "Saudi Riyal (Base Currency)" },
+    { from: "EGP", to: "SAR", label: "جنيه مصري → ريال سعودي", labelEn: "Egyptian Pound → Saudi Riyal", flag: "🇪🇬" },
+    { from: "USD", to: "SAR", label: "دولار أمريكي → ريال سعودي", labelEn: "US Dollar → Saudi Riyal", flag: "🇺🇸" },
+    { from: "SAR", to: "SAR", label: "ريال سعودي (العملة الأساسية)", labelEn: "Saudi Riyal (Base Currency)", flag: "🇸🇦" },
   ];
 
   return (
     <div className="space-y-6">
+      {/* Auto-Sync Card */}
+      <Card className="border-blue-200 bg-blue-50/30 dark:border-blue-900 dark:bg-blue-950/20">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+              <CloudDownload size={20} />
+              {isRTL ? "تحديث تلقائي من الإنترنت" : "Live Rate Sync"}
+            </CardTitle>
+            <Badge variant="secondary" className="text-xs">
+              {isRTL ? "مجاني" : "Free API"}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {isRTL
+              ? "يتم تحديث أسعار الصرف تلقائياً كل 12 ساعة. يمكنك أيضاً التحديث يدوياً بالضغط على الزر أدناه."
+              : "Exchange rates are automatically synced every 12 hours. You can also manually trigger a sync below."}
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Button
+            onClick={() => autoSyncMutation.mutate()}
+            disabled={autoSyncMutation.isPending}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <CloudDownload size={14} className={`mr-2 ${autoSyncMutation.isPending ? "animate-bounce" : ""}`} />
+            {autoSyncMutation.isPending
+              ? (isRTL ? "جاري التحديث..." : "Syncing...")
+              : (isRTL ? "تحديث الأسعار الآن" : "Sync Rates Now")}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Exchange Rates Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -95,11 +172,13 @@ export default function CurrencySettingsTab() {
               {currencyPairs.map((pair) => {
                 const key = `${pair.from}_${pair.to}`;
                 const isBase = pair.from === pair.to;
+                const updated = lastUpdated[key];
                 return (
                   <div
                     key={key}
                     className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
                   >
+                    <div className="text-2xl">{pair.flag}</div>
                     <div className="flex-1">
                       <Label className="text-sm font-medium">
                         {isRTL ? pair.label : pair.labelEn}
@@ -107,6 +186,12 @@ export default function CurrencySettingsTab() {
                       <p className="text-xs text-muted-foreground mt-1">
                         1 {pair.from} = ? {pair.to}
                       </p>
+                      {updated && !isBase && (
+                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                          <Clock size={10} />
+                          {isRTL ? "آخر تحديث: " : "Last updated: "}{formatDate(updated)}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <Input
@@ -139,6 +224,7 @@ export default function CurrencySettingsTab() {
         </CardContent>
       </Card>
 
+      {/* Recalculate Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -157,7 +243,7 @@ export default function CurrencySettingsTab() {
             onClick={() => recalculateMutation.mutate()}
             disabled={recalculateMutation.isPending}
           >
-            <RefreshCw size={14} className={`mr-2 ${recalculateMutation.isPending ? 'animate-spin' : ''}`} />
+            <RefreshCw size={14} className={`mr-2 ${recalculateMutation.isPending ? "animate-spin" : ""}`} />
             {isRTL ? "إعادة حساب كل القيم" : "Recalculate All Values"}
           </Button>
         </CardContent>

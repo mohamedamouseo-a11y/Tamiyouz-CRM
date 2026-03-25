@@ -16,6 +16,7 @@ import { startSyncScheduler } from "../syncEngine";
 import { startMeetingReminderScheduler } from "../meetingReminder";
 import { setupChat } from "../services/chat";
 import { startNotificationEngine } from "../notificationEngine";
+import { startExchangeRateScheduler } from "../exchangeRateSync";
 import { backupService } from "../services/BackupService";
 import { MetaLeadgenService } from "../services/MetaLeadgenService";
 import { restoreService } from "../services/RestoreService";
@@ -262,4 +263,6 @@ startServer().then(() => {
   });
   // Start notification engine
   startNotificationEngine();
+  // Start exchange rate auto-sync scheduler
+  startExchangeRateScheduler();
 }).catch(console.error);

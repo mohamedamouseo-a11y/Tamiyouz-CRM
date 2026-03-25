@@ -1,4 +1,5 @@
 import { storageDelete, storagePut } from "./storage";
+import { syncExchangeRates } from "./exchangeRateSync";
 import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -3433,6 +3434,10 @@ byLeadStageChanges: protectedProcedure
       const { recalculateAllDealValues } = await import("./lib/currency");
       await recalculateAllDealValues();
       return { success: true };
+    }),
+    autoSync: adminProcedure.mutation(async () => {
+      const result = await syncExchangeRates();
+      return result;
     }),
   }),
 });
