@@ -653,7 +653,52 @@ export default function HelpCenter() {
           </Card>
         </div>
 
-        {filteredSections.length === 0 ? (
+        {activeSection ? (
+          /* === Single Section Detail View === */
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 mb-2">
+              <button onClick={() => navigate("/help-center")} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                {t("helpBackToAll" as any) || "Back to Help Center"}
+              </button>
+            </div>
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <div className="h-1.5" style={{ backgroundColor: activeSection.color }} />
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-2xl p-4 text-white" style={{ backgroundColor: activeSection.color }}>
+                    {activeSection.icon}
+                  </div>
+                  <div>
+                    <CardTitle className="text-2xl">{t(activeSection.titleKey)}</CardTitle>
+                    <CardDescription className="mt-1">
+                      {activeSection.items.length} {activeSection.items.length === 1 ? t("helpQuestionSingular") : t("helpQuestionPlural")}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {activeSection.items.map((item, idx) => (
+                  <Accordion key={item.questionKey} type="single" collapsible>
+                    <AccordionItem value={item.questionKey} className="border rounded-lg px-4">
+                      <AccordionTrigger className="text-sm font-medium hover:no-underline py-4">
+                        <span className="flex items-center gap-3">
+                          <span className="flex-shrink-0 w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center text-white" style={{ backgroundColor: activeSection.color }}>
+                            {idx + 1}
+                          </span>
+                          {t(item.questionKey)}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-4 ps-10">
+                        {t(item.answerKey)}
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        ) : filteredSections.length === 0 ? (
           <Card className="border-0 shadow-sm">
             <CardContent className="py-12 text-center text-sm text-muted-foreground">
               {t("helpNoResults")}
