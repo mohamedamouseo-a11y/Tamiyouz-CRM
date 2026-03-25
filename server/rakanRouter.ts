@@ -11,11 +11,15 @@ import {
   clearChatHistory,
   type UserRole,
 } from "./services/rakanService";
+import {
+  generateRakanReport,
+  type RakanReportType,
+} from "./services/rakanReportGenerator";
 
 // ─── Rakan Router ──────────────────────────────────────────────────────────────
 export const rakanRouter = router({
 
-  // ── Send message to Rakan ──────────────────────────────────────────────────
+  // ── Send message to Rakan (now supports text + report responses) ──────────
   chat: protectedProcedure
     .input(z.object({
       message: z.string().min(1).max(2000),
@@ -45,7 +49,59 @@ export const rakanRouter = router({
         if (err.message?.includes("API key not configured")) {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: err.message });
         }
+        if (err.message?.includes("FORBIDDEN_REPORT_ACCESS")) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "ليس لديك صلاحية لهذا التقرير." });
+        }
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Rakan encountered an error. Please try again." });
+      }
+    }),
+
+  // ── Direct report generation endpoint (explicit, no intent analysis) ──────
+  generateReport: protectedProcedure
+    .input(z.object({
+      reportType: z.enum([
+        "sales_performance",
+        "sla_breaches",
+        "activities_followups",
+        "contracts_renewals",
+        "am_delayed_followups",
+        "am_revenue",
+      ]),
+      dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const user = ctx.user;
+      if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+      const enabled = await getRakanSetting("rakan_enabled");
+      if (enabled === "false") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Rakan is currently disabled." });
+      }
+
+      try {
+        const result = await generateRakanReport({
+          reportType: input.reportType as RakanReportType,
+          dateFrom: input.dateFrom,
+          dateTo: input.dateTo,
+          requestedBy: { id: user.id, name: user.name ?? "مستخدم", role: user.role },
+          delivery: "both",
+        });
+
+        return {
+          fileName: result.fileName,
+          mimeType: result.mimeType,
+          base64: result.base64,
+          rowCount: result.rowCount,
+          summaryText: result.summaryText,
+          reportLabel: result.reportLabel,
+        };
+      } catch (err: any) {
+        console.error("[Rakan Report ERROR]", err?.message);
+        if (err.message?.includes("FORBIDDEN_REPORT_ACCESS")) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "ليس لديك صلاحية لهذا التقرير." });
+        }
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "فشل في إنشاء التقرير. حاول مرة أخرى." });
       }
     }),
 
@@ -81,7 +137,7 @@ export const rakanRouter = router({
       // Non-admin: hide API keys and instructions
       const safeGlobal = isAdmin ? global : Object.fromEntries(
         Object.entries(global).filter(([k]) =>
-          !["gemini_api_key", "google_tts_api_key", "rakan_instructions"].includes(k)
+          !["gemini_api_key", "google_tts_api_key", "rakan_instructions", "fallback_llm_api_key"].includes(k)
         )
       );
 
@@ -103,7 +159,7 @@ export const rakanRouter = router({
       if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       // Only Admin can update API keys and instructions
-      const adminOnlyKeys = ["gemini_api_key", "google_tts_api_key", "rakan_instructions"];
+      const adminOnlyKeys = ["gemini_api_key", "google_tts_api_key", "rakan_instructions", "fallback_llm_api_key", "fallback_llm_base_url", "fallback_llm_model"];
       if (adminOnlyKeys.includes(input.key) && user.role !== "Admin") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Only admins can update this setting." });
       }
