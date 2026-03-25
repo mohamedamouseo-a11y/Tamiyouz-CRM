@@ -146,7 +146,7 @@ export default function SalesFunnelDashboard() {
             {
               title: isRTL ? "الصفقات الناجحة" : "Won Deals",
               value: wonDeals?.count ?? 0,
-              subtitle: `${(wonDeals?.totalValue ?? 0).toLocaleString()} ${isRTL ? "ر.س" : "SAR"}`,
+              subtitle: (() => { const bd = (data as any)?.revenueBreakdown?.filter((b: any) => b.status === "Won"); if (bd && bd.length > 1) return bd.map((b: any) => `${Number(b.total).toLocaleString()} ${b.currency}`).join(" + "); return `${(wonDeals?.totalValue ?? 0).toLocaleString()} ${isRTL ? "ر.س" : "SAR"}`; })(),
               icon: <DollarSign size={18} />,
               color: tokens.successColor,
             },
@@ -384,7 +384,7 @@ export default function SalesFunnelDashboard() {
                           </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
-                          {isRTL ? "القيمة" : "Value"}: {deal.value.toLocaleString()} {isRTL ? "ر.س" : "SAR"}
+                          {isRTL ? "القيمة" : "Value"}: {deal.value.toLocaleString()} {isRTL ? "ر.س (محول)" : "SAR (conv.)"}
                         </div>
                         {deal.avg > 0 && (
                           <div className="text-xs text-muted-foreground">

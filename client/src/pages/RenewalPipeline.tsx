@@ -470,7 +470,7 @@ export default function RenewalPipeline() {
           <KpiCard
             title="Total Value"
             value={fmtMoney(stats.totalValue)}
-            suffix="(SAR)"
+            suffix="(ر.س محول | SAR conv.)"
             icon={DollarSign}
             gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
             iconBg="bg-white/20"

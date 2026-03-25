@@ -98,6 +98,11 @@ export default function AgentDashboard() {
     {
       title: t("totalRevenue"),
       value: `${(isAdmin ? (teamStats?.totalDeals?.find((d: any) => d.status === 'Won')?.totalValue ?? 0) : (stats?.totalRevenue ?? 0)).toLocaleString()} ${t("currency")}`,
+      subtitle: (() => {
+        const breakdown = isAdmin ? (teamStats as any)?.revenueBreakdown : (stats as any)?.revenueBreakdown;
+        if (!breakdown || !Array.isArray(breakdown) || breakdown.length <= 1) return undefined;
+        return breakdown.map((b: any) => `${Number(b.total).toLocaleString()} ${b.currency}`).join(" + ");
+      })(),
       icon: <DollarSign size={20} />,
       color: tokens.accentColor,
       href: "/leads?stage=Won",

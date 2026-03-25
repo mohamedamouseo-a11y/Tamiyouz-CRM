@@ -73,7 +73,7 @@ export default function TeamDashboard() {
           {[
             { title: t("totalLeads"), value: stats?.totalLeads ?? 0, icon: <Users size={18} />, color: tokens.primaryColor, href: "/leads" },
             { title: t("wonDeals"), value: stats?.wonDeals ?? 0, icon: <CheckCircle size={18} />, color: tokens.successColor, href: "/leads?stage=Won" },
-            { title: t("totalRevenue"), value: `${(stats?.totalRevenue ?? 0).toLocaleString()} ${t("currency")}`, icon: <TrendingUp size={18} />, color: tokens.accentColor, href: "/leads?stage=Won" },
+            { title: t("totalRevenue"), value: `${(stats?.totalRevenue ?? 0).toLocaleString()} ${t("currency")}`, subtitle: (() => { const bd = (stats as any)?.revenueBreakdown; if (!bd || !Array.isArray(bd) || bd.length <= 1) return undefined; return bd.map((b: any) => `${Number(b.total).toLocaleString()} ${b.currency}`).join(" + "); })(), icon: <TrendingUp size={18} />, color: tokens.accentColor, href: "/leads?stage=Won" },
             { title: t("slaAlerts"), value: stats?.slaBreached ?? 0, icon: <AlertTriangle size={18} />, color: "#ef4444", href: "/leads?slaBreached=true" },
           ].map((card, i) => (
             <Link key={i} href={(card as any).href}><Card className={`cursor-pointer group ${kpiGradients[i]}`}>
