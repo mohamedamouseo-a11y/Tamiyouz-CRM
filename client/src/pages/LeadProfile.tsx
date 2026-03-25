@@ -555,6 +555,7 @@ export default function LeadProfile() {
 
   const lastActivityDate = lastActivity?.activityDate ?? null;
   const leadCreatedAt = toDate(lead?.createdAt) ?? new Date();
+  const daysSinceLastContact = lastActivityDate ? differenceInDays(new Date(), lastActivityDate) : differenceInDays(new Date(), leadCreatedAt);
   const leadScore = getLeadScore(activities?.length ?? 0, lead?.leadQuality, Boolean(deal), (lead as any)?.fitStatus);
   const leadClassification = getLeadClassification(
     lead?.stage ?? "New",
@@ -573,7 +574,6 @@ export default function LeadProfile() {
   const slaProgressValue = slaEnabled && slaThresholdHours > 0 ? Math.min(100, (slaElapsedHours / slaThresholdHours) * 100) : 0;
   const slaStatus = getSlaState(slaProgressValue);
   const isSlaBreached = slaEnabled && (Boolean(lead?.slaBreached) || slaElapsedHours > slaThresholdHours);
-  const daysSinceLastContact = lastActivityDate ? differenceInDays(new Date(), lastActivityDate) : differenceInDays(new Date(), leadCreatedAt);
   const pendingDealNeedsAttention = Boolean(deal?.status === "Pending" && differenceInDays(new Date(), toDate((deal as any)?.updatedAt) ?? toDate((deal as any)?.createdAt) ?? new Date()) >= 3);
   const phoneDigits = normalizePhone(lead?.phone);
   const whatsappUrl = phoneDigits ? `https://wa.me/${phoneDigits}` : "";
