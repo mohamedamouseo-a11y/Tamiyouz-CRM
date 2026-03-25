@@ -6,6 +6,7 @@ export interface ExportLeadsOptions {
   limit?: number;
   stage?: string;
   leadQuality?: "Hot" | "Warm" | "Cold" | "Bad" | "Unknown";
+  fitStatus?: "Fit" | "Not Fit" | "Pending";
   campaignName?: string;
   slaBreached?: boolean;
   search?: string;
@@ -32,6 +33,7 @@ export async function streamLeadsExcel(res: Response, options: ExportLeadsOption
     { header: "Country",          key: "country",         width: 14 },
     { header: "Business Profile", key: "businessProfile", width: 22 },
     { header: "Lead Quality",     key: "leadQuality",     width: 14 },
+    { header: "Fit Status",       key: "fitStatus",       width: 12 },
     { header: "Stage",            key: "stage",           width: 16 },
     { header: "Campaign",         key: "campaignName",    width: 22 },
     { header: "Owner",            key: "ownerName",       width: 22 },
@@ -74,6 +76,7 @@ export async function streamLeadsExcel(res: Response, options: ExportLeadsOption
       country: lead.country ?? "",
       businessProfile: lead.businessProfile ?? "",
       leadQuality: lead.leadQuality ?? "",
+      fitStatus: lead.fitStatus ?? "Pending",
       stage: lead.stage ?? "",
       campaignName: lead.campaignName ?? "",
       ownerName: lead.ownerName ?? "",

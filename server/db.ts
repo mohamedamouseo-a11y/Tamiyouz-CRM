@@ -208,6 +208,7 @@ export interface LeadFilters {
   ownerId?: number;
   stage?: string;
   leadQuality?: string;
+  fitStatus?: string;
   campaignName?: string;
   dateFrom?: Date;
   dateTo?: Date;
@@ -226,6 +227,7 @@ export async function getLeads(filters: LeadFilters = {}) {
   if (filters.ownerId) conditions.push(eq(leads.ownerId, filters.ownerId));
   if (filters.stage) conditions.push(eq(leads.stage, filters.stage));
   if (filters.leadQuality) conditions.push(eq(leads.leadQuality, filters.leadQuality as any));
+  if (filters.fitStatus) conditions.push(eq(leads.fitStatus, filters.fitStatus as any));
   if (filters.campaignName) conditions.push(eq(leads.campaignName, filters.campaignName));
   // Filter by contactTime (date when client was contacted)
   if (filters.dateFrom) {
@@ -254,6 +256,7 @@ export async function getLeads(filters: LeadFilters = {}) {
       country: leads.country,
       businessProfile: leads.businessProfile,
       leadQuality: leads.leadQuality,
+      fitStatus: leads.fitStatus,
       stage: leads.stage,
       campaignName: leads.campaignName,
       adCreative: leads.adCreative,
@@ -292,6 +295,7 @@ export async function getLeadById(id: number): Promise<any | undefined> {
       country: leads.country,
       businessProfile: leads.businessProfile,
       leadQuality: leads.leadQuality,
+      fitStatus: leads.fitStatus,
       stage: leads.stage,
       campaignName: leads.campaignName,
       adCreative: leads.adCreative,
@@ -423,6 +427,7 @@ export async function getLeadsCount(filters: LeadFilters = {}): Promise<number> 
   if (filters.ownerId) conditions.push(eq(leads.ownerId, filters.ownerId));
   if (filters.stage) conditions.push(eq(leads.stage, filters.stage));
   if (filters.leadQuality) conditions.push(eq(leads.leadQuality, filters.leadQuality as any));
+  if (filters.fitStatus) conditions.push(eq(leads.fitStatus, filters.fitStatus as any));
   if (filters.campaignName) conditions.push(eq(leads.campaignName, filters.campaignName));
   if (filters.dateFrom) {
     conditions.push(gte(leads.contactTime, filters.dateFrom));
@@ -1757,6 +1762,7 @@ export interface LeadExportFilters {
   limit?: number;
   stage?: string;
   leadQuality?: string;
+  fitStatus?: string;
   campaignName?: string;
   dateFrom?: Date;
   dateTo?: Date;

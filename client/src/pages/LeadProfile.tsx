@@ -102,6 +102,18 @@ const leadQualityScore: Record<string, number> = {
   Unknown: 5,
 };
 
+const fitStatusScore: Record<string, number> = {
+  Fit: 15,
+  "Not Fit": -20,
+  Pending: 0,
+};
+
+const fitStatusConfig: Record<string, { label: string; icon: string; color: string; bg: string }> = {
+  Fit: { label: "Fit", icon: "✅", color: "text-green-700", bg: "bg-green-50 border-green-200" },
+  "Not Fit": { label: "Not Fit", icon: "❌", color: "text-red-700", bg: "bg-red-50 border-red-200" },
+  Pending: { label: "Pending", icon: "⏳", color: "text-yellow-700", bg: "bg-yellow-50 border-yellow-200" },
+};
+
 function toDate(value?: string | Date | null) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -131,11 +143,12 @@ function normalizePhone(phone?: string | null) {
   return (phone ?? "").replace(/[^\d]/g, "");
 }
 
-function getLeadScore(activitiesCount: number, quality?: string | null, hasDeal?: boolean) {
+function getLeadScore(activitiesCount: number, quality?: string | null, hasDeal?: boolean, fitStatus?: string | null) {
   const activityScore = Math.min(activitiesCount * 10, 50);
   const qualityScore = leadQualityScore[quality ?? "Unknown"] ?? 5;
   const dealScore = hasDeal ? 20 : 0;
-  return Math.min(100, activityScore + qualityScore + dealScore);
+  const fitScore = fitStatusScore[fitStatus ?? "Pending"] ?? 0;
+  return Math.max(0, Math.min(100, activityScore + qualityScore + dealScore + fitScore));
 }
 
 function getScoreColor(score: number) {
@@ -492,7 +505,7 @@ export default function LeadProfile() {
 
   const lastActivityDate = lastActivity?.activityDate ?? null;
   const leadCreatedAt = toDate(lead?.createdAt) ?? new Date();
-  const leadScore = getLeadScore(activities?.length ?? 0, lead?.leadQuality, Boolean(deal));
+  const leadScore = getLeadScore(activities?.length ?? 0, lead?.leadQuality, Boolean(deal), (lead as any)?.fitStatus);
   const slaThresholdHours = Number((slaConfig as any)?.hoursThreshold ?? 24);
   const slaEnabled = Boolean((slaConfig as any)?.isEnabled ?? true);
   const slaReferenceDate = lastActivityDate ?? leadCreatedAt;
@@ -650,6 +663,16 @@ export default function LeadProfile() {
                         </Badge>
                       )}
                       <LeadScoreRing score={leadScore} t={t} />
+                      {(() => {
+                        const fs = (lead as any)?.fitStatus ?? "Pending";
+                        const cfg = fitStatusConfig[fs] ?? fitStatusConfig.Pending;
+                        return (
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm font-medium ${cfg.bg} ${cfg.color}`}>
+                            <span>{cfg.icon}</span>
+                            <span>{t(fs as any) || fs}</span>
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     <p className="text-muted-foreground text-sm mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
