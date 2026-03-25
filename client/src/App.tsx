@@ -71,6 +71,7 @@ function Router() {
       <Route path="/csat/:clientId" component={CSATSurvey} />
       <Route path="/notification-settings" component={NotificationSettings} />
       <Route path="/help-center" component={HelpCenter} />
+      <Route path="/help-center/:slug" component={HelpCenter} />
       <Route path="/support-center" component={SupportCenter} />
       <Route path="/support-center/admin" component={SupportAdminInbox} />
       <Route path="/support-center/:id" component={SupportRequestDetail} />

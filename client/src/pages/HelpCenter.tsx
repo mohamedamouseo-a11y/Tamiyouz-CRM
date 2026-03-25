@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useRoute, Link, useLocation } from "wouter";
 import CRMLayout from "@/components/CRMLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { Activity, ArrowRightLeft, BarChart3, Bell, Briefcase, Calendar, Clipboa
 
 interface HelpSection {
   id: string;
+  slug: string;
   titleKey: string;
   icon: React.ReactNode;
   color: string;
@@ -22,6 +24,7 @@ interface HelpSection {
 const sections: HelpSection[] = [
     {
       id: "dashboard" ,
+      slug: "dashboard" ,
       titleKey: "helpDashboard" ,
       icon: <LayoutDashboard className="h-5 w-5" />,
       color: "#6366f1" ,
@@ -34,6 +37,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "leads" ,
+      slug: "leads" ,
       titleKey: "helpLeads" ,
       icon: <Users className="h-5 w-5" />,
       color: "#3b82f6" ,
@@ -47,6 +51,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "leadProfile" ,
+      slug: "lead-profile" ,
       titleKey: "helpLeadProfile" ,
       icon: <Target className="h-5 w-5" />,
       color: "#8b5cf6" ,
@@ -63,6 +68,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "activities" ,
+      slug: "activities" ,
       titleKey: "helpActivities" ,
       icon: <MessageSquare className="h-5 w-5" />,
       color: "#10b981" ,
@@ -74,6 +80,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "deals" ,
+      slug: "deals" ,
       titleKey: "helpDeals" ,
       icon: <TrendingUp className="h-5 w-5" />,
       color: "#f59e0b" ,
@@ -85,6 +92,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "sla" ,
+      slug: "sla" ,
       titleKey: "helpSla" ,
       icon: <Clock className="h-5 w-5" />,
       color: "#ef4444" ,
@@ -96,6 +104,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "salesFunnel" ,
+      slug: "sales-funnel" ,
       titleKey: "helpSalesFunnel" ,
       icon: <Filter className="h-5 w-5" />,
       color: "#06b6d4" ,
@@ -106,6 +115,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "campaigns" ,
+      slug: "campaigns" ,
       titleKey: "helpCampaigns" ,
       icon: <Megaphone className="h-5 w-5" />,
       color: "#ec4899" ,
@@ -117,6 +127,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "campaignAnalytics" ,
+      slug: "campaign-analytics" ,
       titleKey: "helpCampaignAnalytics" ,
       icon: <BarChart3 className="h-5 w-5" />,
       color: "#d946ef" ,
@@ -127,6 +138,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "metaCampaigns" ,
+      slug: "meta-campaigns" ,
       titleKey: "helpMetaCampaigns" ,
       icon: <Megaphone className="h-5 w-5" />,
       color: "#1877F2" ,
@@ -138,6 +150,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "metaCombinedAnalytics" ,
+      slug: "meta-combined-analytics" ,
       titleKey: "helpMetaCombined" ,
       icon: <Activity className="h-5 w-5" />,
       color: "#4267B2" ,
@@ -149,6 +162,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "metaLeadgen" ,
+      slug: "meta-leadgen" ,
       titleKey: "helpMetaLeadgen" ,
       icon: <Webhook className="h-5 w-5" />,
       color: "#0866FF" ,
@@ -165,6 +179,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "tiktokCampaigns" ,
+      slug: "tiktok-campaigns" ,
       titleKey: "helpTikTok" ,
       icon: <Activity className="h-5 w-5" />,
       color: "#010101" ,
@@ -176,6 +191,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "calendar" ,
+      slug: "calendar" ,
       titleKey: "helpCalendar" ,
       icon: <Calendar className="h-5 w-5" />,
       color: "#14b8a6" ,
@@ -186,6 +202,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "amDashboard" ,
+      slug: "am-dashboard" ,
       titleKey: "helpAMDashboard" ,
       icon: <Zap className="h-5 w-5" />,
       color: "#7c3aed" ,
@@ -197,6 +214,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "amCalendar" ,
+      slug: "am-calendar" ,
       titleKey: "helpAMCalendar" ,
       icon: <Calendar className="h-5 w-5" />,
       color: "#8b5cf6" ,
@@ -207,6 +225,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "clients" ,
+      slug: "clients" ,
       titleKey: "helpClients" ,
       icon: <Briefcase className="h-5 w-5" />,
       color: "#a855f7" ,
@@ -218,6 +237,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "clientProfile" ,
+      slug: "client-profile" ,
       titleKey: "helpClientProfile" ,
       icon: <Briefcase className="h-5 w-5" />,
       color: "#9333ea" ,
@@ -230,6 +250,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "renewals" ,
+      slug: "renewals" ,
       titleKey: "helpRenewals" ,
       icon: <Activity className="h-5 w-5" />,
       color: "#f97316" ,
@@ -240,6 +261,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "teamDashboard" ,
+      slug: "team-dashboard" ,
       titleKey: "helpTeamDashboard" ,
       icon: <BarChart3 className="h-5 w-5" />,
       color: "#0ea5e9" ,
@@ -250,6 +272,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "amLeadDashboard" ,
+      slug: "am-lead-dashboard" ,
       titleKey: "helpAMLeadDashboard" ,
       icon: <BarChart3 className="h-5 w-5" />,
       color: "#6d28d9" ,
@@ -260,6 +283,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "csatSurvey" ,
+      slug: "csat-survey" ,
       titleKey: "helpCSAT" ,
       icon: <Star className="h-5 w-5" />,
       color: "#eab308" ,
@@ -270,6 +294,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "import" ,
+      slug: "import" ,
       titleKey: "helpImport" ,
       icon: <FileSpreadsheet className="h-5 w-5" />,
       color: "#22c55e" ,
@@ -280,6 +305,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "transfers" ,
+      slug: "transfers" ,
       titleKey: "helpTransfers" ,
       icon: <ArrowRightLeft className="h-5 w-5" />,
       color: "#64748b" ,
@@ -290,6 +316,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "trash" ,
+      slug: "trash" ,
       titleKey: "helpTrash" ,
       icon: <Trash2 className="h-5 w-5" />,
       color: "#dc2626" ,
@@ -301,6 +328,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "auditLog" ,
+      slug: "audit-log" ,
       titleKey: "helpAuditLog" ,
       icon: <ClipboardList className="h-5 w-5" />,
       color: "#475569" ,
@@ -312,6 +340,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "chatMonitor" ,
+      slug: "chat-monitor" ,
       titleKey: "helpChatMonitor" ,
       icon: <MessageSquare className="h-5 w-5" />,
       color: "#1e40af" ,
@@ -322,6 +351,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "supportCenter" ,
+      slug: "support-center" ,
       titleKey: "helpSupportCenter" ,
       icon: <LifeBuoy className="h-5 w-5" />,
       color: "#6366f1" ,
@@ -333,6 +363,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "admin" ,
+      slug: "admin" ,
       titleKey: "helpAdmin" ,
       icon: <Settings className="h-5 w-5" />,
       color: "#78716c" ,
@@ -345,6 +376,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "customFields" ,
+      slug: "custom-fields" ,
       titleKey: "helpCustomFields" ,
       icon: <Settings className="h-5 w-5" />,
       color: "#7c3aed" ,
@@ -355,6 +387,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "leadSources" ,
+      slug: "lead-sources" ,
       titleKey: "helpLeadSources" ,
       icon: <Globe className="h-5 w-5" />,
       color: "#0891b2" ,
@@ -365,6 +398,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "backup" ,
+      slug: "backup" ,
       titleKey: "helpBackup" ,
       icon: <Database className="h-5 w-5" />,
       color: "#059669" ,
@@ -375,6 +409,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "notifications" ,
+      slug: "notifications" ,
       titleKey: "helpNotifications" ,
       icon: <Bell className="h-5 w-5" />,
       color: "#f59e0b" ,
@@ -385,6 +420,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "meetingNotifications" ,
+      slug: "meeting-notifications" ,
       titleKey: "helpMeetingNotifs" ,
       icon: <Bell className="h-5 w-5" />,
       color: "#8b5cf6" ,
@@ -395,6 +431,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "metaIntegration" ,
+      slug: "meta-integration" ,
       titleKey: "helpMetaIntegration" ,
       icon: <Settings className="h-5 w-5" />,
       color: "#1877F2" ,
@@ -406,6 +443,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "tiktokIntegration" ,
+      slug: "tiktok-integration" ,
       titleKey: "helpTikTokIntegration" ,
       icon: <Settings className="h-5 w-5" />,
       color: "#010101" ,
@@ -416,6 +454,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "rakanAI" ,
+      slug: "rakan-ai" ,
       titleKey: "helpRakanAI" ,
       icon: <Sparkles className="h-5 w-5" />,
       color: "#7c3aed" ,
@@ -427,6 +466,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "roles" ,
+      slug: "roles" ,
       titleKey: "helpRoles" ,
       icon: <Shield className="h-5 w-5" />,
       color: "#0d9488" ,
@@ -437,6 +477,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "darkMode" ,
+      slug: "dark-mode" ,
       titleKey: "helpDarkMode" ,
       icon: <Moon className="h-5 w-5" />,
       color: "#334155" ,
@@ -447,6 +488,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "language" ,
+      slug: "language" ,
       titleKey: "helpLanguage" ,
       icon: <Globe className="h-5 w-5" />,
       color: "#2563eb" ,
@@ -457,6 +499,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "leadIntelligence" ,
+      slug: "lead-intelligence" ,
       titleKey: "helpLeadIntelligence" ,
       icon: <Sparkles className="h-5 w-5" />,
       color: "#059669" ,
@@ -477,6 +520,7 @@ const sections: HelpSection[] = [
     },
     {
       id: "passwordReset" ,
+      slug: "password-reset" ,
       titleKey: "helpPasswordReset" ,
       icon: <Lock className="h-5 w-5" />,
       color: "#dc2626" ,
@@ -491,6 +535,10 @@ export default function HelpCenter() {
   const [searchTerm, setSearchTerm] = useState("");
   const { t, isRTL } = useLanguage();
   const { tokens } = useThemeTokens();
+  const [, params] = useRoute("/help-center/:slug");
+  const [, navigate] = useLocation();
+  const activeSlug = params?.slug || null;
+  const activeSection = activeSlug ? sections.find(s => s.slug === activeSlug) : null;
 
   const filteredSections = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -614,7 +662,7 @@ export default function HelpCenter() {
         ) : (
           <div className="grid gap-4 xl:grid-cols-2">
             {filteredSections.map((section) => (
-              <Card key={section.id} id={section.id} className="border-0 shadow-sm">
+              <Card key={section.id} id={section.id} className="border-0 shadow-sm cursor-pointer transition-all hover:shadow-md hover:scale-[1.01]" onClick={() => navigate(`/help-center/${section.slug}`)}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -629,25 +677,21 @@ export default function HelpCenter() {
                       </div>
                     </div>
                     <Badge variant="secondary" className="rounded-full px-3 py-1" style={{ color: section.color, borderColor: `${section.color}22`, backgroundColor: `${section.color}12` }}>
-                      {section.id}
+                      {section.items.length} {section.items.length === 1 ? t("helpQuestionSingular") : t("helpQuestionPlural")}
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <Accordion type="single" collapsible className="w-full">
-                    {section.items.map((item, index) => (
-                      <AccordionItem key={item.questionKey} value={`${section.id}-${index}`}>
-                        <AccordionTrigger className={`text-start leading-6 hover:no-underline ${isRTL ? "text-right" : "text-left"}`}>
-                          {t(item.questionKey)}
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="whitespace-pre-line text-sm leading-7 text-muted-foreground">
-                            {t(item.answerKey)}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
+                <CardContent className="pt-0">
+                  <div className="flex flex-wrap gap-1.5">
+                    {section.items.slice(0, 3).map((item) => (
+                      <span key={item.questionKey} className="text-xs text-muted-foreground bg-muted/50 rounded-md px-2 py-0.5 truncate max-w-[200px]">
+                        {t(item.questionKey)}
+                      </span>
                     ))}
-                  </Accordion>
+                    {section.items.length > 3 && (
+                      <span className="text-xs text-muted-foreground bg-muted/50 rounded-md px-2 py-0.5">+{section.items.length - 3}</span>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}
