@@ -3706,8 +3706,7 @@ byLeadStageChanges: protectedProcedure
     }),
   }),
   rakan: rakanRouter,
-});
-// ─── Exchange Rates ──────────────────────────────────────────────────────────
+  // ─── Exchange Rates ──────────────────────────────────────────────────────────
   exchangeRates: router({
     list: adminProcedure.query(async () => {
       return getExchangeRates();
@@ -3722,6 +3721,11 @@ byLeadStageChanges: protectedProcedure
         await upsertExchangeRate(input.fromCurrency, input.toCurrency, input.rate);
         return { success: true };
       }),
+    recalculate: adminProcedure.mutation(async () => {
+      const { recalculateAllDealValues } = await import("./lib/currency");
+      await recalculateAllDealValues();
+      return { success: true };
+    }),
   }),
 });
 
