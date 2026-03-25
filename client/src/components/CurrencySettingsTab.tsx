@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { DollarSign, Save, RefreshCw } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
@@ -16,7 +16,6 @@ interface ExchangeRate {
 }
 
 export default function CurrencySettingsTab() {
-  const { toast } = useToast();
   const [rates, setRates] = useState<Record<string, string>>({});
 
   const { data: exchangeRates, isLoading } = trpc.exchangeRates.list.useQuery();
@@ -36,19 +35,21 @@ export default function CurrencySettingsTab() {
   const updateMutation = trpc.exchangeRates.upsert.useMutation({
     onSuccess: () => {
       utils.exchangeRates.list.invalidate();
-      toast({ title: "Exchange rate updated successfully" });
+      toast.success("Exchange rate updated successfully");
     },
     onError: () => {
-      toast({ title: "Failed to update exchange rate", variant: "destructive" });
+      toast.error("Failed to update exchange rate");
     },
   });
 
+  const isRTL = document.documentElement.dir === "rtl";
+
   const recalculateMutation = trpc.exchangeRates.recalculate.useMutation({
     onSuccess: () => {
-      toast({ title: isRTL ? "تم إعادة الحساب بنجاح" : "Recalculation complete" });
+      toast.success(isRTL ? "تم إعادة الحساب بنجاح" : "Recalculation complete");
     },
     onError: () => {
-      toast({ title: isRTL ? "فشل إعادة الحساب" : "Recalculation failed", variant: "destructive" });
+      toast.error(isRTL ? "فشل إعادة الحساب" : "Recalculation failed");
     },
   });
 
@@ -56,7 +57,7 @@ export default function CurrencySettingsTab() {
     const key = `${from}_${to}`;
     const rate = parseFloat(rates[key] || "0");
     if (isNaN(rate) || rate <= 0) {
-      toast({ title: "Rate must be greater than 0", variant: "destructive" });
+      toast.error("Rate must be greater than 0");
       return;
     }
     updateMutation.mutate({ fromCurrency: from, toCurrency: to, rate: rate.toString() });
@@ -67,8 +68,6 @@ export default function CurrencySettingsTab() {
     { from: "USD", to: "SAR", label: "دولار أمريكي → ريال سعودي", labelEn: "US Dollar → Saudi Riyal" },
     { from: "SAR", to: "SAR", label: "ريال سعودي (العملة الأساسية)", labelEn: "Saudi Riyal (Base Currency)" },
   ];
-
-  const isRTL = document.documentElement.dir === "rtl";
 
   return (
     <div className="space-y-6">

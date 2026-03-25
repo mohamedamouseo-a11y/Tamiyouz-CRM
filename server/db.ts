@@ -1035,8 +1035,8 @@ export async function getAgentStats(userId: number, dateFrom?: Date, dateTo?: Da
   
   // Revenue breakdown by currency
   const revenueBreakdownQuery = isMediaBuyer
-    ? db.execute(sql\`SELECT COALESCE(d.currency, SAR) as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.deletedAt IS NULL AND d.status = Won AND d.createdAt BETWEEN \${from} AND \${to} GROUP BY d.currency\`)
-    : db.execute(sql\`SELECT COALESCE(d.currency, SAR) as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.ownerId = \${userId} AND d.status = Won AND d.createdAt BETWEEN \${from} AND \${to} GROUP BY d.currency\`);
+    ? db.execute(sql`SELECT COALESCE(d.currency, 'SAR') as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.deletedAt IS NULL AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to} GROUP BY d.currency`)
+    : db.execute(sql`SELECT COALESCE(d.currency, 'SAR') as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.ownerId = ${userId} AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to} GROUP BY d.currency`);
   const breakdownRows = (await revenueBreakdownQuery as any)[0] ?? [];
   const revenueBreakdown = Array.isArray(breakdownRows) ? breakdownRows.map((r: any) => ({ currency: r.currency || "SAR", total: Number(r.total || 0) })) : [];
   
@@ -4016,9 +4016,9 @@ export async function getExchangeRates(): Promise<ExchangeRate[]> {
 export async function upsertExchangeRate(fromCurrency: string, toCurrency: string, rate: string): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.execute(sql\`
+  await db.execute(sql`
     INSERT INTO exchange_rates (fromCurrency, toCurrency, rate)
-    VALUES (\${fromCurrency}, \${toCurrency}, \${rate})
+    VALUES (${fromCurrency}, ${toCurrency}, ${rate})
     ON DUPLICATE KEY UPDATE rate = VALUES(rate), updatedAt = CURRENT_TIMESTAMP
-  \`);
+  `);
 }
