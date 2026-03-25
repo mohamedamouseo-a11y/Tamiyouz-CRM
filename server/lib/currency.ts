@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 import { and, desc, eq } from "drizzle-orm";
-import { db } from "../db";
+import { getDb } from "../db";
 import { exchangeRates } from "../../drizzle/schema";
 
 export const BASE_CURRENCY = "SAR";
@@ -21,6 +21,12 @@ export async function getExchangeRate(
   const to = normalizeCurrency(toCurrency);
 
   if (from === to) return new Decimal(1);
+
+  const db = await getDb();
+  if (!db) {
+    console.warn("Database not available for exchange rate lookup, defaulting to 1");
+    return new Decimal(1);
+  }
 
   const [direct] = await db
     .select({ rate: exchangeRates.rate })
