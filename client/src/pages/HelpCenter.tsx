@@ -7,7 +7,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useThemeTokens } from "@/contexts/ThemeTokenContext";
-import { Activity, ArrowRightLeft, BarChart3, Bell, Briefcase, Calendar, ClipboardList, Clock, Database, FileSpreadsheet, Filter, Globe, HelpCircle, LifeBuoy, LayoutDashboard, Lock, Megaphone, MessageSquare, Moon, Search, Settings, Shield, Sparkles, Star, Target, Trash2, TrendingUp, Users, Webhook, Zap } from "lucide-react";
+import { Activity, ArrowRightLeft, BarChart3, Bell, Briefcase, Calendar, ClipboardList, Clock, Database, DollarSign, FileSpreadsheet, Filter, Globe, HelpCircle, LifeBuoy, LayoutDashboard, Lock, Megaphone, MessageSquare, Moon, Search, Settings, Shield, Sparkles, Star, Target, Trash2, TrendingUp, Users, Webhook, Zap } from "lucide-react";
 
 interface HelpSection {
   id: string;

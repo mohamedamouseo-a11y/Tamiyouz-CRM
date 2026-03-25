@@ -667,6 +667,17 @@ export const translations = {
     helpPasswordResetA1: "من صفحة تسجيل الدخول اضغط على Forgot Password ثم أدخل بريدك الإلكتروني المسجل في النظام. ستصلك رسالة تحتوي على رابط لإعادة التعيين، وبعد فتحه يمكنك اختيار كلمة مرور جديدة والعودة لتسجيل الدخول مرة أخرى.",
     helpPasswordResetQ2: "كيف أغيّر كلمة المرور وأنا مسجل الدخول؟",
     helpPasswordResetA2: "انتقل إلى Settings ثم تبويب Preferences أو القسم المخصص للحساب، وأدخل كلمة المرور الحالية ثم الجديدة مرتين للتأكيد. اختر كلمة مرور قوية يسهل عليك تذكرها ويصعب تخمينها، ويفضل عدم إعادة استخدام كلمات مرور قديمة.",
+    helpCurrency: "العملات وأسعار الصرف",
+    helpCurrencyQ1: "ما هو نظام العملات المتعددة؟",
+    helpCurrencyA1: "نظام العملات المتعددة يتيح لك إنشاء صفقات بعملات مختلفة مثل الجنيه المصري والدولار الأمريكي والريال السعودي. يتم تحويل جميع القيم تلقائياً إلى العملة الأساسية (الريال السعودي) باستخدام أسعار الصرف المحدثة، مما يسهل متابعة الإيرادات الإجمالية بعملة موحدة.",
+    helpCurrencyQ2: "كيف يتم تحديث أسعار الصرف؟",
+    helpCurrencyA2: "يتم تحديث أسعار الصرف تلقائياً كل 12 ساعة من الإنترنت باستخدام API مجاني وموثوق. يمكنك أيضاً تحديث الأسعار يدوياً في أي وقت بالضغط على زر تحديث الأسعار الآن في تبويب العملات بالإعدادات، أو تعديل السعر يدوياً إذا كنت تفضل سعراً مخصصاً.",
+    helpCurrencyQ3: "كيف أضيف صفقة بعملة مختلفة؟",
+    helpCurrencyA3: "عند إنشاء صفقة جديدة من ملف العميل المحتمل، ستجد قائمة منسدلة لاختيار العملة بجانب حقل قيمة الصفقة. اختر العملة المناسبة وأدخل القيمة، وسيقوم النظام تلقائياً بحساب القيمة المعادلة بالريال السعودي.",
+    helpCurrencyQ4: "أين أجد إعدادات العملات؟",
+    helpCurrencyA4: "انتقل إلى الإعدادات ثم اضغط على تبويب العملات. ستجد قسم التحديث التلقائي من الإنترنت مع زر لتحديث الأسعار فوراً، وقسم أسعار الصرف حيث يمكنك رؤية وتعديل سعر كل عملة مقابل الريال السعودي، وقسم إعادة حساب القيم لتحديث جميع الصفقات بالأسعار الجديدة.",
+    helpCurrencyQ5: "كيف تظهر الإيرادات في لوحة التحكم؟",
+    helpCurrencyA5: "في لوحة التحكم ولوحة الفريق، تظهر الإيرادات الإجمالية بالريال السعودي (العملة الأساسية) مع تفصيل لكل عملة على حدة. هذا يساعدك على رؤية الصورة الكاملة للإيرادات مع معرفة توزيعها حسب العملة.",
 
 
 
@@ -1417,6 +1428,17 @@ export const translations = {
     helpPasswordResetA1: "On the login page, click Forgot Password and enter the email address registered in the system. You will receive a reset link by email, and after opening it you can set a new password and sign in again.",
     helpPasswordResetQ2: "How do I change my password while logged in?",
     helpPasswordResetA2: "Go to Settings and open the Preferences tab or account section, then enter your current password and the new one twice for confirmation. Choose a strong password that is easy for you to remember but difficult to guess, and avoid reusing older passwords.",
+    helpCurrency: "Currencies & Exchange Rates",
+    helpCurrencyQ1: "What is the multi-currency system?",
+    helpCurrencyA1: "The multi-currency system allows you to create deals in different currencies such as Egyptian Pound, US Dollar, and Saudi Riyal. All values are automatically converted to the base currency (SAR) using updated exchange rates, making it easy to track total revenue in a unified currency.",
+    helpCurrencyQ2: "How are exchange rates updated?",
+    helpCurrencyA2: "Exchange rates are automatically updated every 12 hours from the internet using a free and reliable API. You can also update rates manually at any time by clicking the Update Rates Now button in the Currency tab under Settings, or manually edit the rate if you prefer a custom value.",
+    helpCurrencyQ3: "How do I create a deal in a different currency?",
+    helpCurrencyA3: "When creating a new deal from a lead profile, you will find a currency dropdown next to the deal value field. Select the appropriate currency and enter the value, and the system will automatically calculate the equivalent value in SAR.",
+    helpCurrencyQ4: "Where do I find currency settings?",
+    helpCurrencyA4: "Go to Settings and click on the Currency tab. You will find the Auto-Sync section with a button to update rates instantly, the Exchange Rates section where you can view and edit each currency rate against SAR, and the Recalculate Values section to update all deals with the new rates.",
+    helpCurrencyQ5: "How is revenue displayed on the dashboard?",
+    helpCurrencyA5: "On the Dashboard and Team Dashboard, total revenue is shown in SAR (base currency) with a breakdown for each currency. This helps you see the full revenue picture while knowing the distribution by currency.",
 
 
 
