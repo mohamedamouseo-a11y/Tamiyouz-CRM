@@ -1,16 +1,40 @@
-import { storageDelete, storagePut } from "./storage";
-import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq } from "drizzle-orm";
-import { z } from "zod";
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
-import { rakanRouter } from "./rakanRouter";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createSessionToken } from "./auth";
-import bcrypt from "bcryptjs";
-import { nanoid } from "nanoid";
 import {
+  getExchangeRates,
+  upsertExchangeRate, storageDelete, storagePut } from "./storage";
+import {
+  getExchangeRates,
+  upsertExchangeRate, TRPCError } from "@trpc/server";
+import {
+  getExchangeRates,
+  upsertExchangeRate, and, asc, desc, eq, gte } from "drizzle-orm";
+import {
+  getExchangeRates,
+  upsertExchangeRate, z } from "zod";
+import {
+  getExchangeRates,
+  upsertExchangeRate, COOKIE_NAME } from "@shared/const";
+import {
+  getExchangeRates,
+  upsertExchangeRate, getSessionCookieOptions } from "./_core/cookies";
+import {
+  getExchangeRates,
+  upsertExchangeRate, systemRouter } from "./_core/systemRouter";
+import {
+  getExchangeRates,
+  upsertExchangeRate, rakanRouter } from "./rakanRouter";
+import {
+  getExchangeRates,
+  upsertExchangeRate, protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import {
+  getExchangeRates,
+  upsertExchangeRate, createSessionToken } from "./auth";
+import bcrypt from "bcryptjs";
+import {
+  getExchangeRates,
+  upsertExchangeRate, nanoid } from "nanoid";
+import {
+  getExchangeRates,
+  upsertExchangeRate,
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
@@ -18,8 +42,12 @@ import {
   listCalendarEvents,
   getFreeBusy,
 } from "./googleCalendar";
-import { buildPasswordResetEmail, sendEmail } from "./email";
 import {
+  getExchangeRates,
+  upsertExchangeRate, buildPasswordResetEmail, sendEmail } from "./email";
+import {
+  getExchangeRates,
+  upsertExchangeRate,
   assignLeadRoundRobin,
   bulkCreateLeads,
   checkAndUpdateSLA,
@@ -174,20 +202,28 @@ import {
   getNotificationSoundConfig,
   updateNotificationSoundConfig,
   getDb,
+} from "./db";
+import {
+  getExchangeRates,
+  upsertExchangeRate, buildReportEmail } from "./emailReports";
+import {
+  getExchangeRates,
+  upsertExchangeRate, createLeadSourcesRouter } from "./leadSourcesRouter";
+import {
   getExchangeRates,
   upsertExchangeRate,
-} from "./db";
-import { buildReportEmail } from "./emailReports";
-import { createLeadSourcesRouter } from "./leadSourcesRouter";
-import {
   createBackupProcedure,
   getBackupsProcedure,
   deleteBackupProcedure,
   archiveDataProcedure,
   getArchiveStatsProcedure,
 } from "./backup_procedures";
-import { getConversationMetaForUser } from "./services/chat";
 import {
+  getExchangeRates,
+  upsertExchangeRate, getConversationMetaForUser } from "./services/chat";
+import {
+  getExchangeRates,
+  upsertExchangeRate,
   getMetaIntegration,
   upsertMetaIntegration,
   deleteMetaIntegration as deleteMetaIntegrationFn,
@@ -204,10 +240,18 @@ import {
   changeCampaignBudget as changeMetaCampaignBudget,
   fetchAllCampaignInsights as fetchAllMetaCampaignInsights,
 } from "./services/MetaService";
-import { MetaLeadgenService } from "./services/MetaLeadgenService";
-import { getMetaCombinedAnalytics } from "./services/metaCombinedAnalyticsService";
-import { getTikTokCampaignAnalytics } from "./services/tiktok/tiktokCampaignsService";
-import { getTikTokIntegration, upsertTikTokIntegration, deleteTikTokIntegration, getTikTokAdAccounts, addTikTokAdAccount, selectTikTokAdAccount, updateTikTokAdAccountToken, deleteTikTokAdAccount, syncTikTokCampaigns, getActiveTikTokAdAccount } from "./services/tiktok/tiktokSettingsService";
+import {
+  getExchangeRates,
+  upsertExchangeRate, MetaLeadgenService } from "./services/MetaLeadgenService";
+import {
+  getExchangeRates,
+  upsertExchangeRate, getMetaCombinedAnalytics } from "./services/metaCombinedAnalyticsService";
+import {
+  getExchangeRates,
+  upsertExchangeRate, getTikTokCampaignAnalytics } from "./services/tiktok/tiktokCampaignsService";
+import {
+  getExchangeRates,
+  upsertExchangeRate, getTikTokIntegration, upsertTikTokIntegration, deleteTikTokIntegration, getTikTokAdAccounts, addTikTokAdAccount, selectTikTokAdAccount, updateTikTokAdAccountToken, deleteTikTokAdAccount, syncTikTokCampaigns, getActiveTikTokAdAccount } from "./services/tiktok/tiktokSettingsService";
 
 // ─── Role Guards ──────────────────────────────────────────────────────────────
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -558,6 +602,7 @@ export const appRouter = router({
         z.object({
           stage: z.string().optional(),
           leadQuality: z.string().optional(),
+          fitStatus: z.string().optional(),
           campaignName: z.string().optional(),
           dateFrom: z.date().optional(),
           dateTo: z.date().optional(),
@@ -603,6 +648,7 @@ export const appRouter = router({
           country: z.string().optional(),
           businessProfile: z.string().optional(),
           leadQuality: z.enum(["Hot", "Warm", "Cold", "Bad", "Unknown"]).default("Unknown"),
+          fitStatus: z.enum(["Fit", "Not Fit", "Pending"]).default("Pending"),
           campaignName: z.string().optional(),
           adCreative: z.string().optional(),
           ownerId: z.number().optional(),
@@ -644,6 +690,7 @@ export const appRouter = router({
           country: z.string().optional(),
           businessProfile: z.string().optional(),
           leadQuality: z.enum(["Hot", "Warm", "Cold", "Bad", "Unknown"]).optional(),
+          fitStatus: z.enum(["Fit", "Not Fit", "Pending"]).optional(),
           campaignName: z.string().optional(),
           adCreative: z.string().optional(),
           ownerId: z.number().nullable().optional(),
@@ -962,6 +1009,7 @@ export const appRouter = router({
         z.object({
           leadId: z.number(),
           valueSar: z.string().optional(),
+          currency: z.string().default("SAR").optional(),
           status: z.enum(["Won", "Lost", "Pending"]).default("Pending"),
           dealType: z.enum(["New", "Contract", "Renewal", "Upsell"]).optional(),
           lossReason: z.string().optional(),
@@ -986,6 +1034,7 @@ export const appRouter = router({
           id: z.number(),
           leadId: z.number().optional(),
           valueSar: z.string().optional(),
+          currency: z.string().optional(),
           status: z.enum(["Won", "Lost", "Pending"]).optional(),
           closedAt: z.date().optional(),
           dealType: z.enum(["New", "Contract", "Renewal", "Upsell"]).optional(),
@@ -1283,6 +1332,7 @@ export const appRouter = router({
               country: z.string().optional(),
               businessProfile: z.string().optional(),
               leadQuality: z.enum(["Hot", "Warm", "Cold", "Bad", "Unknown"]).optional(),
+          fitStatus: z.enum(["Fit", "Not Fit", "Pending"]).optional(),
               campaignName: z.string().optional(),
               adCreative: z.string().optional(),
               stage: z.string().optional(),
@@ -2807,6 +2857,7 @@ byLeadStageChanges: protectedProcedure
       .input(z.object({ status: supportStatusSchema.optional(), requestType: supportRequestTypeSchema.optional() }).optional())
       .query(async ({ input }) => {
         const { supportRequests } = await import("../drizzle/schema");
+        const { users } = await import("../drizzle/schema");
         const conditions: any[] = [];
         if (input?.status) conditions.push(eq(supportRequests.status, input.status));
         if (input?.requestType) conditions.push(eq(supportRequests.requestType, input.requestType));
@@ -2814,11 +2865,28 @@ byLeadStageChanges: protectedProcedure
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
+        const baseQuery = db.select({
+          id: supportRequests.id,
+          code: supportRequests.code,
+          requestType: supportRequests.requestType,
+          subject: supportRequests.subject,
+          priority: supportRequests.priority,
+          status: supportRequests.status,
+          createdAt: supportRequests.createdAt,
+          updatedAt: supportRequests.updatedAt,
+          lastActivityAt: supportRequests.lastActivityAt,
+          createdBy: supportRequests.createdBy,
+          requesterName: users.name,
+          createdByName: users.name,
+        })
+        .from(supportRequests)
+        .leftJoin(users, eq(supportRequests.createdBy, users.id));
+
         if (conditions.length === 0) {
-          return db.select().from(supportRequests).orderBy(desc(supportRequests.lastActivityAt));
+          return baseQuery.orderBy(desc(supportRequests.lastActivityAt));
         }
 
-        return db.select().from(supportRequests).where(and(...conditions)).orderBy(desc(supportRequests.lastActivityAt));
+        return baseQuery.where(and(...conditions)).orderBy(desc(supportRequests.lastActivityAt));
       }),
 
     byId: protectedProcedure
@@ -2828,7 +2896,26 @@ byLeadStageChanges: protectedProcedure
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
-        const rows = await db.select().from(supportRequests).where(eq(supportRequests.id, input.id)).limit(1);
+        const { users } = await import("../drizzle/schema");
+        const rows = await db.select({
+          id: supportRequests.id,
+          code: supportRequests.code,
+          requestType: supportRequests.requestType,
+          category: supportRequests.category,
+          subject: supportRequests.subject,
+          description: supportRequests.description,
+          priority: supportRequests.priority,
+          status: supportRequests.status,
+          screenRecordingLink: supportRequests.screenRecordingLink,
+          createdBy: supportRequests.createdBy,
+          superAdminId: supportRequests.superAdminId,
+          closedAt: supportRequests.closedAt,
+          closedBy: supportRequests.closedBy,
+          lastActivityAt: supportRequests.lastActivityAt,
+          createdAt: supportRequests.createdAt,
+          updatedAt: supportRequests.updatedAt,
+          createdByName: users.name,
+        }).from(supportRequests).leftJoin(users, eq(supportRequests.createdBy, users.id)).where(eq(supportRequests.id, input.id)).limit(1);
         const request = rows[0];
         if (!request) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Support request not found" });
@@ -2861,6 +2948,19 @@ byLeadStageChanges: protectedProcedure
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
         const { supportRequests, supportRequestAttachments } = await import("../drizzle/schema");
+        // Deduplication: reject if same user submitted same subject within last 30 seconds
+        const thirtySecondsAgo = new Date(Date.now() - 30_000);
+        const recentDuplicates = await db.select({ id: supportRequests.id })
+          .from(supportRequests)
+          .where(and(
+            eq(supportRequests.createdBy, ctx.user.id),
+            eq(supportRequests.subject, input.subject),
+            gte(supportRequests.createdAt, thirtySecondsAgo),
+          ))
+          .limit(1);
+        if (recentDuplicates.length > 0) {
+          throw new TRPCError({ code: "CONFLICT", message: "A similar request was just submitted. Please wait before submitting again." });
+        }
         const superAdmin = await getPrimarySuperAdminOrThrow();
         const code = buildSupportRequestCode();
 
@@ -2909,19 +3009,39 @@ byLeadStageChanges: protectedProcedure
           await db.insert(supportRequestAttachments).values(attachmentRows as any);
         }
 
-        await createInAppNotification({
-          userId: superAdmin.id,
-          type: "system",
-          title: `${input.requestType} ${code}`,
-          body: `${ctx.user.name ?? ctx.user.email ?? "A user"} submitted: ${input.subject}`,
-          link: `/support-center/${requestId}`,
-          metadata: {
-            requestId,
-            code,
-            requestType: input.requestType,
-            createdBy: ctx.user.id,
-          },
-        } as any);
+        // Notify ALL admins about new support ticket
+        const { getAllUsers: getAllUsersForNotif } = await import("./db");
+        const allUsersForNotif = await getAllUsersForNotif();
+        const adminRolesSet = new Set(["Admin", "admin", "SalesManager"]);
+        const adminUserIds = allUsersForNotif
+          .filter((u: any) => Boolean(u.isActive) && adminRolesSet.has(String(u.role)) && u.id !== ctx.user.id)
+          .map((u: any) => Number(u.id))
+          .filter((id: number) => Number.isFinite(id) && id > 0);
+        // Always include superAdmin
+        if (!adminUserIds.includes(superAdmin.id) && superAdmin.id !== ctx.user.id) {
+          adminUserIds.push(superAdmin.id);
+        }
+        const creatorName = ctx.user.name ?? ctx.user.email ?? "A user";
+        if (adminUserIds.length > 0) {
+          const notifItems = adminUserIds.map((uid: number) => ({
+            userId: uid,
+            type: "system" as const,
+            title: `New Support ${input.requestType}: ${code} — ${input.subject}`,
+            titleAr: `طلب دعم جديد (${input.requestType === "Ticket" ? "تذكرة" : "اقتراح"}): ${code} — ${input.subject}`,
+            body: `${creatorName} submitted a new ${input.requestType.toLowerCase()}: ${input.subject}`,
+            bodyAr: `${creatorName} أرسل ${input.requestType === "Ticket" ? "تذكرة" : "اقتراح"} جديد: ${input.subject}`,
+            isRead: false,
+            link: `/support-center/admin`,
+            metadata: {
+              requestId,
+              code,
+              requestType: input.requestType,
+              createdBy: ctx.user.id,
+              trigger: "support_ticket_created",
+            },
+          }));
+          await createBulkInAppNotifications(notifItems as any);
+        }
 
         await createAuditLog({
           userId: ctx.user.id,
@@ -2991,15 +3111,56 @@ byLeadStageChanges: protectedProcedure
           await createInAppNotification({
             userId: notificationUserId,
             type: "system",
-            title: `Update on ${request.code}`,
-            body: isSuperAdmin ? "The super admin replied to your request" : "The requester added a new reply",
+            title: isSuperAdmin
+              ? `Reply on your ticket ${request.code}`
+              : `New reply on ticket ${request.code}`,
+            titleAr: isSuperAdmin
+              ? `رد على طلبك ${request.code}`
+              : `رد جديد على التذكرة ${request.code}`,
+            body: isSuperAdmin
+              ? `The admin replied to your support request. Status: ${nextStatus}`
+              : `${ctx.user.name ?? "The requester"} added a new reply`,
+            bodyAr: isSuperAdmin
+              ? `تم الرد على طلب الدعم الخاص بك. الحالة: ${nextStatus}`
+              : `${ctx.user.name ?? "مقدم الطلب"} أضاف رد جديد`,
+            isRead: false,
             link: `/support-center/${request.id}`,
             metadata: {
               requestId: request.id,
               code: request.code,
               status: nextStatus,
+              trigger: "support_ticket_reply",
             },
           } as any);
+        }
+        // Also notify all admins when a member replies (not just the assigned super admin)
+        if (!isSuperAdmin) {
+          const { getAllUsers: getAllUsersReply } = await import("./db");
+          const allUsersReply = await getAllUsersReply();
+          const adminRolesReply = new Set(["Admin", "admin", "SalesManager"]);
+          const otherAdminIds = allUsersReply
+            .filter((u: any) => Boolean(u.isActive) && adminRolesReply.has(String(u.role)) && u.id !== ctx.user.id && u.id !== request.superAdminId)
+            .map((u: any) => Number(u.id))
+            .filter((id: number) => Number.isFinite(id) && id > 0);
+          if (otherAdminIds.length > 0) {
+            const replyNotifs = otherAdminIds.map((uid: number) => ({
+              userId: uid,
+              type: "system" as const,
+              title: `New reply on ticket ${request.code}`,
+              titleAr: `رد جديد على التذكرة ${request.code}`,
+              body: `${ctx.user.name ?? "The requester"} added a new reply`,
+              bodyAr: `${ctx.user.name ?? "مقدم الطلب"} أضاف رد جديد`,
+              isRead: false,
+              link: `/support-center/admin`,
+              metadata: {
+                requestId: request.id,
+                code: request.code,
+                status: nextStatus,
+                trigger: "support_ticket_reply",
+              },
+            }));
+            await createBulkInAppNotifications(replyNotifs as any);
+          }
         }
 
         await createAuditLog({
@@ -3043,16 +3204,29 @@ byLeadStageChanges: protectedProcedure
         } as any).where(eq(supportRequests.id, input.requestId));
 
         if (request.createdBy !== ctx.user.id) {
+          const statusArMap: Record<string, string> = {
+            New: "جديد",
+            UnderReview: "قيد المراجعة",
+            WaitingUser: "بانتظار المستخدم",
+            Resolved: "تم الحل",
+            Closed: "مغلق",
+          };
+          const statusAr = statusArMap[input.status] ?? input.status;
           await createInAppNotification({
             userId: request.createdBy,
             type: "system",
-            title: `Status changed for ${request.code}`,
-            body: `Your request is now ${input.status}`,
+            title: `Status updated for ${request.code}: ${input.status}`,
+            titleAr: `تم تحديث حالة طلبك ${request.code}: ${statusAr}`,
+            body: `Your support request status has been changed to: ${input.status}`,
+            bodyAr: `تم تغيير حالة طلب الدعم الخاص بك إلى: ${statusAr}`,
+            isRead: false,
             link: `/support-center/${request.id}`,
             metadata: {
               requestId: request.id,
               code: request.code,
               status: input.status,
+              previousStatus: request.status,
+              trigger: "support_ticket_status_change",
             },
           } as any);
         }
@@ -3104,6 +3278,126 @@ byLeadStageChanges: protectedProcedure
           },
         });
 
+        return { success: true };
+      }),
+    // Edit a support request (only by the creator, and only if status is New or UnderReview)
+    edit: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        subject: z.string().min(3).max(255).optional(),
+        description: z.string().min(10).optional(),
+        category: supportCategorySchema.optional(),
+        priority: supportPrioritySchema.optional(),
+        screenRecordingLink: z.string().url().max(2000).nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const { supportRequests } = await import("../drizzle/schema");
+        const { users } = await import("../drizzle/schema");
+        const rows = await db.select({
+          id: supportRequests.id,
+          code: supportRequests.code,
+          requestType: supportRequests.requestType,
+          category: supportRequests.category,
+          subject: supportRequests.subject,
+          description: supportRequests.description,
+          priority: supportRequests.priority,
+          status: supportRequests.status,
+          screenRecordingLink: supportRequests.screenRecordingLink,
+          createdBy: supportRequests.createdBy,
+          superAdminId: supportRequests.superAdminId,
+          closedAt: supportRequests.closedAt,
+          closedBy: supportRequests.closedBy,
+          lastActivityAt: supportRequests.lastActivityAt,
+          createdAt: supportRequests.createdAt,
+          updatedAt: supportRequests.updatedAt,
+          createdByName: users.name,
+        }).from(supportRequests).leftJoin(users, eq(supportRequests.createdBy, users.id)).where(eq(supportRequests.id, input.id)).limit(1);
+        const request = rows[0];
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Request not found" });
+        }
+        // Only the creator can edit
+        if (request.createdBy !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the request creator can edit this ticket" });
+        }
+        // Only editable if status is New or UnderReview
+        if (!["New", "UnderReview"].includes(request.status)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "This ticket can no longer be edited" });
+        }
+        const updates: Record<string, any> = {};
+        if (input.subject !== undefined) updates.subject = input.subject;
+        if (input.description !== undefined) updates.description = input.description;
+        if (input.category !== undefined) updates.category = input.category;
+        if (input.priority !== undefined) updates.priority = input.priority;
+        if (input.screenRecordingLink !== undefined) updates.screenRecordingLink = input.screenRecordingLink;
+        if (Object.keys(updates).length === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No fields to update" });
+        }
+        await db.update(supportRequests).set(updates).where(eq(supportRequests.id, input.id));
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "update",
+          entityType: "support_request",
+          entityId: input.id,
+          entityName: input.subject || request.subject,
+          details: { updatedFields: Object.keys(updates) },
+        });
+        return { success: true };
+      }),
+    // Delete a support request (super admin only)
+    delete: superAdminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const { supportRequests, supportRequestMessages, supportRequestAttachments } = await import("../drizzle/schema");
+        const { users } = await import("../drizzle/schema");
+        const rows = await db.select({
+          id: supportRequests.id,
+          code: supportRequests.code,
+          requestType: supportRequests.requestType,
+          category: supportRequests.category,
+          subject: supportRequests.subject,
+          description: supportRequests.description,
+          priority: supportRequests.priority,
+          status: supportRequests.status,
+          screenRecordingLink: supportRequests.screenRecordingLink,
+          createdBy: supportRequests.createdBy,
+          superAdminId: supportRequests.superAdminId,
+          closedAt: supportRequests.closedAt,
+          closedBy: supportRequests.closedBy,
+          lastActivityAt: supportRequests.lastActivityAt,
+          createdAt: supportRequests.createdAt,
+          updatedAt: supportRequests.updatedAt,
+          createdByName: users.name,
+        }).from(supportRequests).leftJoin(users, eq(supportRequests.createdBy, users.id)).where(eq(supportRequests.id, input.id)).limit(1);
+        const request = rows[0];
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Request not found" });
+        }
+        // Delete attachments storage files first
+        const attachments = await db.select().from(supportRequestAttachments).where(eq(supportRequestAttachments.requestId, input.id));
+        for (const att of attachments) {
+          try { await storageDelete(att.storageKey); } catch {}
+        }
+        // Delete related records then the request
+        await db.delete(supportRequestAttachments).where(eq(supportRequestAttachments.requestId, input.id));
+        await db.delete(supportRequestMessages).where(eq(supportRequestMessages.requestId, input.id));
+        await db.delete(supportRequests).where(eq(supportRequests.id, input.id));
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "delete",
+          entityType: "support_request",
+          entityId: input.id,
+          entityName: request.subject,
+          details: { code: request.code, deletedAttachments: attachments.length },
+        });
         return { success: true };
       }),
   }),
@@ -3434,4 +3728,5 @@ byLeadStageChanges: protectedProcedure
     }),
   }),
 });
+
 export type AppRouter = typeof appRouter;
