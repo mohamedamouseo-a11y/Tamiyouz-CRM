@@ -311,7 +311,7 @@ export default function SupportRequestDetail() {
             <CardContent className="space-y-4 p-8 text-center">
               <h1 className="text-xl font-semibold">{t("requestNotFound")}</h1>
               <p className="text-sm text-muted-foreground">{detailQuery.error?.message || t("requestNotFoundHint")}</p>
-              <Button onClick={() => navigate("/support-center")}>{t("backToSupportCenter")}</Button>
+              <Button onClick={() => navigate(isSuperAdmin ? "/support-center/admin" : "/support-center")}>{t(isSuperAdmin ? "supportAdmin" : "backToSupportCenter")}</Button>
             </CardContent>
           </Card>
         </div>
@@ -324,7 +324,7 @@ export default function SupportRequestDetail() {
       <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="space-y-3">
-            <Link href="/support-center">
+            <Link href={isSuperAdmin ? "/support-center/admin" : "/support-center"}>
               <Button variant="ghost" className="-ml-3 gap-2 px-3 text-muted-foreground">
                 <ArrowLeft size={16} className={isRTL ? "rotate-180" : ""} />
                 {t("backToSupportCenter")}
