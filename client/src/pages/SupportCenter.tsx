@@ -141,6 +141,7 @@ export default function SupportCenter() {
 
   const requestsQuery = supportCenter.myRequests.useQuery(queryInput, {
     refetchOnWindowFocus: true,
+    refetchInterval: 30000, // Auto-refresh every 30 seconds to show status updates
   });
 
   const createMutation = supportCenter.create.useMutation({

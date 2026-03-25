@@ -78,7 +78,11 @@ export default function SupportAdminInbox() {
       status: statusFilter === "all" ? undefined : statusFilter,
       requestType: typeFilter === "all" ? undefined : typeFilter,
     },
-    { enabled: isSuperAdmin }
+    {
+      enabled: isSuperAdmin,
+      refetchOnWindowFocus: true,
+      refetchInterval: 30000, // Auto-refresh every 30 seconds to show new tickets
+    }
   );
 
   const requests = React.useMemo<SupportRequestLike[]>(() => {

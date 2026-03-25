@@ -2920,19 +2920,39 @@ byLeadStageChanges: protectedProcedure
           await db.insert(supportRequestAttachments).values(attachmentRows as any);
         }
 
-        await createInAppNotification({
-          userId: superAdmin.id,
-          type: "system",
-          title: `${input.requestType} ${code}`,
-          body: `${ctx.user.name ?? ctx.user.email ?? "A user"} submitted: ${input.subject}`,
-          link: `/support-center/${requestId}`,
-          metadata: {
-            requestId,
-            code,
-            requestType: input.requestType,
-            createdBy: ctx.user.id,
-          },
-        } as any);
+        // Notify ALL admins about new support ticket
+        const { getAllUsers: getAllUsersForNotif } = await import("./db");
+        const allUsersForNotif = await getAllUsersForNotif();
+        const adminRolesSet = new Set(["Admin", "admin", "SalesManager"]);
+        const adminUserIds = allUsersForNotif
+          .filter((u: any) => Boolean(u.isActive) && adminRolesSet.has(String(u.role)) && u.id !== ctx.user.id)
+          .map((u: any) => Number(u.id))
+          .filter((id: number) => Number.isFinite(id) && id > 0);
+        // Always include superAdmin
+        if (!adminUserIds.includes(superAdmin.id) && superAdmin.id !== ctx.user.id) {
+          adminUserIds.push(superAdmin.id);
+        }
+        const creatorName = ctx.user.name ?? ctx.user.email ?? "A user";
+        if (adminUserIds.length > 0) {
+          const notifItems = adminUserIds.map((uid: number) => ({
+            userId: uid,
+            type: "system" as const,
+            title: `New Support ${input.requestType}: ${code} — ${input.subject}`,
+            titleAr: `طلب دعم جديد (${input.requestType === "Ticket" ? "تذكرة" : "اقتراح"}): ${code} — ${input.subject}`,
+            body: `${creatorName} submitted a new ${input.requestType.toLowerCase()}: ${input.subject}`,
+            bodyAr: `${creatorName} أرسل ${input.requestType === "Ticket" ? "تذكرة" : "اقتراح"} جديد: ${input.subject}`,
+            isRead: false,
+            link: `/support-center/admin`,
+            metadata: {
+              requestId,
+              code,
+              requestType: input.requestType,
+              createdBy: ctx.user.id,
+              trigger: "support_ticket_created",
+            },
+          }));
+          await createBulkInAppNotifications(notifItems as any);
+        }
 
         await createAuditLog({
           userId: ctx.user.id,
@@ -3002,15 +3022,56 @@ byLeadStageChanges: protectedProcedure
           await createInAppNotification({
             userId: notificationUserId,
             type: "system",
-            title: `Update on ${request.code}`,
-            body: isSuperAdmin ? "The super admin replied to your request" : "The requester added a new reply",
+            title: isSuperAdmin
+              ? `Reply on your ticket ${request.code}`
+              : `New reply on ticket ${request.code}`,
+            titleAr: isSuperAdmin
+              ? `رد على طلبك ${request.code}`
+              : `رد جديد على التذكرة ${request.code}`,
+            body: isSuperAdmin
+              ? `The admin replied to your support request. Status: ${nextStatus}`
+              : `${ctx.user.name ?? "The requester"} added a new reply`,
+            bodyAr: isSuperAdmin
+              ? `تم الرد على طلب الدعم الخاص بك. الحالة: ${nextStatus}`
+              : `${ctx.user.name ?? "مقدم الطلب"} أضاف رد جديد`,
+            isRead: false,
             link: `/support-center/${request.id}`,
             metadata: {
               requestId: request.id,
               code: request.code,
               status: nextStatus,
+              trigger: "support_ticket_reply",
             },
           } as any);
+        }
+        // Also notify all admins when a member replies (not just the assigned super admin)
+        if (!isSuperAdmin) {
+          const { getAllUsers: getAllUsersReply } = await import("./db");
+          const allUsersReply = await getAllUsersReply();
+          const adminRolesReply = new Set(["Admin", "admin", "SalesManager"]);
+          const otherAdminIds = allUsersReply
+            .filter((u: any) => Boolean(u.isActive) && adminRolesReply.has(String(u.role)) && u.id !== ctx.user.id && u.id !== request.superAdminId)
+            .map((u: any) => Number(u.id))
+            .filter((id: number) => Number.isFinite(id) && id > 0);
+          if (otherAdminIds.length > 0) {
+            const replyNotifs = otherAdminIds.map((uid: number) => ({
+              userId: uid,
+              type: "system" as const,
+              title: `New reply on ticket ${request.code}`,
+              titleAr: `رد جديد على التذكرة ${request.code}`,
+              body: `${ctx.user.name ?? "The requester"} added a new reply`,
+              bodyAr: `${ctx.user.name ?? "مقدم الطلب"} أضاف رد جديد`,
+              isRead: false,
+              link: `/support-center/admin`,
+              metadata: {
+                requestId: request.id,
+                code: request.code,
+                status: nextStatus,
+                trigger: "support_ticket_reply",
+              },
+            }));
+            await createBulkInAppNotifications(replyNotifs as any);
+          }
         }
 
         await createAuditLog({
@@ -3054,16 +3115,29 @@ byLeadStageChanges: protectedProcedure
         } as any).where(eq(supportRequests.id, input.requestId));
 
         if (request.createdBy !== ctx.user.id) {
+          const statusArMap: Record<string, string> = {
+            New: "جديد",
+            UnderReview: "قيد المراجعة",
+            WaitingUser: "بانتظار المستخدم",
+            Resolved: "تم الحل",
+            Closed: "مغلق",
+          };
+          const statusAr = statusArMap[input.status] ?? input.status;
           await createInAppNotification({
             userId: request.createdBy,
             type: "system",
-            title: `Status changed for ${request.code}`,
-            body: `Your request is now ${input.status}`,
+            title: `Status updated for ${request.code}: ${input.status}`,
+            titleAr: `تم تحديث حالة طلبك ${request.code}: ${statusAr}`,
+            body: `Your support request status has been changed to: ${input.status}`,
+            bodyAr: `تم تغيير حالة طلب الدعم الخاص بك إلى: ${statusAr}`,
+            isRead: false,
             link: `/support-center/${request.id}`,
             metadata: {
               requestId: request.id,
               code: request.code,
               status: input.status,
+              previousStatus: request.status,
+              trigger: "support_ticket_status_change",
             },
           } as any);
         }

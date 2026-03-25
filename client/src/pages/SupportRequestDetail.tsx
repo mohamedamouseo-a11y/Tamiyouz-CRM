@@ -128,7 +128,11 @@ export default function SupportRequestDetail() {
 
   const detailQuery = supportCenter.byId.useQuery(
     { id: requestId },
-    { enabled: Number.isFinite(requestId) && requestId > 0 }
+    {
+      enabled: Number.isFinite(requestId) && requestId > 0,
+      refetchOnWindowFocus: true,
+      refetchInterval: 30000, // Auto-refresh every 30 seconds to show status/reply updates
+    }
   );
 
   const replyMutation = supportCenter.reply.useMutation({
