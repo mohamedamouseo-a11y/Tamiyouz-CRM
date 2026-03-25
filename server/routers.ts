@@ -2809,19 +2809,39 @@ byLeadStageChanges: protectedProcedure
     adminInbox: superAdminProcedure
       .input(z.object({ status: supportStatusSchema.optional(), requestType: supportRequestTypeSchema.optional() }).optional())
       .query(async ({ input }) => {
-        const { supportRequests } = await import("../drizzle/schema");
+        const { supportRequests, users } = await import("../drizzle/schema");
         const conditions: any[] = [];
         if (input?.status) conditions.push(eq(supportRequests.status, input.status));
         if (input?.requestType) conditions.push(eq(supportRequests.requestType, input.requestType));
 
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-
-        if (conditions.length === 0) {
-          return db.select().from(supportRequests).orderBy(desc(supportRequests.lastActivityAt));
-        }
-
-        return db.select().from(supportRequests).where(and(...conditions)).orderBy(desc(supportRequests.lastActivityAt));
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+        const rows = await db
+          .select({
+            id: supportRequests.id,
+            code: supportRequests.code,
+            requestType: supportRequests.requestType,
+            category: supportRequests.category,
+            subject: supportRequests.subject,
+            description: supportRequests.description,
+            priority: supportRequests.priority,
+            status: supportRequests.status,
+            screenRecordingLink: supportRequests.screenRecordingLink,
+            createdBy: supportRequests.createdBy,
+            superAdminId: supportRequests.superAdminId,
+            closedAt: supportRequests.closedAt,
+            closedBy: supportRequests.closedBy,
+            lastActivityAt: supportRequests.lastActivityAt,
+            createdAt: supportRequests.createdAt,
+            updatedAt: supportRequests.updatedAt,
+            requesterName: users.name,
+          })
+          .from(supportRequests)
+          .leftJoin(users, eq(supportRequests.createdBy, users.id))
+          .where(whereClause)
+          .orderBy(desc(supportRequests.lastActivityAt));
+        return rows;
       }),
 
     byId: protectedProcedure
