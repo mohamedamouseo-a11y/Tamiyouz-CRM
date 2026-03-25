@@ -1063,6 +1063,7 @@ export async function getAgentStats(userId: number, dateFrom?: Date, dateTo?: Da
     totalActivities: Number(myActivities[0]?.count ?? 0),
     wonDeals: Number(dealsData.count ?? 0),
     totalRevenue: Number(dealsData.totalValue ?? 0),
+    revenueBreakdown,
     slaBreached: Number(slaBreached[0]?.count ?? 0),
     contactToMeetingRate: contactedCount > 0 ? Math.round((meetingCount / contactedCount) * 100 * 10) / 10 : 0,
     meetingToCloseRate: meetingCount > 0 ? Math.round((wonCount / meetingCount) * 100 * 10) / 10 : 0,

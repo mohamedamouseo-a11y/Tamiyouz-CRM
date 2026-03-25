@@ -1,5 +1,5 @@
 import Decimal from "decimal.js";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { exchangeRates } from "../../drizzle/schema";
 
@@ -94,4 +94,39 @@ export function createCachedConverter() {
     const rate = cache.get(key)!;
     return new Decimal(amount || 0).mul(rate).toDecimalPlaces(2);
   };
+}
+
+
+// Recalculate all deal values in base currency using current exchange rates
+export async function recalculateAllDealValues(): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("Database not available for recalculation");
+    return;
+  }
+  
+  const converter = createCachedConverter();
+  
+  // Get all deals with non-base currency
+  const allDeals = await db.execute(
+    sql`SELECT id, valueSar, currency FROM deals WHERE currency IS NOT NULL AND currency != '' AND deletedAt IS NULL`
+  );
+  
+  const rows = (allDeals as any)[0] ?? [];
+  let updated = 0;
+  
+  for (const deal of rows) {
+    const currency = normalizeCurrency(deal.currency);
+    if (currency === BASE_CURRENCY) continue;
+    
+    const originalValue = deal.valueSar || "0";
+    const convertedValue = await converter(originalValue, currency, BASE_CURRENCY);
+    
+    await db.execute(
+      sql`UPDATE deals SET valueBase = ${convertedValue.toFixed(2)} WHERE id = ${deal.id}`
+    );
+    updated++;
+  }
+  
+  console.log(`Recalculated ${updated} deal values`);
 }

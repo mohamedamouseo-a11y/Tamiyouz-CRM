@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { DollarSign, Save, RefreshCw } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 
 interface ExchangeRate {
   id: number;
@@ -17,38 +17,25 @@ interface ExchangeRate {
 
 export default function CurrencySettingsTab() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [rates, setRates] = useState<Record<string, string>>({});
 
-  const { data: exchangeRates, isLoading } = useQuery<ExchangeRate[]>({
-    queryKey: ["/api/exchange-rates"],
-    queryFn: async () => {
-      const res = await fetch("/api/exchange-rates", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch");
-      return res.json();
-    },
-    onSuccess: (data: ExchangeRate[]) => {
+  const { data: exchangeRates, isLoading } = trpc.exchangeRates.list.useQuery();
+
+  useEffect(() => {
+    if (exchangeRates && Array.isArray(exchangeRates)) {
       const rateMap: Record<string, string> = {};
-      data.forEach((r: ExchangeRate) => {
+      (exchangeRates as ExchangeRate[]).forEach((r: ExchangeRate) => {
         rateMap[`${r.fromCurrency}_${r.toCurrency}`] = r.rate;
       });
       setRates(rateMap);
-    },
-  } as any);
+    }
+  }, [exchangeRates]);
 
-  const updateMutation = useMutation({
-    mutationFn: async (payload: { fromCurrency: string; toCurrency: string; rate: number }) => {
-      const res = await fetch("/api/exchange-rates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("Failed to update");
-      return res.json();
-    },
+  const utils = trpc.useUtils();
+
+  const updateMutation = trpc.exchangeRates.upsert.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
+      utils.exchangeRates.list.invalidate();
       toast({ title: "Exchange rate updated successfully" });
     },
     onError: () => {
@@ -56,14 +43,23 @@ export default function CurrencySettingsTab() {
     },
   });
 
+  const recalculateMutation = trpc.exchangeRates.recalculate.useMutation({
+    onSuccess: () => {
+      toast({ title: isRTL ? "تم إعادة الحساب بنجاح" : "Recalculation complete" });
+    },
+    onError: () => {
+      toast({ title: isRTL ? "فشل إعادة الحساب" : "Recalculation failed", variant: "destructive" });
+    },
+  });
+
   const handleSave = (from: string, to: string) => {
     const key = `${from}_${to}`;
     const rate = parseFloat(rates[key] || "0");
-    if (rate <= 0) {
+    if (isNaN(rate) || rate <= 0) {
       toast({ title: "Rate must be greater than 0", variant: "destructive" });
       return;
     }
-    updateMutation.mutate({ fromCurrency: from, toCurrency: to, rate });
+    updateMutation.mutate({ fromCurrency: from, toCurrency: to, rate: rate.toString() });
   };
 
   const currencyPairs = [
@@ -159,23 +155,10 @@ export default function CurrencySettingsTab() {
           </p>
           <Button
             variant="outline"
-            onClick={async () => {
-              try {
-                const res = await fetch("/api/exchange-rates/recalculate", {
-                  method: "POST",
-                  credentials: "include",
-                });
-                if (res.ok) {
-                  toast({ title: isRTL ? "تم إعادة الحساب بنجاح" : "Recalculation complete" });
-                } else {
-                  toast({ title: isRTL ? "فشل إعادة الحساب" : "Recalculation failed", variant: "destructive" });
-                }
-              } catch {
-                toast({ title: "Error", variant: "destructive" });
-              }
-            }}
+            onClick={() => recalculateMutation.mutate()}
+            disabled={recalculateMutation.isPending}
           >
-            <RefreshCw size={14} className="mr-2" />
+            <RefreshCw size={14} className={`mr-2 ${recalculateMutation.isPending ? 'animate-spin' : ''}`} />
             {isRTL ? "إعادة حساب كل القيم" : "Recalculate All Values"}
           </Button>
         </CardContent>
