@@ -1,3 +1,4 @@
+import CRMLayout from "@/components/CRMLayout";
 import { useEffect, useMemo, useState } from "react";
 import { Filter, MailOpen } from "lucide-react";
 
@@ -82,6 +83,7 @@ export default function InboxPage() {
   }, [user?.role]);
 
   return (
+    <CRMLayout>
     <div className="flex min-h-[calc(100vh-5rem)] flex-col gap-4 p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -170,5 +172,6 @@ export default function InboxPage() {
         </ResizablePanelGroup>
       </Card>
     </div>
+    </CRMLayout>
   );
 }
