@@ -116,6 +116,12 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
       roles: ["Admin", "admin", "SalesManager", "SalesAgent", "MediaBuyer"],
     },
     {
+      href: "/inbox",
+      labelKey: "inbox",
+      icon: <Inbox size={18} />,
+      roles: ["Admin", "admin", "SalesManager", "SalesAgent", "MediaBuyer", "AccountManager", "AccountManagerLead"],
+    },
+    {
       href: "/team-dashboard",
       labelKey: "teamDashboard",
       icon: <BarChart3 size={18} />,

@@ -39,6 +39,7 @@ import MetaCombinedPage from "./pages/MetaCombinedPage";
 import TikTokCampaignsPage from "./pages/TikTokCampaignsPage";
 import SupportCenter from "./pages/SupportCenter";
 import SupportAdminInbox from "./pages/SupportAdminInbox";
+import InboxPage from "./pages/Inbox";
 import SupportRequestDetail from "./pages/SupportRequestDetail";
 import { InnoCallProvider } from "./contexts/InnoCallProvider";
 function Router() {
@@ -75,6 +76,7 @@ function Router() {
       <Route path="/support-center" component={SupportCenter} />
       <Route path="/support-center/admin" component={SupportAdminInbox} />
       <Route path="/support-center/:id" component={SupportRequestDetail} />
+      <Route path="/inbox" component={InboxPage} />
       <Route path="/meta-campaigns" component={MetaCampaigns} />
       <Route path="/meta-combined" component={MetaCombinedPage} />
       <Route path="/tiktok-campaigns" component={TikTokCampaignsPage} />

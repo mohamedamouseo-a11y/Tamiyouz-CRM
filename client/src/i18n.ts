@@ -8,6 +8,7 @@ export const translations = {
 
     // Nav
     dashboard: "لوحة التحكم",
+    inbox: "صندوق الوارد",
     salesFunnel: "قمع المبيعات",
     campaignAnalytics: "تحليلات الحملات",
     taskSla: "المهام و SLA",
@@ -521,6 +522,7 @@ export const translations = {
 
     // Nav
     dashboard: "Dashboard",
+    inbox: "Inbox",
     salesFunnel: "Sales Funnel",
     campaignAnalytics: "Campaign Analytics",
     taskSla: "Tasks & SLA",
