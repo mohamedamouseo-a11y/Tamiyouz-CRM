@@ -453,15 +453,18 @@ const sections: HelpSection[] = [
       ],
     },
     {
-      id: "rakanAI" ,
-      slug: "rakan-ai" ,
-      titleKey: "helpRakanAI" ,
+      id: "rakanAI",
+      slug: "rakan-ai",
+      titleKey: "helpRakanAI",
       icon: <Sparkles className="h-5 w-5" />,
-      color: "#7c3aed" ,
+      color: "#7c3aed",
       items: [
         { questionKey: "helpRakanAIQ1", answerKey: "helpRakanAIA1" },
         { questionKey: "helpRakanAIQ2", answerKey: "helpRakanAIA2" },
         { questionKey: "helpRakanAIQ3", answerKey: "helpRakanAIA3" },
+        { questionKey: "helpRakanAIQ4", answerKey: "helpRakanAIA4" },
+        { questionKey: "helpRakanAIQ5", answerKey: "helpRakanAIA5" },
+        { questionKey: "helpRakanAIQ6", answerKey: "helpRakanAIA6" },
       ],
     },
     {
