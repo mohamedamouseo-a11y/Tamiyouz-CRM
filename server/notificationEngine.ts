@@ -644,3 +644,159 @@ export function startContractRenewalScheduler() {
   // First check after 20 seconds
   setTimeout(checkContractRenewals, 20000);
 }
+
+
+// ─── Inbox-Specific Notification Functions ────────────────────────────────────
+
+async function getUsersByRoles(roles: string[]): Promise<{ id: number; name: string; role: string }[]> {
+  const users = await getAllUsers();
+  return users
+    .filter((u: any) => Boolean(u.isActive) && roles.includes(String(u.role)))
+    .map((u: any) => ({ id: Number(u.id), name: String(u.name ?? ""), role: String(u.role) }));
+}
+
+export async function notifyInboxNewLead(params: {
+  targetUserId: number;
+  leadId: number;
+  leadName: string;
+  phone?: string;
+  campaignName?: string;
+  leadTime?: Date | string | null;
+  createdAt?: Date | string | null;
+}) {
+  await createInAppNotification({
+    userId: params.targetUserId,
+    type: "new_lead" as any,
+    title: `New lead: ${params.leadName}`,
+    titleAr: `عميل محتمل جديد: ${params.leadName}`,
+    body: `${params.leadName} was received from ${params.campaignName ?? "a campaign"}.`,
+    bodyAr: `تم استلام ${params.leadName} من ${params.campaignName ?? "إحدى الحملات"}.`,
+    isRead: false,
+    link: `/leads/${params.leadId}`,
+    metadata: {
+      leadId: params.leadId,
+      leadName: params.leadName,
+      phone: params.phone ?? null,
+      campaignName: params.campaignName ?? null,
+      leadTime: params.leadTime ? new Date(String(params.leadTime)).toISOString() : null,
+      createdAt: params.createdAt ? new Date(String(params.createdAt)).toISOString() : new Date().toISOString(),
+    },
+  });
+}
+
+export async function notifyInboxLeadAssigned(params: {
+  assigneeUserId: number;
+  assignedToName: string;
+  leadId: number;
+  leadName: string;
+  phone?: string;
+  campaignName?: string;
+  leadTime?: Date | string | null;
+  createdAt?: Date | string | null;
+}) {
+  await createInAppNotification({
+    userId: params.assigneeUserId,
+    type: "lead_assigned" as any,
+    title: `Lead assigned: ${params.leadName}`,
+    titleAr: `تم توزيع عميل محتمل: ${params.leadName}`,
+    body: `${params.leadName} was assigned to ${params.assignedToName}.`,
+    bodyAr: `تم توزيع ${params.leadName} على ${params.assignedToName}.`,
+    isRead: false,
+    link: `/leads/${params.leadId}`,
+    metadata: {
+      leadId: params.leadId,
+      leadName: params.leadName,
+      phone: params.phone ?? null,
+      campaignName: params.campaignName ?? null,
+      assignedToName: params.assignedToName,
+      leadTime: params.leadTime ? new Date(String(params.leadTime)).toISOString() : null,
+      createdAt: params.createdAt ? new Date(String(params.createdAt)).toISOString() : new Date().toISOString(),
+    },
+  });
+}
+
+export async function notifyInboxCampaignStatus(params: {
+  campaignName: string;
+  platform?: string;
+  status: "started" | "stopped";
+  startDate?: Date | string | null;
+}) {
+  const recipients = await getUsersByRoles(["Admin", "admin", "SalesManager", "SalesAgent", "MediaBuyer"]);
+  if (recipients.length === 0) return;
+  const items = recipients.map((user) => ({
+    userId: user.id,
+    type: "campaign_alert" as any,
+    title: `Campaign ${params.status}: ${params.campaignName}`,
+    titleAr: `الحملة ${params.status === "started" ? "بدأت" : "توقفت"}: ${params.campaignName}`,
+    body: `${params.campaignName} on ${params.platform ?? "Unknown platform"} has ${params.status}.`,
+    bodyAr: `حالة الحملة ${params.campaignName} على ${params.platform ?? "منصة غير معروفة"}: ${params.status === "started" ? "بدأت" : "توقفت"}.`,
+    isRead: false,
+    link: `/campaigns`,
+    metadata: {
+      campaignName: params.campaignName,
+      platform: params.platform ?? null,
+      status: params.status,
+      startDate: params.startDate ? new Date(String(params.startDate)).toISOString() : null,
+    },
+  }));
+  await createBulkInAppNotifications(items as any);
+}
+
+export async function notifyInboxAdminLeadDistribution(params: {
+  leadId: number;
+  leadName: string;
+  phone?: string;
+  campaignName?: string;
+  leadTime?: Date | string | null;
+  createdAt?: Date | string | null;
+  assignedToId: number;
+  assignedToName: string;
+}) {
+  const admins = await getUsersByRoles(["Admin", "admin", "SalesManager"]);
+  if (admins.length === 0) return;
+  const items = admins.map((admin) => ({
+    userId: admin.id,
+    type: "lead_distribution" as any,
+    title: `Lead distributed: ${params.leadName}`,
+    titleAr: `تم توزيع عميل محتمل: ${params.leadName}`,
+    body: `${params.leadName} from ${params.campaignName ?? "a campaign"} was assigned to ${params.assignedToName}.`,
+    bodyAr: `تم توزيع ${params.leadName} من ${params.campaignName ?? "إحدى الحملات"} على ${params.assignedToName}.`,
+    isRead: false,
+    link: `/leads/${params.leadId}`,
+    metadata: {
+      leadId: params.leadId,
+      leadName: params.leadName,
+      phone: params.phone ?? null,
+      campaignName: params.campaignName ?? null,
+      assignedToId: params.assignedToId,
+      assignedToName: params.assignedToName,
+      leadTime: params.leadTime ? new Date(String(params.leadTime)).toISOString() : null,
+      createdAt: params.createdAt ? new Date(String(params.createdAt)).toISOString() : new Date().toISOString(),
+    },
+  }));
+  await createBulkInAppNotifications(items as any);
+}
+
+export async function notifyInboxMediaBuyerLeadPulse(params: {
+  campaignName: string;
+  leadId: number;
+}) {
+  const mediaBuyers = await getUsersByRoles(["MediaBuyer"]);
+  if (mediaBuyers.length === 0) return;
+  const items = mediaBuyers.map((user) => ({
+    userId: user.id,
+    type: "campaign_alert" as any,
+    title: `Lead received from ${params.campaignName}`,
+    titleAr: `تم استلام ليد من ${params.campaignName}`,
+    body: `A new lead came from ${params.campaignName}.`,
+    bodyAr: `وصل ليد جديد من ${params.campaignName}.`,
+    isRead: false,
+    link: `/campaigns`,
+    metadata: {
+      campaignName: params.campaignName,
+      leadId: params.leadId,
+      visibility: "campaign_only",
+    },
+  }));
+  await createBulkInAppNotifications(items as any);
+}

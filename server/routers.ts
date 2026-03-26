@@ -1,7 +1,8 @@
 import { storageDelete, storagePut } from "./storage";
 import { syncExchangeRates } from "./exchangeRateSync";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { inAppNotifications } from "../drizzle/schema";
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -878,4 +879,2715 @@ export const appRouter = router({
                 await createCalendarEvent({
                   summary,
                   description: input.notes || "",
-                  startDateTime: start
+                  startDateTime: startTime.toISOString(),
+                  endDateTime: endTime.toISOString(),
+                  attendees,
+                  leadId: input.leadId,
+                  leadName,
+                  agentName: agentDisplayName,
+                });
+                console.log(`[AutoCalendar] Created ${input.type} event for lead ${leadName}`);
+              } else {
+                console.log(`[AutoCalendar] Agent busy at ${startTime.toISOString()}, skipping calendar event`);
+              }
+            }
+          } catch (err) {
+            console.error("[AutoCalendar] Error creating calendar event:", err);
+            // Don't fail the activity creation if calendar fails
+          }
+        }
+
+        return { id };
+      }),
+
+    update: notMediaBuyerProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          type: z.enum(["WhatsApp", "Call", "SMS", "Meeting", "Offer", "Email", "Note"]).optional(),
+          activityTime: z.date().optional(),
+          outcome: z
+            .enum(["Contacted", "NoAnswer", "Interested", "NotInterested", "Meeting", "Offer", "Won", "Lost", "Callback"])
+            .optional(),
+          notes: z.string().optional(),
+        })
+      )
+      .mutation(({ input }) => {
+        const { id, ...data } = input;
+        return updateActivity(id, data as any);
+      }),
+
+    delete: notMediaBuyerProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await deleteActivity(input.id, ctx.user.id);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "soft_delete",
+          entityType: "activities",
+          entityId: input.id,
+        });
+        return { success: true };
+      }),
+  }),
+
+  // ─── Deals (with row-level security) ─────────────────────────────────────
+  deals: router({
+    byLead: protectedProcedure
+      .input(z.object({ leadId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        // ── ROW-LEVEL SECURITY ──
+        if (ctx.user.role === "SalesAgent") {
+          const lead = await getLeadById(input.leadId);
+          if (!lead || lead.ownerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        return getDealByLead(input.leadId);
+      }),
+
+    byUser: protectedProcedure
+      .input(z.object({ userId: z.number().optional() }))
+      .query(({ ctx, input }) => {
+        const userId = input.userId ?? ctx.user.id;
+        // ── ROW-LEVEL SECURITY ──
+        if (ctx.user.role === "SalesAgent" && userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return getDealsByUser(userId);
+      }),
+
+    create: notMediaBuyerProcedure
+      .input(
+        z.object({
+          leadId: z.number(),
+          valueSar: z.string().optional(),
+          currency: z.string().optional().default("SAR"),
+          status: z.enum(["Won", "Lost", "Pending"]).default("Pending"),
+          dealType: z.enum(["New", "Contract", "Renewal", "Upsell"]).optional(),
+          lossReason: z.string().optional(),
+          notes: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        // ── ROW-LEVEL SECURITY ──
+        if (ctx.user.role === "SalesAgent") {
+          const lead = await getLeadById(input.leadId);
+          if (!lead || lead.ownerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        const id = await createDeal(input as any);
+        return { id };
+      }),
+
+    update: notMediaBuyerProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          leadId: z.number().optional(),
+          valueSar: z.string().optional(),
+          currency: z.string().optional(),
+          status: z.enum(["Won", "Lost", "Pending"]).optional(),
+          closedAt: z.date().optional(),
+          dealType: z.enum(["New", "Contract", "Renewal", "Upsell"]).optional(),
+          lossReason: z.string().optional(),
+          notes: z.string().optional(),
+        })
+      )
+      .mutation(({ input }) => {
+        const { id, ...data } = input;
+        return updateDeal(id, data as any);
+      }),
+  }),
+
+  // ─── Campaigns ────────────────────────────────────────────────────────────
+  campaigns: router({
+    list: protectedProcedure.query(() => getCampaigns()),
+
+    create: mediaBuyerOrAdminProcedure
+      .input(
+        z.object({
+          name: z.string().min(1),
+          platform: z.enum(["Messages", "LeadForm", "Meta", "Google", "Snapchat", "TikTok", "Other"]).default("Meta"),
+          startDate: z.date().optional(),
+          endDate: z.date().optional(),
+          notes: z.string().optional(),
+          roundRobinEnabled: z.boolean().default(false),
+        })
+      )
+      .mutation(({ input }) => createCampaign(input as any)),
+
+    update: mediaBuyerOrAdminProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().optional(),
+          platform: z.enum(["Messages", "LeadForm", "Meta", "Google", "Snapchat", "TikTok", "Other"]).optional(),
+          notes: z.string().optional(),
+          roundRobinEnabled: z.boolean().optional(),
+          isActive: z.boolean().optional(),
+        })
+      )
+      .mutation(({ input }) => {
+        const { id, ...data } = input;
+        return updateCampaign(id, data as any);
+      }),
+
+    delete: mediaBuyerOrAdminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await deleteCampaign(input.id, ctx.user.id);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "soft_delete",
+          entityType: "campaigns",
+          entityId: input.id,
+        });
+        return { success: true };
+      }),
+
+    stats: protectedProcedure
+      .input(z.object({
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+      }).optional())
+      .query(({ input }) => getCampaignStats(input?.dateFrom, input?.dateTo)),
+
+    detail: protectedProcedure
+      .input(z.object({
+        campaignName: z.string(),
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+      }))
+      .query(({ input }) => getCampaignDetail(input.campaignName, input.dateFrom, input.dateTo)),
+  }),
+
+  // ─── Pipeline Stages ──────────────────────────────────────────────────────
+  pipeline: router({
+    list: publicProcedure.query(() => getPipelineStages()),
+
+    create: adminProcedure
+      .input(
+        z.object({
+          name: z.string().min(1),
+          nameAr: z.string().optional(),
+          color: z.string().default("#6366f1"),
+          order: z.number().default(0),
+        })
+      )
+      .mutation(({ input }) => createPipelineStage(input as any)),
+
+    update: adminProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().optional(),
+          nameAr: z.string().optional(),
+          color: z.string().optional(),
+          order: z.number().optional(),
+        })
+      )
+      .mutation(({ input }) => {
+        const { id, ...data } = input;
+        return updatePipelineStage(id, data);
+      }),
+
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => deletePipelineStage(input.id)),
+    toggle: adminProcedure
+      .input(z.object({ id: z.number(), isActive: z.boolean() }))
+      .mutation(({ input }) => updatePipelineStage(input.id, { isActive: input.isActive })),
+    reorder: adminProcedure
+      .input(z.object({ items: z.array(z.object({ id: z.number(), order: z.number() })) }))
+      .mutation(async ({ input }) => {
+        for (const item of input.items) {
+          await updatePipelineStage(item.id, { order: item.order });
+        }
+        return { success: true };
+      }),
+  }),
+  // ─── Custom Fields ────────────────────────────────────────────────────────
+  customFields: router({
+    list: protectedProcedure
+      .input(z.object({ entity: z.string().optional() }))
+      .query(({ input }) => getCustomFields(input.entity)),
+
+    create: adminProcedure
+      .input(
+        z.object({
+          entity: z.enum(["Lead", "Deal", "Activity", "Campaign"]),
+          fieldName: z.string().min(1),
+          fieldLabel: z.string().optional(),
+          fieldLabelAr: z.string().optional(),
+          fieldType: z.enum(["text", "number", "date", "select", "boolean"]),
+          options: z.array(z.string()).optional(),
+          isRequired: z.boolean().default(false),
+          order: z.number().default(0),
+        })
+      )
+      .mutation(({ input }) => createCustomField(input as any)),
+
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => deleteCustomField(input.id)),
+  }),
+
+  // ─── Theme Settings ───────────────────────────────────────────────────────
+  theme: router({
+    get: publicProcedure.query(() => getThemeSettings()),
+
+    set: adminProcedure
+      .input(z.object({ key: z.string(), value: z.string() }))
+      .mutation(({ input }) => upsertThemeSetting(input.key, input.value)),
+
+    setBulk: adminProcedure
+      .input(z.array(z.object({ key: z.string(), value: z.string() })))
+      .mutation(async ({ input }) => {
+        for (const item of input) {
+          await upsertThemeSetting(item.key, item.value);
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ─── SLA Config ───────────────────────────────────────────────────────────
+  sla: router({
+    get: protectedProcedure.query(() => getSlaConfig()),
+
+    update: adminProcedure
+      .input(z.object({ hoursThreshold: z.number().min(1).max(720), isEnabled: z.boolean() }))
+      .mutation(({ input }) => updateSlaConfig(input.hoursThreshold, input.isEnabled)),
+
+    check: adminProcedure.mutation(() => checkAndUpdateSLA()),
+  }),
+
+  // ─── Dashboard Stats ──────────────────────────────────────────────────────
+  dashboard: router({
+    salesFunnel: protectedProcedure
+      .input(z.object({
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+      }).optional())
+      .query(({ ctx, input }) => getSalesFunnelData(input?.dateFrom, input?.dateTo, ctx.user.role, ctx.user.id)),
+    taskSla: protectedProcedure
+      .input(z.object({
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+        agentId: z.number().optional(),
+      }).optional())
+      .query(({ ctx, input }) => {
+        // If agentId is specified by a manager, use it to filter; otherwise use current user for agents
+        const isManagerRole = ["Admin", "SalesManager", "admin"].includes(ctx.user.role);
+        const effectiveRole = (isManagerRole && input?.agentId) ? 'SalesAgent' : ctx.user.role;
+        const effectiveUserId = (isManagerRole && input?.agentId) ? input.agentId : ctx.user.id;
+        return getTaskSlaDashboardData(input?.dateFrom, input?.dateTo, effectiveRole, effectiveUserId);
+      }),
+     agentStats: protectedProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+      }))
+      .query(({ ctx, input }) => {
+        const userId = input.userId ?? ctx.user.id;
+        // ── ROW-LEVEL SECURITY ──
+        if (ctx.user.role === "SalesAgent" && userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+        return getAgentStats(userId, input.dateFrom, input.dateTo, ctx.user.role);
+      }),
+    teamStats: managerProcedure
+      .input(z.object({
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+      }).optional())
+      .query(({ input }) => getTeamStats(input?.dateFrom, input?.dateTo)),
+  }),
+
+  // ─── Notifications ─────────────────────────────────────────────────────────
+  notifications: router({
+    getSubscribers: adminProcedure
+      .query(async () => {
+        return getNotificationSubscribers();
+      }),
+    addSubscriber: adminProcedure
+      .input(z.object({
+        email: z.string().email(),
+        name: z.string().optional(),
+        frequency: z.enum(["daily", "weekly"]),
+        reportTypes: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const id = await addNotificationSubscriber({
+          email: input.email,
+          name: input.name ?? null,
+          frequency: input.frequency,
+          reportTypes: input.reportTypes ?? ["sla", "performance"],
+          isActive: true,
+        });
+        return { id };
+      }),
+    updateSubscriber: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        email: z.string().email().optional(),
+        name: z.string().optional(),
+        frequency: z.enum(["daily", "weekly"]).optional(),
+        isActive: z.boolean().optional(),
+        reportTypes: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, reportTypes, ...rest } = input;
+        await updateNotificationSubscriber(id, {
+          ...rest,
+          ...(reportTypes !== undefined ? { reportTypes: reportTypes } : {}),
+        });
+        return { success: true };
+      }),
+    deleteSubscriber: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteNotificationSubscriber(input.id);
+        return { success: true };
+      }),
+    sendTestReport: adminProcedure
+      .input(z.object({ email: z.string().email() }))
+      .mutation(async ({ input }) => {
+        const reportData = await getReportData();
+        if (!reportData) return { success: false, info: "No data available" };
+        const { subject, html, text } = buildReportEmail(reportData, "daily");
+        const result = await sendEmail({ to: input.email, subject, html, text });
+        return result;
+      }),
+    getReportData: adminProcedure
+      .input(z.object({
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        return getReportData(input?.dateFrom, input?.dateTo);
+      }),
+  }),
+
+  // ─── Excel Import ─────────────────────────────────────────────────────────
+  import: router({
+    leads: adminProcedure
+      .input(
+        z.object({
+          rows: z.array(
+            z.object({
+              name: z.string().optional(),
+              phone: z.string(),
+              country: z.string().optional(),
+              businessProfile: z.string().optional(),
+              leadQuality: z.enum(["Hot", "Warm", "Cold", "Bad", "Unknown"]).optional(),
+              campaignName: z.string().optional(),
+              adCreative: z.string().optional(),
+              stage: z.string().optional(),
+              notes: z.string().optional(),
+              mediaBuyerNotes: z.string().optional(),
+              serviceIntroduced: z.string().optional(),
+              leadTime: z.string().optional(),
+            })
+          ),
+        })
+      )
+      .mutation(async ({ input }) => {
+        // Convert leadTime strings to Date objects for DB insertion
+        const rows = input.rows.map((row) => ({
+          ...row,
+          leadTime: row.leadTime ? new Date(row.leadTime) : undefined,
+        }));
+        const result = await bulkCreateLeads(rows as any);
+        return result;
+      }),
+  }),
+
+  // ─── Internal Notes ──────────────────────────────────────────────────────
+  notes: router({
+    byLead: protectedProcedure
+      .input(z.object({ leadId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role === "SalesAgent") {
+          const lead = await getLeadById(input.leadId);
+          if (!lead || lead.ownerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        return getInternalNotesByLead(input.leadId);
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        leadId: z.number(),
+        content: z.string().min(1),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role === "SalesAgent") {
+          const lead = await getLeadById(input.leadId);
+          if (!lead || lead.ownerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        const id = await createInternalNote({
+          leadId: input.leadId,
+          userId: ctx.user.id,
+          content: input.content,
+        });
+        return { id };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await deleteInternalNote(input.id, ctx.user.id);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "soft_delete",
+          entityType: "internalNotes",
+          entityId: input.id,
+        });
+        return { success: true };
+      }),
+  }),
+
+
+
+// ─── Lead Attachments ─────────────────────────────────────────────────────
+attachments: router({
+  byLead: protectedProcedure
+    .input(z.object({ leadId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role === "SalesAgent") {
+        const lead = await getLeadById(input.leadId);
+        if (!lead || lead.ownerId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+      }
+
+      const db = await (await import("./db")).getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+      const { leadAttachments } = await import("../drizzle/schema");
+
+      return db
+        .select()
+        .from(leadAttachments)
+        .where(eq(leadAttachments.leadId, input.leadId))
+        .orderBy(desc(leadAttachments.createdAt));
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      leadId: z.number(),
+      fileName: z.string().min(1),
+      fileUrl: z.string().url(),
+      fileSize: z.number().optional(),
+      fileType: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role === "SalesAgent") {
+        const lead = await getLeadById(input.leadId);
+        if (!lead || lead.ownerId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+      }
+
+      const db = await (await import("./db")).getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+      const { leadAttachments } = await import("../drizzle/schema");
+
+      await db.insert(leadAttachments).values({
+        leadId: input.leadId,
+        fileName: input.fileName,
+        fileUrl: input.fileUrl,
+        fileSize: input.fileSize ?? null,
+        fileType: input.fileType ?? null,
+        uploadedBy: ctx.user.id,
+      });
+
+      return { success: true };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await (await import("./db")).getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+      const { leadAttachments } = await import("../drizzle/schema");
+
+      const rows = await db
+        .select()
+        .from(leadAttachments)
+        .where(eq(leadAttachments.id, input.id))
+        .limit(1);
+
+      const attachment = rows[0];
+      if (!attachment) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Attachment not found" });
+      }
+
+      if (ctx.user.role === "SalesAgent") {
+        const lead = await getLeadById(attachment.leadId);
+        if (!lead || lead.ownerId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+      }
+
+      await db.delete(leadAttachments).where(eq(leadAttachments.id, input.id));
+      return { success: true };
+    }),
+}),
+
+  // ─── Lead Transfers ──────────────────────────────────────────────────────
+  transfers: router({
+    byLead: protectedProcedure
+      .input(z.object({ leadId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role === "SalesAgent") {
+          const access = await checkLeadAccess(input.leadId, ctx.user.id);
+          if (!access.hasAccess) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        return getLeadTransfersByLead(input.leadId);
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        leadId: z.number(),
+        toUserId: z.number(),
+        reason: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const lead = await getLeadById(input.leadId);
+        if (!lead) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found" });
+        }
+        if (ctx.user.role === "SalesAgent" && lead.ownerId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You can only transfer leads assigned to you" });
+        }
+        if (input.toUserId === ctx.user.id) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot transfer lead to yourself" });
+        }
+        const result = await smartHandover({
+          leadId: input.leadId,
+          fromUserId: ctx.user.id,
+          toUserId: input.toUserId,
+          reason: input.reason,
+          notes: input.notes,
+        });
+        return { id: result.transferId, success: true };
+      }),
+  }),
+
+  // ─── Chat System ──────────────────────────────────────────────────────────
+  // ─── Lead Assignments (Collaboration Model) ────────────────────────────────
+  assignments: router({
+    byLead: protectedProcedure
+      .input(z.object({ leadId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        return getLeadAssignments(input.leadId);
+      }),
+    history: protectedProcedure
+      .input(z.object({ leadId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        return getLeadAssignmentHistory(input.leadId);
+      }),
+    myCollaborated: protectedProcedure
+      .query(async ({ ctx }) => {
+        return getMyCollaboratedLeads(ctx.user.id);
+      }),
+    myWatching: protectedProcedure
+      .query(async ({ ctx }) => {
+        return getMyWatchingLeads(ctx.user.id);
+      }),
+    myByRole: protectedProcedure
+      .input(z.object({ role: z.string().optional() }))
+      .query(async ({ ctx, input }) => {
+        return getLeadsByAssignment(ctx.user.id, input.role);
+      }),
+    checkAccess: protectedProcedure
+      .input(z.object({ leadId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        return checkLeadAccess(input.leadId, ctx.user.id);
+      }),
+    handover: protectedProcedure
+      .input(z.object({
+        leadId: z.number(),
+        toUserId: z.number(),
+        reason: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const lead = await getLeadById(input.leadId);
+        if (!lead) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found" });
+        }
+        if (ctx.user.role === "SalesAgent" && lead.ownerId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You can only handover leads assigned to you" });
+        }
+        if (input.toUserId === ctx.user.id) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot handover lead to yourself" });
+        }
+        return smartHandover({
+          leadId: input.leadId,
+          fromUserId: ctx.user.id,
+          toUserId: input.toUserId,
+          reason: input.reason,
+          notes: input.notes,
+        });
+      }),
+    addCollaborator: protectedProcedure
+      .input(z.object({
+        leadId: z.number(),
+        userId: z.number(),
+        role: z.enum(["collaborator", "client_success", "account_manager", "observer"]),
+        reason: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const lead = await getLeadById(input.leadId);
+        if (!lead) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found" });
+        }
+        // Only owner, admin, or manager can add collaborators
+        if (ctx.user.role === "SalesAgent" && lead.ownerId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the lead owner can add collaborators" });
+        }
+        if (input.userId === lead.ownerId && input.role !== "observer") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot add the owner as a collaborator" });
+        }
+        const id = await addCollaborator({
+          leadId: input.leadId,
+          userId: input.userId,
+          role: input.role,
+          assignedBy: ctx.user.id,
+          reason: input.reason,
+          notes: input.notes,
+        });
+        return { id, success: true };
+      }),
+    remove: protectedProcedure
+      .input(z.object({ assignmentId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        // Admin/Manager can remove any, SalesAgent can only remove from their own leads
+        await removeLeadAssignment(input.assignmentId);
+        return { success: true };
+      }),
+  }),
+  chat: router({
+    getHistory: protectedProcedure
+      .input(z.object({
+        toUserId: z.number().optional(),
+        roomId: z.string().optional(),
+        limit: z.number().optional().default(50),
+      }))
+      .query(async ({ ctx, input }) => {
+        return getChatMessages({
+          fromUserId: ctx.user.id,
+          toUserId: input.toUserId,
+          roomId: input.roomId,
+          limit: input.limit,
+        });
+      }),
+    getConversations: adminProcedure
+      .query(async () => {
+        return getAllChatConversations();
+      }),
+    // NEW: last message preview + per-conversation unread badges + total unread
+    getConversationMeta: protectedProcedure.query(async ({ ctx }) => {
+      return getConversationMetaForUser(ctx.user.id);
+    }),
+    // Keep this for backward compatibility (now derived from meta)
+    getUnreadCount: protectedProcedure.query(async ({ ctx }) => {
+      const meta = await getConversationMetaForUser(ctx.user.id);
+      return meta.totalUnread;
+    }),
+    markAsRead: protectedProcedure
+      .input(z.object({ fromUserId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await markMessagesAsRead(input.fromUserId, ctx.user.id);
+        return { success: true };
+      }),
+  }),
+
+  // ─── Lead Sources (Google Sheets Integration) ─────────────────────────────
+  leadSources: createLeadSourcesRouter(adminProcedure),
+
+  // ─── Backup & Restore ─────────────────────────────────────────────────────
+  admin: router({
+    createBackup: adminProcedure
+      .input(
+        z.object({
+          startDate: z.string(),
+          endDate: z.string(),
+          format: z.enum(["json", "csv", "both"]),
+          confirmed: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        return createBackupProcedure(input, ctx.user.id);
+      }),
+
+    getBackups: adminProcedure.query(async () => {
+      return getBackupsProcedure();
+    }),
+
+    deleteBackup: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return deleteBackupProcedure(input.id);
+      }),
+
+    archiveData: adminProcedure
+      .input(
+        z.object({
+          startDate: z.string(),
+          endDate: z.string(),
+          cleanupMode: z.enum(["archive", "delete"]),
+          dryRun: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return archiveDataProcedure(input);
+      }),
+
+    getArchiveStats: adminProcedure.query(async () => {
+      return getArchiveStatsProcedure();
+    }),
+  }),
+
+  // ─── Trash & Data Protection ────────────────────────────────────────────
+  trash: router({
+    stats: adminProcedure.query(async () => {
+      return getTrashStats();
+    }),
+
+    items: adminProcedure
+      .input(z.object({ entityType: z.string().optional() }).optional())
+      .query(async ({ input }) => {
+        return getTrashItems(input?.entityType);
+      }),
+
+    restore: adminProcedure
+      .input(z.object({
+        entityType: z.enum(["leads", "users", "campaigns", "activities", "deals", "internalNotes"]),
+        id: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const restoreMap: Record<string, (id: number) => Promise<void>> = {
+          leads: restoreLead,
+          users: restoreUser,
+          campaigns: restoreCampaign,
+          activities: restoreActivity,
+          deals: restoreDeal,
+          internalNotes: restoreInternalNote,
+        };
+        const fn = restoreMap[input.entityType];
+        if (!fn) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid entity type" });
+        await fn(input.id);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "restore",
+          entityType: input.entityType,
+          entityId: input.id,
+        });
+        return { success: true };
+      }),
+
+    permanentDelete: adminProcedure
+      .input(z.object({
+        entityType: z.enum(["leads", "users", "campaigns", "activities", "deals", "internalNotes"]),
+        id: z.number(),
+        password: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Verify the special deletion password
+        const DELETION_PASSWORD = "AY2001131ay**yearlyremovecrm";
+        if (input.password !== DELETION_PASSWORD) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Incorrect deletion password" });
+        }
+        const result = await permanentDeleteEntity(input.entityType, input.id);
+        if (!result.success) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: result.reason ?? "Cannot delete" });
+        }
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "permanent_delete",
+          entityType: input.entityType,
+          entityId: input.id,
+          details: { reason: "Password-verified permanent deletion" },
+        });
+        return { success: true };
+      }),
+  }),
+
+  // ─── Audit Logs ─────────────────────────────────────────────────────────
+  auditLogs: router({
+    list: adminProcedure
+      .input(z.object({
+        entityType: z.string().optional(),
+        limit: z.number().default(100),
+        offset: z.number().default(0),
+      }).optional())
+      .query(async ({ input }) => {
+        return getAuditLogs({
+          entityType: input?.entityType,
+          limit: input?.limit,
+          offset: input?.offset,
+        });
+      }),
+
+
+byLeadStageChanges: protectedProcedure
+  .input(z.object({ leadId: z.number() }))
+  .query(async ({ ctx, input }) => {
+    if (ctx.user.role === "SalesAgent") {
+      const lead = await getLeadById(input.leadId);
+      if (!lead || lead.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+    }
+
+    const db = await (await import("./db")).getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+    const { auditLogs } = await import("../drizzle/schema");
+
+    const rows = await db
+      .select()
+      .from(auditLogs)
+      .where(and(eq(auditLogs.entityType, "leads"), eq(auditLogs.entityId, input.leadId)))
+      .orderBy(desc(auditLogs.createdAt));
+
+    return rows
+      .map((row) => ({
+        ...row,
+        previousStage: getAuditStage(row.previousValue),
+        newStage: getAuditStage(row.newValue),
+      }))
+      .filter((row) => row.previousStage || row.newStage)
+      .reverse();
+  }),
+
+    undo: adminProcedure
+      .input(z.object({ auditLogId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const log = await getAuditLogById(input.auditLogId);
+        if (!log) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Audit log entry not found" });
+        }
+        if (!log.previousValue) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No previous value stored for this change - cannot undo" });
+        }
+
+        const { sql } = await import("drizzle-orm");
+        const db = await (await import("./db")).getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+                // Build the update from previousValue
+        const prev = typeof log.previousValue === "string" ? JSON.parse(log.previousValue) : log.previousValue;
+        const entityType = log.entityType;
+        const entityId = log.entityId;
+
+        // Generic undo: update the entity with previous values using parameterized query
+        const updateFields = Object.entries(prev)
+          .filter(([key]) => key !== "id" && key !== "createdAt");
+
+        if (updateFields.length > 0) {
+          const setParts: string[] = [];
+          for (const [key, value] of updateFields) {
+            if (value === null) {
+              setParts.push(key + " = NULL");
+            } else if (typeof value === "string") {
+              setParts.push(key + " = " + JSON.stringify(value).replace(/\\/g, "\\\\"));
+            } else if (typeof value === "number" || typeof value === "boolean") {
+              setParts.push(key + " = " + String(value));
+            } else {
+              setParts.push(key + " = " + JSON.stringify(JSON.stringify(value)));
+            }
+          }
+          const setClause = setParts.join(", ");
+          const query = "UPDATE " + entityType + " SET " + setClause + " WHERE id = " + entityId;
+          await db.execute(sql.raw(query));
+        }
+
+        // Log the undo action
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "undo",
+          entityType: entityType,
+          entityId: entityId,
+          entityName: log.entityName ?? undefined,
+          details: { undoneAuditLogId: input.auditLogId, undoneAction: log.action },
+          previousValue: log.newValue,
+          newValue: log.previousValue,
+        });
+
+        // Notify all admins about the undo
+        try {
+          const allUsers = await getAllUsers();
+          const admins = allUsers.filter((u: any) => u.role === "Admin" || u.role === "admin");
+          for (const admin of admins) {
+            if (admin.id !== ctx.user.id) {
+              await createInAppNotification({
+                userId: admin.id,
+                type: "data_undo" as any,
+                title: `Undo: ${log.action} on ${entityType} #${entityId}`,
+                titleAr: `تراجع: ${log.action} على ${entityType} #${entityId}`,
+                body: `${ctx.user.name} undid a ${log.action} action on ${entityType} "${log.entityName ?? entityId}"`,
+                bodyAr: `${ctx.user.name} تراجع عن عملية ${log.action} على ${entityType} "${log.entityName ?? entityId}"`,
+                link: null,
+                metadata: { auditLogId: input.auditLogId },
+              } as any);
+            }
+          }
+        } catch (e) {
+          console.error("[Undo] Failed to send notifications:", e);
+        }
+
+        return { success: true, message: "Change undone successfully" };
+      }),
+  }),
+
+  // ─── Google Calendar ──────────────────────────────────────────────────
+  calendar: router({
+    list: protectedProcedure
+      .input(z.object({
+        timeMin: z.string().optional(),
+        timeMax: z.string().optional(),
+        maxResults: z.number().optional(),
+        search: z.string().optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        return listCalendarEvents({
+          timeMin: input?.timeMin,
+          timeMax: input?.timeMax,
+          maxResults: input?.maxResults,
+          search: input?.search,
+        });
+      }),
+
+    get: protectedProcedure
+      .input(z.object({ eventId: z.string() }))
+      .query(async ({ input }) => {
+        return getCalendarEvent(input.eventId);
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        summary: z.string().min(1),
+        description: z.string().optional(),
+        location: z.string().optional(),
+        startDateTime: z.string(),
+        endDateTime: z.string(),
+        attendees: z.array(z.string().email()).optional(),
+        leadId: z.number().optional(),
+        leadName: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Include creator's email in attendees list (will be added to description, not as Google Calendar attendees)
+        let attendees = input.attendees || [];
+        if (ctx.user.email && !attendees.includes(ctx.user.email)) {
+          attendees = [ctx.user.email, ...attendees];
+        }
+        // Add agent name to summary for visibility on shared calendar
+        const agentName = ctx.user.name || "Unknown Agent";
+        const summaryWithAgent = `${input.summary} [${agentName}]`;
+        const result = await createCalendarEvent({
+          ...input,
+          summary: summaryWithAgent,
+          attendees,
+          agentName,
+        });
+        // Log the calendar event creation
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "calendar_event_created",
+          entityType: "calendar",
+          entityId: 0,
+          details: { eventId: result.id, summary: input.summary, leadId: input.leadId },
+        });
+        return result;
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        eventId: z.string(),
+        summary: z.string().optional(),
+        description: z.string().optional(),
+        location: z.string().optional(),
+        startDateTime: z.string().optional(),
+        endDateTime: z.string().optional(),
+        attendees: z.array(z.string().email()).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { eventId, ...updateData } = input;
+        const result = await updateCalendarEvent(eventId, updateData);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "calendar_event_updated",
+          entityType: "calendar",
+          entityId: 0,
+          details: { eventId, summary: input.summary },
+        });
+        return result;
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ eventId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        await deleteCalendarEvent(input.eventId);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "calendar_event_deleted",
+          entityType: "calendar",
+          entityId: 0,
+          details: { eventId: input.eventId },
+        });
+        return { success: true };
+      }),
+
+    freeBusy: protectedProcedure
+      .input(z.object({
+        timeMin: z.string(),
+        timeMax: z.string(),
+      }))
+      .query(async ({ input }) => {
+        return getFreeBusy(input.timeMin, input.timeMax);
+      }),
+  }),
+
+
+  // ─── In-App Notifications ──────────────────────────────────────────────
+  inAppNotifications: router({
+    list: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(100).default(30),
+        offset: z.number().min(0).default(0),
+        dateFrom: z.date().optional(),
+        dateTo: z.date().optional(),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        return getInAppNotifications(ctx.user.id, input?.limit ?? 30, input?.offset ?? 0, input?.dateFrom, input?.dateTo);
+      }),
+
+    unreadCount: protectedProcedure
+      .query(async ({ ctx }) => {
+        return getUnreadNotificationCount(ctx.user.id);
+      }),
+
+    markRead: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await markNotificationRead(input.id, ctx.user.id);
+        return { success: true };
+      }),
+
+    markAllRead: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        await markAllNotificationsRead(ctx.user.id);
+        return { success: true };
+      }),
+
+    create: adminProcedure
+      .input(z.object({
+        userId: z.number(),
+        type: z.enum(["meeting_reminder", "lead_assigned", "sla_breach", "lead_transfer", "mention", "system"]).default("system"),
+        title: z.string(),
+        titleAr: z.string().optional(),
+        body: z.string().optional(),
+        bodyAr: z.string().optional(),
+        link: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const id = await createInAppNotification({
+          userId: input.userId,
+          type: input.type,
+          title: input.title,
+          titleAr: input.titleAr ?? null,
+          body: input.body ?? null,
+          bodyAr: input.bodyAr ?? null,
+          link: input.link ?? null,
+          isRead: false,
+        });
+        return { id };
+      }),
+  }),
+
+
+
+  // ─── Inbox Router ──────────────────────────────────────────────────────
+  inbox: router({
+    list: protectedProcedure
+      .input(z.object({
+        tab: z.enum(["all", "unread", "sla", "leads", "reminders", "campaigns"]).default("all"),
+        type: z.string().default("all"),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(20),
+      }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) return { items: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 }, counters: { unread: 0, slaUnread: 0 } };
+        const page = input.page;
+        const pageSize = input.pageSize;
+        const offset = (page - 1) * pageSize;
+
+        const conditions: any[] = [eq(inAppNotifications.userId, ctx.user.id)];
+
+        // Tab-based type filtering
+        const tabTypeMap: Record<string, string[]> = {
+          sla: ["sla_breach"],
+          leads: ["new_lead", "lead_assigned", "lead_distribution"],
+          reminders: ["reminder", "meeting_reminder", "follow_up_reminder"],
+          campaigns: ["campaign_alert"],
+        };
+        if (input.tab !== "all" && input.tab !== "unread" && tabTypeMap[input.tab]) {
+          conditions.push(inArray(inAppNotifications.type, tabTypeMap[input.tab] as any));
+        }
+        if (input.tab === "unread") {
+          conditions.push(eq(inAppNotifications.isRead, 0));
+        }
+        if (input.type !== "all") {
+          conditions.push(eq(inAppNotifications.type, input.type as any));
+        }
+
+        const whereClause = and(...conditions);
+
+        const [items, totalRows, unreadRows, slaUnreadRows] = await Promise.all([
+          db.select().from(inAppNotifications).where(whereClause).orderBy(desc(inAppNotifications.createdAt)).limit(pageSize).offset(offset),
+          db.select({ value: count() }).from(inAppNotifications).where(whereClause),
+          db.select({ value: count() }).from(inAppNotifications).where(and(eq(inAppNotifications.userId, ctx.user.id), eq(inAppNotifications.isRead, 0))),
+          db.select({ value: count() }).from(inAppNotifications).where(and(eq(inAppNotifications.userId, ctx.user.id), eq(inAppNotifications.isRead, 0), eq(inAppNotifications.type, "sla_breach" as any))),
+        ]);
+
+        return {
+          items: items.map((item: any) => ({
+            id: item.id,
+            type: item.type,
+            title: item.title,
+            titleAr: item.titleAr ?? null,
+            body: item.body ?? "",
+            bodyAr: item.bodyAr ?? null,
+            isRead: Boolean(item.isRead),
+            link: item.link ?? null,
+            metadata: item.metadata ?? null,
+            createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date(item.createdAt).toISOString(),
+          })),
+          pagination: {
+            page,
+            pageSize,
+            total: totalRows[0]?.value ?? 0,
+            totalPages: Math.max(1, Math.ceil((totalRows[0]?.value ?? 0) / pageSize)),
+          },
+          counters: {
+            unread: unreadRows[0]?.value ?? 0,
+            slaUnread: slaUnreadRows[0]?.value ?? 0,
+          },
+        };
+      }),
+
+    counts: protectedProcedure
+      .query(async ({ ctx }) => {
+        const db = await getDb();
+        if (!db) return { all: 0, unread: 0, sla: 0, leads: 0, reminders: 0, campaigns: 0 };
+        const rows = await db
+          .select({
+            type: inAppNotifications.type,
+            unread: sql<number>`sum(case when ${inAppNotifications.isRead} = 0 then 1 else 0 end)`,
+            total: count(),
+          })
+          .from(inAppNotifications)
+          .where(eq(inAppNotifications.userId, ctx.user.id))
+          .groupBy(inAppNotifications.type);
+
+        const counts = { all: 0, unread: 0, sla: 0, leads: 0, reminders: 0, campaigns: 0 };
+        for (const row of rows) {
+          const unread = Number(row.unread ?? 0);
+          const total = Number(row.total ?? 0);
+          counts.all += total;
+          counts.unread += unread;
+          if (row.type === "sla_breach") counts.sla += unread;
+          if (["new_lead", "lead_assigned", "lead_distribution"].includes(row.type ?? "")) counts.leads += unread;
+          if (["reminder", "meeting_reminder", "follow_up_reminder"].includes(row.type ?? "")) counts.reminders += unread;
+          if (row.type === "campaign_alert") counts.campaigns += unread;
+        }
+        return counts;
+      }),
+
+    markRead: protectedProcedure
+      .input(z.object({ notificationId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) return { success: false };
+        await db.update(inAppNotifications).set({ isRead: 1 }).where(and(eq(inAppNotifications.id, input.notificationId), eq(inAppNotifications.userId, ctx.user.id)));
+        return { success: true };
+      }),
+
+    markAllRead: protectedProcedure
+      .input(z.object({ tab: z.enum(["all", "unread", "sla", "leads", "reminders", "campaigns"]).default("all") }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) return { success: false };
+        const conditions: any[] = [eq(inAppNotifications.userId, ctx.user.id), eq(inAppNotifications.isRead, 0)];
+        const tabTypeMap: Record<string, string[]> = {
+          sla: ["sla_breach"],
+          leads: ["new_lead", "lead_assigned", "lead_distribution"],
+          reminders: ["reminder", "meeting_reminder", "follow_up_reminder"],
+          campaigns: ["campaign_alert"],
+        };
+        if (input.tab !== "all" && input.tab !== "unread" && tabTypeMap[input.tab]) {
+          conditions.push(inArray(inAppNotifications.type, tabTypeMap[input.tab] as any));
+        }
+        await db.update(inAppNotifications).set({ isRead: 1 }).where(and(...conditions));
+        return { success: true };
+      }),
+  }),
+
+  // ─── Meeting Notification Config ────────────────────────────────────────
+  meetingNotificationConfig: router({
+    get: protectedProcedure
+      .query(async () => {
+        const config = await getMeetingNotificationConfig();
+        return config ? {
+          reminderMinutes: config.reminderMinutes as number[],
+          repeatCount: config.repeatCount,
+          soundEnabled: !!config.soundEnabled,
+          popupEnabled: !!config.popupEnabled,
+          autoCalendarForMeeting: !!config.autoCalendarForMeeting,
+          autoCalendarForCall: !!config.autoCalendarForCall,
+        } : {
+          reminderMinutes: [30, 10],
+          repeatCount: 1,
+          soundEnabled: true,
+          popupEnabled: true,
+          autoCalendarForMeeting: true,
+          autoCalendarForCall: true,
+        };
+      }),
+
+    update: adminProcedure
+      .input(z.object({
+        reminderMinutes: z.array(z.number().int().min(1).max(120)).optional(),
+        repeatCount: z.number().int().min(1).max(10).optional(),
+        soundEnabled: z.boolean().optional(),
+        popupEnabled: z.boolean().optional(),
+        autoCalendarForMeeting: z.boolean().optional(),
+        autoCalendarForCall: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await updateMeetingNotificationConfig(input);
+        return { success: true };
+      }),
+  }),
+
+  // ─── Account Management ─────────────────────────────────────────────────
+  accountManagement: router({
+    listClients: accountManagerProcedure
+      .input(z.object({
+        planStatus: z.string().optional(),
+        renewalStatus: z.string().optional(),
+        accountManagerId: z.number().optional(),
+        search: z.string().optional(),
+        limit: z.number().default(50),
+        offset: z.number().default(0),
+      }).optional())
+      .query(async ({ input, ctx }) => {
+        return getClients({
+          ...input,
+          userRole: ctx.user.role,
+          userId: ctx.user.id,
+        });
+      }),
+
+    getClient: accountManagerProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return getClientById(input.id);
+      }),
+
+    getClientProfile: accountManagerProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const data = await getClientProfileById(input.id);
+        if (ctx.user.role === "AccountManager" && data.client.accountManagerId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        return data;
+      }),
+
+    createClient: accountManagerProcedure
+      .input(z.object({
+        leadId: z.number().optional().nullable(),
+        dealId: z.number().optional().nullable(),
+        businessProfile: z.string().optional(),
+        group: z.string().optional(),
+        planStatus: z.enum(["Active", "Paused", "Cancelled", "Pending"]).default("Active"),
+        renewalStatus: z.enum(["Renewed", "Pending", "Expired", "Cancelled"]).default("Pending"),
+        accountManagerId: z.number().optional().nullable(),
+        competentPerson: z.string().optional(),
+        contactEmail: z.string().optional(),
+        contactPhone: z.string().optional(),
+        leadName: z.string().optional(),
+        phone: z.string().optional(),
+        otherPhones: z.string().optional(),
+        contractLink: z.string().optional(),
+        marketingObjective: z.string().optional(),
+        servicesNeeded: z.string().optional(),
+        socialMedia: z.string().optional(),
+        feedback: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const id = await createClient(input as any);
+        return { id };
+      }),
+
+    updateClient: accountManagerProcedure
+      .input(z.object({
+        id: z.number(),
+        businessProfile: z.string().optional(),
+        group: z.string().optional(),
+        planStatus: z.enum(["Active", "Paused", "Cancelled", "Pending"]).optional(),
+        renewalStatus: z.enum(["Renewed", "Pending", "Expired", "Cancelled"]).optional(),
+        accountManagerId: z.number().optional().nullable(),
+        competentPerson: z.string().optional().nullable(),
+        contactEmail: z.string().optional().nullable(),
+        contactPhone: z.string().optional().nullable(),
+        leadName: z.string().optional().nullable(),
+        phone: z.string().optional().nullable(),
+        otherPhones: z.string().optional().nullable(),
+        contractLink: z.string().optional().nullable(),
+        marketingObjective: z.string().optional(),
+        servicesNeeded: z.string().optional(),
+        socialMedia: z.string().optional(),
+        feedback: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await updateClient(id, data as any);
+        return { success: true };
+      }),
+
+    deleteClient: accountManagerProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await deleteClient(input.id, ctx.user.id);
+        return { success: true };
+      }),
+
+    listAccountManagers: accountManagerProcedure
+      .query(async () => {
+        return listAccountManagers();
+      }),
+
+    // Contracts
+    getContracts: accountManagerProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input }) => {
+        return getContractsByClient(input.clientId);
+      }),
+
+    createContract: accountManagerProcedure
+      .input(z.object({
+        clientId: z.number(),
+        packageId: z.number().optional().nullable(),
+        contractName: z.string().optional(),
+        contractFile: z.string().optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        period: z.string().optional(),
+        charges: z.string().optional(),
+        currency: z.string().optional(),
+        monthlyCharges: z.string().optional(),
+        status: z.enum(["Active", "Expired", "Cancelled", "PendingRenewal"]).default("Active"),
+        contractRenewalStatus: z.enum(["New", "Negotiation", "SentOffer", "Won", "Lost", "Renewed", "NotRenewed"]).optional(),
+        renewalAssignedTo: z.number().optional().nullable(),
+        priceOffer: z.string().optional(),
+        upselling: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const contractData: any = { ...input };
+        if (input.startDate) contractData.startDate = new Date(input.startDate);
+        if (input.endDate) contractData.endDate = new Date(input.endDate);
+        // Fix: remove null/empty packageId and renewalAssignedTo to avoid DB insert errors
+        if (contractData.packageId === null || contractData.packageId === undefined) delete contractData.packageId;
+        if (contractData.renewalAssignedTo === null || contractData.renewalAssignedTo === undefined) delete contractData.renewalAssignedTo;
+        const id = await createContract(contractData);
+        return { id };
+      }),
+
+    updateContract: accountManagerProcedure
+      .input(z.object({
+        id: z.number(),
+        contractName: z.string().optional(),
+        contractFile: z.string().optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        period: z.string().optional(),
+        charges: z.string().optional(),
+        currency: z.string().optional(),
+        monthlyCharges: z.string().optional(),
+        status: z.enum(["Active", "Expired", "Cancelled", "PendingRenewal"]).optional(),
+        contractRenewalStatus: z.enum(["New", "Negotiation", "SentOffer", "Won", "Lost", "Renewed", "NotRenewed"]).optional(),
+        renewalAssignedTo: z.number().optional().nullable(),
+        priceOffer: z.string().optional(),
+        upselling: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        const contractData: any = { ...data };
+        if (data.startDate) contractData.startDate = new Date(data.startDate);
+        if (data.endDate) contractData.endDate = new Date(data.endDate);
+        // Fix: remove undefined packageId and renewalAssignedTo to avoid DB update errors
+        if (contractData.packageId === undefined) delete contractData.packageId;
+        if (contractData.renewalAssignedTo === undefined) delete contractData.renewalAssignedTo;
+        await updateContract(id, contractData);
+        return { success: true };
+      }),
+
+    // Service Packages
+    listPackages: accountManagerProcedure
+      .query(async () => {
+        return getServicePackages();
+      }),
+
+    createPackage: adminProcedure
+      .input(z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        price: z.string().optional(),
+        period: z.string().optional(),
+        services: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const id = await createServicePackage(input as any);
+        return { id };
+      }),
+  }),
+
+  // ─── Phase 3: Follow-ups ──────────────────────────────────────────────
+  followUps: router({
+    list: accountManagerProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        // RBAC: AccountManager can only see their own clients
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(input.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        return getFollowUps(input.clientId);
+      }),
+
+    create: accountManagerProcedure
+      .input(z.object({
+        clientId: z.number(),
+        type: z.enum(["Call", "Meeting", "WhatsApp", "Email"]),
+        followUpDate: z.string(),
+        notes: z.string().optional().nullable(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(input.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        await createFollowUp({
+          clientId: input.clientId,
+          userId: ctx.user.id,
+          type: input.type,
+          followUpDate: new Date(input.followUpDate),
+          notes: input.notes ?? null,
+          status: "Pending",
+        });
+
+        // ── Auto-create calendar event for Meeting/Call follow-ups ──
+        if (input.type === "Meeting" || input.type === "Call") {
+          try {
+            const config = await getMeetingNotificationConfig();
+            const shouldCreate = input.type === "Meeting"
+              ? (config?.autoCalendarForMeeting ?? true)
+              : (config?.autoCalendarForCall ?? true);
+            if (shouldCreate) {
+              const client = await getClientProfileById(input.clientId);
+              const clientName = client?.client?.companyName || `Client #${input.clientId}`;
+              const startTime = new Date(input.followUpDate);
+              const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hour default
+              // Check free/busy
+              const busy = await getFreeBusy(startTime.toISOString(), endTime.toISOString());
+              const isAgentBusy = busy.some((slot: any) => {
+                const slotStart = new Date(slot.start).getTime();
+                const slotEnd = new Date(slot.end).getTime();
+                return startTime.getTime() < slotEnd && endTime.getTime() > slotStart;
+              });
+              if (!isAgentBusy) {
+                const attendees: string[] = [];
+                if (ctx.user.email) attendees.push(ctx.user.email);
+                const agentDisplayName = ctx.user.name || "Unknown";
+                const summary = input.type === "Meeting"
+                  ? `[Meeting] متابعة: ${clientName} [${agentDisplayName}]`
+                  : `[Call] متابعة: ${clientName} [${agentDisplayName}]`;
+                await createCalendarEvent({
+                  summary,
+                  description: input.notes || "",
+                  startDateTime: startTime.toISOString(),
+                  endDateTime: endTime.toISOString(),
+                  attendees,
+                  leadId: input.clientId,
+                  leadName: clientName,
+                  agentName: agentDisplayName,
+                });
+                console.log(`[AutoCalendar] Created follow-up ${input.type} event for client ${clientName}`);
+              } else {
+                console.log(`[AutoCalendar] Agent busy at ${startTime.toISOString()}, skipping follow-up calendar event`);
+              }
+            }
+          } catch (err) {
+            console.error("[AutoCalendar] Error creating follow-up calendar event:", err);
+          }
+        }
+        return { success: true };
+      }),
+
+    complete: accountManagerProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const meta = await getFollowUpMeta(input.id);
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(meta.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        await completeFollowUp(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // ─── Phase 3: Client Tasks ─────────────────────────────────────────────
+  clientTasks: router({
+    list: accountManagerProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(input.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        return getClientTasks(input.clientId);
+      }),
+
+    create: accountManagerProcedure
+      .input(z.object({
+        clientId: z.number(),
+        title: z.string().min(1),
+        assignedTo: z.number().optional().nullable(),
+        dueDate: z.string().optional().nullable(),
+        priority: z.enum(["Low", "Medium", "High"]).optional(),
+        notes: z.string().optional().nullable(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(input.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        await createClientTask({
+          clientId: input.clientId,
+          title: input.title,
+          assignedTo: input.assignedTo ?? null,
+          dueDate: input.dueDate ? new Date(input.dueDate) : null,
+          priority: input.priority ?? "Medium",
+          status: "ToDo",
+          notes: input.notes ?? null,
+          createdBy: ctx.user.id,
+        });
+        return { success: true };
+      }),
+
+    update: accountManagerProcedure
+      .input(z.object({
+        id: z.number(),
+        data: z.object({
+          title: z.string().optional(),
+          assignedTo: z.number().optional().nullable(),
+          dueDate: z.string().optional().nullable(),
+          priority: z.enum(["Low", "Medium", "High"]).optional(),
+          status: z.enum(["ToDo", "InProgress", "Done", "Cancelled"]).optional(),
+          notes: z.string().optional().nullable(),
+        }),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const meta = await getClientTaskMeta(input.id);
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(meta.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        const patch: any = { ...input.data };
+        if (patch.dueDate) patch.dueDate = new Date(patch.dueDate);
+        await updateClientTask(input.id, patch);
+        return { success: true };
+      }),
+  }),
+
+  // ─── Phase 3: Onboarding ───────────────────────────────────────────────
+  onboarding: router({
+    getItems: accountManagerProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(input.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        return getOnboardingItems(input.clientId);
+      }),
+
+    updateItem: accountManagerProcedure
+      .input(z.object({ id: z.number(), isChecked: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
+        const meta = await getOnboardingItemMeta(input.id);
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(meta.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        await updateOnboardingItem(input.id, input.isChecked);
+        return { success: true };
+      }),
+
+    initialize: accountManagerProcedure
+      .input(z.object({ clientId: z.number(), checklistId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(input.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        await initializeOnboarding(input.clientId, input.checklistId);
+        return { success: true };
+      }),
+  }),
+
+  // ─── Phase 3: Users list (for task assignment) ─────────────────────────
+  usersList: router({
+    list: accountManagerProcedure.query(async () => {
+      return listAllUsers();
+    }),
+  }),
+
+  // ─── Renewals Pipeline ──────────────────────────────────────────────────
+  renewals: router({
+    list: accountManagerProcedure.query(async ({ ctx }) => {
+      const rows = await getRenewals();
+      if (ctx.user.role === "AccountManager") {
+        return rows.filter((r) => r.accountManagerId === ctx.user.id);
+      }
+      return rows;
+    }),
+
+    updateStage: accountManagerProcedure
+      .input(z.object({
+        contractId: z.number(),
+        stage: z.enum(["New", "Negotiation", "SentOffer", "Won", "Lost", "Renewed", "NotRenewed"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const contract = await getContractById(input.contractId);
+        if (ctx.user.role === "AccountManager" && contract.accountManagerId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+        await updateRenewalStage(input.contractId, input.stage);
+        return { success: true };
+      }),
+  }),
+
+  // ─── Phase 4: AM Dashboards ─────────────────────────────────────────────
+  amDashboard: router({
+    getStats: accountManagerProcedure.query(async ({ ctx }) => {
+      return getAMDashboardStats(ctx.user.id, ctx.user.role);
+    }),
+    getLeadStats: protectedProcedure.query(async ({ ctx }) => {
+      if (!["AccountManagerLead", "Admin"].includes(ctx.user.role)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      return getAMLeadDashboardStats();
+    }),
+    recalcHealthScores: adminProcedure.mutation(async () => {
+      return updateAllHealthScores();
+    }),
+    calcHealthScore: accountManagerProcedure
+      .input(z.object({ clientId: z.number() }))
+      .mutation(async ({ input }) => {
+        return calculateHealthScore(input.clientId);
+      }),
+  }),
+
+  // ─── Phase 4: OKRs (Objectives & Key Results) ─────────────────────────
+  objectives: router({
+    list: accountManagerProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input }) => {
+        return getObjectives(input.clientId);
+      }),
+    create: accountManagerProcedure
+      .input(z.object({
+        clientId: z.number(),
+        title: z.string().min(1).max(255),
+        status: z.enum(["OnTrack", "AtRisk", "OffTrack"]).default("OnTrack"),
+      }))
+      .mutation(async ({ input }) => {
+        return createObjective({ clientId: input.clientId, title: input.title, status: input.status });
+      }),
+    createKeyResult: accountManagerProcedure
+      .input(z.object({
+        objectiveId: z.number(),
+        title: z.string().min(1).max(255),
+        targetValue: z.number().nonnegative().nullable().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return createKeyResult({
+          objectiveId: input.objectiveId,
+          title: input.title,
+          targetValue: input.targetValue ?? null,
+        });
+      }),
+    updateKeyResult: accountManagerProcedure
+      .input(z.object({ id: z.number(), currentValue: z.number().nonnegative() }))
+      .mutation(async ({ input }) => {
+        return updateKeyResult(input.id, input.currentValue);
+      }),
+  }),
+
+  // ─── Phase 5: Deliverables ────────────────────────────────────────────
+  deliverables: router({
+    list: accountManagerProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input }) => {
+        return getDeliverables(input.clientId);
+      }),
+    create: accountManagerProcedure
+      .input(z.object({
+        clientId: z.number(),
+        contractId: z.number().nullable().optional(),
+        name: z.string().min(1).max(255),
+        description: z.string().nullable().optional(),
+        status: z.enum(["Pending", "InProgress", "Delivered", "Approved", "Rejected"]).default("Pending"),
+        dueDate: z.string().optional().nullable(),
+        assignedTo: z.number().nullable().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return createDeliverable({
+          clientId: input.clientId,
+          contractId: input.contractId ?? null,
+          name: input.name,
+          description: input.description ?? null,
+          status: input.status,
+          dueDate: input.dueDate ? new Date(input.dueDate) : null,
+          assignedTo: input.assignedTo ?? null,
+        });
+      }),
+    update: accountManagerProcedure
+      .input(z.object({
+        id: z.number(),
+        data: z.object({
+          name: z.string().optional(),
+          description: z.string().nullable().optional(),
+          status: z.enum(["Pending", "InProgress", "Delivered", "Approved", "Rejected"]).optional(),
+          dueDate: z.string().nullable().optional(),
+          assignedTo: z.number().nullable().optional(),
+        }),
+      }))
+      .mutation(async ({ input }) => {
+        const patch: any = { ...input.data };
+        if (patch.dueDate) patch.dueDate = new Date(patch.dueDate);
+        return updateDeliverable(input.id, patch);
+      }),
+  }),
+
+  // ─── Phase 5: Upsell Opportunities ────────────────────────────────────
+  upsell: router({
+    list: accountManagerProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input }) => {
+        return getUpsellOpportunities(input.clientId);
+      }),
+    create: accountManagerProcedure
+      .input(z.object({
+        clientId: z.number(),
+        servicePackageId: z.number().nullable().optional(),
+        title: z.string().min(1).max(255),
+        potentialValue: z.string().nullable().optional(),
+        status: z.enum(["Prospecting", "ProposalSent", "Negotiation", "Won", "Lost"]).default("Prospecting"),
+        notes: z.string().nullable().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        return createUpsellOpportunity({
+          clientId: input.clientId,
+          servicePackageId: input.servicePackageId ?? null,
+          title: input.title,
+          potentialValue: input.potentialValue ?? null,
+          status: input.status,
+          notes: input.notes ?? null,
+          createdBy: ctx.user.id,
+        });
+      }),
+    update: accountManagerProcedure
+      .input(z.object({
+        id: z.number(),
+        data: z.object({
+          title: z.string().optional(),
+          potentialValue: z.string().nullable().optional(),
+          status: z.enum(["Prospecting", "ProposalSent", "Negotiation", "Won", "Lost"]).optional(),
+          notes: z.string().nullable().optional(),
+        }),
+      }))
+      .mutation(async ({ input }) => {
+        return updateUpsellOpportunity(input.id, input.data);
+      }),
+  }),
+
+  // ─── Phase 5: Client Communications ───────────────────────────────────
+  communications: router({
+    list: accountManagerProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input }) => {
+        return getClientCommunications(input.clientId);
+      }),
+    create: accountManagerProcedure
+      .input(z.object({
+        clientId: z.number(),
+        channelName: z.string().min(1).max(100),
+        channelType: z.enum(["EmailThread", "WhatsAppGroup", "SlackChannel", "Other"]),
+        link: z.string().nullable().optional(),
+        notes: z.string().nullable().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return createClientCommunication({
+          clientId: input.clientId,
+          channelName: input.channelName,
+          channelType: input.channelType,
+          link: input.link ?? null,
+          notes: input.notes ?? null,
+        });
+      }),
+  }),
+
+  // ─── Phase 5: CSAT Surveys ────────────────────────────────────────────
+  // ─── Lead Reminders ────────────────────────────────────────────────────
+  leadReminders: router({
+    getByLead: protectedProcedure
+      .input(z.object({ leadId: z.number() }))
+      .query(async ({ input }) => {
+        return getLeadReminders(input.leadId);
+      }),
+    getByUser: protectedProcedure
+      .input(z.object({
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        return getRemindersByUser(ctx.user.id, input?.dateFrom, input?.dateTo);
+      }),
+    getToday: protectedProcedure
+      .query(async ({ ctx }) => {
+        return getTodayReminders(ctx.user.id);
+      }),
+    getCalendar: protectedProcedure
+      .input(z.object({ month: z.number().min(1).max(12), year: z.number() }))
+      .query(async ({ ctx, input }) => {
+        return getRemindersForCalendar(ctx.user.id, input.month, input.year);
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        leadId: z.number(),
+        title: z.string().min(1),
+        description: z.string().nullable().optional(),
+        reminderDate: z.string(),
+        reminderTime: z.string().optional(),
+        priority: z.enum(["Low", "Medium", "High"]).optional(),
+        color: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await createLeadReminder({
+          leadId: input.leadId,
+          userId: ctx.user.id,
+          title: input.title,
+          description: input.description ?? null,
+          reminderDate: new Date(input.reminderDate),
+          reminderTime: input.reminderTime,
+          priority: input.priority,
+          color: input.color,
+        });
+        return { id };
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().optional(),
+        description: z.string().nullable().optional(),
+        reminderDate: z.string().optional(),
+        reminderTime: z.string().optional(),
+        priority: z.enum(["Low", "Medium", "High"]).optional(),
+        status: z.enum(["Pending", "Done", "Cancelled"]).optional(),
+        color: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await updateLeadReminder(input.id, {
+          title: input.title,
+          description: input.description,
+          reminderDate: input.reminderDate ? new Date(input.reminderDate) : undefined,
+          reminderTime: input.reminderTime,
+          priority: input.priority,
+          status: input.status,
+          color: input.color,
+        });
+        return { success: true };
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteLeadReminder(input.id);
+        return { success: true };
+      }),
+    markDone: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await updateLeadReminder(input.id, { status: "Done" });
+        return { success: true };
+      }),
+  }),
+  csat: router({
+    submit: publicProcedure
+      .input(z.object({
+        clientId: z.number(),
+        contractId: z.number().nullable().optional(),
+        score: z.number().int().min(1).max(5),
+        feedback: z.string().nullable().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return submitCSAT({
+          clientId: input.clientId,
+          contractId: input.contractId ?? null,
+          score: input.score,
+          feedback: input.feedback ?? null,
+        });
+      }),
+    getScores: accountManagerProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input }) => {
+        return getCSATScores(input.clientId);
+      }),
+  }),
+
+
+
+  // ─── Support Center ───────────────────────────────────────────────────────
+  supportCenter: router({
+    myRequests: protectedProcedure
+      .input(z.object({ status: supportStatusSchema.optional(), requestType: supportRequestTypeSchema.optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const { supportRequests } = await import("../drizzle/schema");
+        const conditions = [eq(supportRequests.createdBy, ctx.user.id)];
+        if (input?.status) conditions.push(eq(supportRequests.status, input.status));
+        if (input?.requestType) conditions.push(eq(supportRequests.requestType, input.requestType));
+        const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+        return getDb()
+          .then((db) => {
+            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+            return db.select().from(supportRequests).where(whereClause).orderBy(desc(supportRequests.lastActivityAt));
+          });
+      }),
+
+    adminInbox: superAdminProcedure
+      .input(z.object({ status: supportStatusSchema.optional(), requestType: supportRequestTypeSchema.optional() }).optional())
+      .query(async ({ input }) => {
+        const { supportRequests, users } = await import("../drizzle/schema");
+        const conditions: any[] = [];
+        if (input?.status) conditions.push(eq(supportRequests.status, input.status));
+        if (input?.requestType) conditions.push(eq(supportRequests.requestType, input.requestType));
+
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+        const rows = await db
+          .select({
+            id: supportRequests.id,
+            code: supportRequests.code,
+            requestType: supportRequests.requestType,
+            category: supportRequests.category,
+            subject: supportRequests.subject,
+            description: supportRequests.description,
+            priority: supportRequests.priority,
+            status: supportRequests.status,
+            screenRecordingLink: supportRequests.screenRecordingLink,
+            createdBy: supportRequests.createdBy,
+            superAdminId: supportRequests.superAdminId,
+            closedAt: supportRequests.closedAt,
+            closedBy: supportRequests.closedBy,
+            lastActivityAt: supportRequests.lastActivityAt,
+            createdAt: supportRequests.createdAt,
+            updatedAt: supportRequests.updatedAt,
+            requesterName: users.name,
+          })
+          .from(supportRequests)
+          .leftJoin(users, eq(supportRequests.createdBy, users.id))
+          .where(whereClause)
+          .orderBy(desc(supportRequests.lastActivityAt));
+        return rows;
+      }),
+
+    byId: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { supportRequests, supportRequestMessages, supportRequestAttachments } = await import("../drizzle/schema");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        const rows = await db.select().from(supportRequests).where(eq(supportRequests.id, input.id)).limit(1);
+        const request = rows[0];
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Support request not found" });
+        }
+
+        if (!isPrimarySuperAdmin(ctx.user) && request.createdBy !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const [messages, attachments] = await Promise.all([
+          db.select().from(supportRequestMessages).where(eq(supportRequestMessages.requestId, input.id)).orderBy(asc(supportRequestMessages.createdAt)),
+          db.select().from(supportRequestAttachments).where(eq(supportRequestAttachments.requestId, input.id)).orderBy(desc(supportRequestAttachments.createdAt)),
+        ]);
+
+        return { request, messages, attachments };
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        requestType: supportRequestTypeSchema,
+        category: supportCategorySchema,
+        subject: z.string().min(3).max(255),
+        description: z.string().min(10),
+        priority: supportPrioritySchema.default("Medium"),
+        screenRecordingLink: z.string().url().max(2000).nullable().optional(),
+        screenshots: z.array(supportScreenshotInputSchema).max(MAX_SUPPORT_SCREENSHOTS).default([]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        const { supportRequests, supportRequestAttachments } = await import("../drizzle/schema");
+        const superAdmin = await getPrimarySuperAdminOrThrow();
+        const code = buildSupportRequestCode();
+
+        const insertResult = await db.insert(supportRequests).values({
+          code,
+          requestType: input.requestType,
+          category: input.category,
+          subject: input.subject,
+          description: input.description,
+          priority: input.priority,
+          status: "New",
+          screenRecordingLink: input.screenRecordingLink ?? null,
+          createdBy: ctx.user.id,
+          superAdminId: superAdmin.id,
+        } as any);
+
+        const requestId = insertResult[0].insertId;
+        const attachmentRows: Array<Record<string, unknown>> = [];
+
+        for (const screenshot of input.screenshots) {
+          if (!screenshot.contentType.toLowerCase().startsWith("image/")) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Only image screenshots are allowed" });
+          }
+
+          const buffer = Buffer.from(screenshot.fileBase64, "base64");
+          if (!buffer.length || buffer.length > MAX_SUPPORT_SCREENSHOT_SIZE_BYTES) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Screenshot is empty or exceeds the 5 MB limit" });
+          }
+
+          const safeFileName = sanitizeUploadedFileName(screenshot.fileName);
+          const storageKey = `support-center/${requestId}/${Date.now()}-${safeFileName}`;
+          const uploaded = await storagePut(storageKey, buffer, screenshot.contentType);
+
+          attachmentRows.push({
+            requestId,
+            fileName: safeFileName,
+            fileUrl: uploaded.url,
+            storageKey: uploaded.key,
+            fileSize: buffer.length,
+            fileType: screenshot.contentType,
+            uploadedBy: ctx.user.id,
+          });
+        }
+
+        if (attachmentRows.length > 0) {
+          await db.insert(supportRequestAttachments).values(attachmentRows as any);
+        }
+
+        await createInAppNotification({
+          userId: superAdmin.id,
+          type: "system",
+          title: `${input.requestType} ${code}`,
+          body: `${ctx.user.name ?? ctx.user.email ?? "A user"} submitted: ${input.subject}`,
+          link: `/support-center/${requestId}`,
+          metadata: {
+            requestId,
+            code,
+            requestType: input.requestType,
+            createdBy: ctx.user.id,
+          },
+        } as any);
+
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "create",
+          entityType: "support_request",
+          entityId: requestId,
+          entityName: code,
+          details: {
+            requestType: input.requestType,
+            category: input.category,
+            priority: input.priority,
+            screenshotsCount: input.screenshots.length,
+          },
+        });
+
+        return { success: true, id: requestId, code };
+      }),
+
+    reply: protectedProcedure
+      .input(z.object({
+        requestId: z.number(),
+        message: z.string().min(1),
+        status: supportStatusSchema.optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { supportRequests, supportRequestMessages } = await import("../drizzle/schema");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        const rows = await db.select().from(supportRequests).where(eq(supportRequests.id, input.requestId)).limit(1);
+        const request = rows[0];
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Support request not found" });
+        }
+
+        const isSuperAdmin = isPrimarySuperAdmin(ctx.user);
+        if (!isSuperAdmin && request.createdBy !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        if (!isSuperAdmin && input.status) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the super admin can change status directly" });
+        }
+
+        await db.insert(supportRequestMessages).values({
+          requestId: input.requestId,
+          userId: ctx.user.id,
+          message: input.message,
+          isFromSuperAdmin: isSuperAdmin ? 1 : 0,
+        } as any);
+
+        const nextStatus = isSuperAdmin
+          ? (input.status ?? (request.status === "New" || request.status === "UnderReview" ? "WaitingUser" : request.status))
+          : (request.status === "WaitingUser" ? "UnderReview" : request.status);
+
+        await db.update(supportRequests).set({
+          status: nextStatus,
+          lastActivityAt: new Date(),
+          closedAt: nextStatus === "Resolved" || nextStatus === "Closed" ? new Date() : null,
+          closedBy: nextStatus === "Resolved" || nextStatus === "Closed" ? ctx.user.id : null,
+        } as any).where(eq(supportRequests.id, input.requestId));
+
+        const notificationUserId = isSuperAdmin ? request.createdBy : request.superAdminId;
+        if (notificationUserId !== ctx.user.id) {
+          await createInAppNotification({
+            userId: notificationUserId,
+            type: "system",
+            title: `Update on ${request.code}`,
+            body: isSuperAdmin ? "The super admin replied to your request" : "The requester added a new reply",
+            link: `/support-center/${request.id}`,
+            metadata: {
+              requestId: request.id,
+              code: request.code,
+              status: nextStatus,
+            },
+          } as any);
+        }
+
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "update",
+          entityType: "support_request_reply",
+          entityId: input.requestId,
+          entityName: request.code,
+          details: {
+            isSuperAdmin,
+            status: nextStatus,
+          },
+        });
+
+        return { success: true, status: nextStatus };
+      }),
+
+    updateStatus: superAdminProcedure
+      .input(z.object({
+        requestId: z.number(),
+        status: supportStatusSchema,
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { supportRequests } = await import("../drizzle/schema");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        const rows = await db.select().from(supportRequests).where(eq(supportRequests.id, input.requestId)).limit(1);
+        const request = rows[0];
+        if (!request) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Support request not found" });
+        }
+
+        await db.update(supportRequests).set({
+          status: input.status,
+          lastActivityAt: new Date(),
+          closedAt: input.status === "Resolved" || input.status === "Closed" ? new Date() : null,
+          closedBy: input.status === "Resolved" || input.status === "Closed" ? ctx.user.id : null,
+        } as any).where(eq(supportRequests.id, input.requestId));
+
+        if (request.createdBy !== ctx.user.id) {
+          await createInAppNotification({
+            userId: request.createdBy,
+            type: "system",
+            title: `Status changed for ${request.code}`,
+            body: `Your request is now ${input.status}`,
+            link: `/support-center/${request.id}`,
+            metadata: {
+              requestId: request.id,
+              code: request.code,
+              status: input.status,
+            },
+          } as any);
+        }
+
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "update",
+          entityType: "support_request_status",
+          entityId: input.requestId,
+          entityName: request.code,
+          details: {
+            previousStatus: request.status,
+            newStatus: input.status,
+          },
+        });
+
+        return { success: true };
+      }),
+
+    deleteAttachment: superAdminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { supportRequestAttachments } = await import("../drizzle/schema");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+        const rows = await db.select().from(supportRequestAttachments).where(eq(supportRequestAttachments.id, input.id)).limit(1);
+        const attachment = rows[0];
+        if (!attachment) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Attachment not found" });
+        }
+
+        await storageDelete(attachment.storageKey);
+        await db.delete(supportRequestAttachments).where(eq(supportRequestAttachments.id, input.id));
+
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "delete",
+          entityType: "support_request_attachment",
+          entityId: input.id,
+          entityName: attachment.fileName,
+          details: {
+            requestId: attachment.requestId,
+            storageKey: attachment.storageKey,
+          },
+        });
+
+        return { success: true };
+      }),
+  }),
+
+  // ─── Notification Preferences (per-user) ──────────────────────────────────
+  notificationPreferences: router({
+    get: protectedProcedure.query(async ({ ctx }) => {
+      return getUserNotificationPreferences(ctx.user.id);
+    }),
+
+    update: protectedProcedure
+      .input(z.object({
+        preferences: z.array(z.object({
+          notificationType: z.string(),
+          soundEnabled: z.boolean(),
+          popupEnabled: z.boolean(),
+        })),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await bulkUpsertUserNotificationPreferences(ctx.user.id, input.preferences);
+        return { success: true };
+      }),
+
+    getSoundConfig: protectedProcedure.query(async () => {
+      return getNotificationSoundConfig();
+    }),
+
+    uploadSound: protectedProcedure
+      .input(z.object({
+        fileBase64: z.string(),
+        fileName: z.string(),
+        contentType: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Only admin@tamiyouz.com (user ID 1) can upload sound files
+        if (ctx.user.id !== 1) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the primary admin can upload notification sounds" });
+        }
+        const buffer = Buffer.from(input.fileBase64, "base64");
+        const key = `notification-sounds/${Date.now()}-${input.fileName}`;
+        const result = await storagePut(key, buffer, input.contentType);
+        await updateNotificationSoundConfig(result.url, input.fileName, ctx.user.id);
+        return { url: result.url, fileName: input.fileName };
+      }),
+
+    removeSound: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        if (ctx.user.id !== 1) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the primary admin can manage notification sounds" });
+        }
+        await updateNotificationSoundConfig(null, null, ctx.user.id);
+        return { success: true };
+      }),
+  }),
+// ─── Meta Ads Integration ──────────────────────────────────────────────────
+  metaCombined: router({    getAnalytics: mediaBuyerOrAdminProcedure      .input(z.object({        dateFrom: z.string().optional(),        dateTo: z.string().optional(),        campaignIds: z.array(z.number()).optional(),        minSpend: z.number().optional(),        datePreset: z.string().optional().default("last_30d"),      }))      .query(async ({ input }) => {        return getMetaCombinedAnalytics({          dateFrom: input.dateFrom,          dateTo: input.dateTo,          campaignIds: input.campaignIds,          minSpend: input.minSpend,          datePreset: input.datePreset,        });      }),  }),
+  meta: router({
+    // Get integration config
+    getIntegration: protectedProcedure
+      .query(async () => {
+        return getMetaIntegration();
+      }),
+
+    // Save/update integration config (app id + secret)
+    upsertIntegration: mediaBuyerOrAdminProcedure
+      .input(z.object({
+        appId: z.string().min(1),
+        appSecret: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        const id = await upsertMetaIntegration(input.appId, input.appSecret);
+        return { id };
+      }),
+
+    // Delete integration and all related data
+    deleteIntegration: adminProcedure
+      .mutation(async () => {
+        await deleteMetaIntegrationFn();
+        return { success: true };
+      }),
+
+    // List all ad accounts
+    getAdAccounts: protectedProcedure
+      .query(async () => {
+        return getMetaAdAccounts();
+      }),
+
+    // Get active ad account
+    getActiveAdAccount: protectedProcedure
+      .query(async () => {
+        return getActiveMetaAdAccount();
+      }),
+
+    // Add a new ad account
+    addAdAccount: mediaBuyerOrAdminProcedure
+      .input(z.object({
+        adAccountId: z.string().min(1),
+        accountName: z.string().optional().default(""),
+        accessToken: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        const integration = await getMetaIntegration();
+        if (!integration) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Meta integration not configured. Please set App ID and App Secret first." });
+        }
+        // Try to fetch account info to validate
+        try {
+          const actId = input.adAccountId.startsWith("act_") ? input.adAccountId : `act_${input.adAccountId}`;
+          const info = await fetchAdAccountInfoFn(actId, input.accessToken);
+          const name = input.accountName || info.name || actId;
+          const id = await addMetaAdAccount(integration.id, input.adAccountId, name, input.accessToken);
+          return { id, name };
+        } catch (err: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Failed to validate ad account: ${err.message}` });
+        }
+      }),
+
+    // Select/switch active ad account
+    selectAdAccount: protectedProcedure
+      .input(z.object({ accountId: z.number() }))
+      .mutation(async ({ input }) => {
+        await selectMetaAdAccount(input.accountId);
+        return { success: true };
+      }),
+
+    // Update ad account access token
+    updateAdAccountToken: adminProcedure
+      .input(z.object({
+        accountId: z.number(),
+        accessToken: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        await updateMetaAdAccountToken(input.accountId, input.accessToken);
+        return { success: true };
+      }),
+
+    // Delete an ad account
+    deleteAdAccount: adminProcedure
+      .input(z.object({ accountId: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteMetaAdAccountFn(input.accountId);
+        return { success: true };
+      }),
+
+    // Get campaign snapshots for active account
+    getCampaigns: protectedProcedure
+      .query(async () => {
+        return getActiveMetaCampaignSnapshots();
+      }),
+
+    // Sync campaigns from Meta API
+    syncCampaigns: mediaBuyerOrAdminProcedure
+      .mutation(async () => {
+        const active = await getActiveMetaAdAccount();
+        if (!active) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No active ad account selected" });
+        }
+        const count = await syncMetaCampaigns(active.id);
+        return { synced: count };
+      }),
+
+    // Change campaign status (ACTIVE/PAUSED)
+    changeCampaignStatus: mediaBuyerOrAdminProcedure
+      .input(z.object({
+        snapshotId: z.number(),
+        newStatus: z.enum(["ACTIVE", "PAUSED"]),
+      }))
+      .mutation(async ({ input }) => {
+        return changeMetaCampaignStatus(input.snapshotId, input.newStatus);
+      }),
+
+    // Change campaign budget
+    changeBudget: mediaBuyerOrAdminProcedure
+      .input(z.object({
+        snapshotId: z.number(),
+        budgetType: z.enum(["daily", "lifetime"]),
+        amount: z.number().positive(),
+      }))
+      .mutation(async ({ input }) => {
+        return changeMetaCampaignBudget(input.snapshotId, input.budgetType, input.amount);
+      }),
+
+    // Get campaign insights/metrics
+    getInsights: mediaBuyerOrAdminProcedure
+      .input(z.object({
+        datePreset: z.enum(["today", "yesterday", "last_7d", "last_14d", "last_30d", "this_month", "last_month"]).optional().default("last_30d"),
+      }))
+      .query(async ({ input }) => {
+        const active = await getActiveMetaAdAccount();
+        if (!active) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No active ad account selected" });
+        }
+        return fetchAllMetaCampaignInsights(active.id, input.datePreset);
+      }),
+
+    // ─── Meta Leadgen Webhook Integration ──────────────────────────────────────
+    leadgen: router({
+      getConfigs: protectedProcedure.query(async () => {
+        return MetaLeadgenService.getLeadgenConfigs();
+      }),
+
+      getStats: protectedProcedure.query(async () => {
+        return MetaLeadgenService.getLeadgenStats();
+      }),
+
+      upsertConfig: mediaBuyerOrAdminProcedure
+        .input(z.object({
+          id: z.number().optional(),
+          pageId: z.string().min(1),
+          pageName: z.string().optional().nullable(),
+          pageAccessToken: z.string().min(1),
+          isEnabled: z.union([z.boolean(), z.number()]).optional(),
+          assignmentRule: z.enum(["round_robin", "fixed_owner", "by_campaign"]).optional(),
+          fixedOwnerId: z.number().optional().nullable(),
+          fieldMapping: z.record(z.string(), z.string()).optional().nullable(),
+        }))
+        .mutation(async ({ input }) => {
+          return MetaLeadgenService.upsertLeadgenConfig(input);
+        }),
+
+      deleteConfig: mediaBuyerOrAdminProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          return MetaLeadgenService.deleteLeadgenConfig(input.id);
+        }),
+
+      testConnection: mediaBuyerOrAdminProcedure
+        .input(z.object({
+          pageId: z.string().min(1),
+          accessToken: z.string().min(1),
+        }))
+        .mutation(async ({ input }) => {
+          return MetaLeadgenService.testPageConnection(input.pageId, input.accessToken);
+        }),
+
+      subscribeWebhook: mediaBuyerOrAdminProcedure
+        .input(z.object({
+          pageId: z.string().min(1),
+          accessToken: z.string().min(1),
+        }))
+        .mutation(async ({ input }) => {
+          return MetaLeadgenService.subscribePageWebhook(input.pageId, input.accessToken);
+        }),
+
+      getForms: mediaBuyerOrAdminProcedure
+        .input(z.object({
+          pageId: z.string().min(1),
+          accessToken: z.string().min(1),
+        }))
+        .query(async ({ input }) => {
+          return MetaLeadgenService.fetchLeadgenForms(input.pageId, input.accessToken);
+        }),
+    }),
+  }),
+  tiktok: router({
+    campaigns: router({
+      getAnalytics: mediaBuyerOrAdminProcedure
+        .input(z.object({
+          dateFrom: z.string().min(1),
+          dateTo: z.string().min(1),
+          minSpend: z.number().optional(),
+          maxSpend: z.number().optional(),
+          status: z.array(z.string()).optional(),
+          objectives: z.array(z.string()).optional(),
+        }))
+        .query(async ({ input }) => {
+          return getTikTokCampaignAnalytics(input);
+        }),
+    }),
+    settings: router({
+      getIntegration: mediaBuyerOrAdminProcedure
+        .query(async () => getTikTokIntegration()),
+      upsertIntegration: mediaBuyerOrAdminProcedure
+        .input(z.object({ appId: z.string().min(1), appSecret: z.string().min(1) }))
+        .mutation(async ({ input }) => {
+          const id = await upsertTikTokIntegration(input.appId, input.appSecret);
+          return { id };
+        }),
+      deleteIntegration: mediaBuyerOrAdminProcedure
+        .mutation(async () => { await deleteTikTokIntegration(); return { success: true }; }),
+      getAdAccounts: mediaBuyerOrAdminProcedure
+        .query(async () => getTikTokAdAccounts()),
+      addAdAccount: mediaBuyerOrAdminProcedure
+        .input(z.object({ advertiserId: z.string().min(1), accountName: z.string().optional().default(""), accessToken: z.string().min(1) }))
+        .mutation(async ({ input }) => {
+          const integration = await getTikTokIntegration();
+          if (!integration) throw new TRPCError({ code: "NOT_FOUND", message: "TikTok integration not configured" });
+          return addTikTokAdAccount(integration.id, input.advertiserId, input.accountName, input.accessToken);
+        }),
+      selectAdAccount: mediaBuyerOrAdminProcedure
+        .input(z.object({ accountId: z.number() }))
+        .mutation(async ({ input }) => { await selectTikTokAdAccount(input.accountId); return { success: true }; }),
+      updateToken: mediaBuyerOrAdminProcedure
+        .input(z.object({ accountId: z.number(), accessToken: z.string().min(1) }))
+        .mutation(async ({ input }) => { await updateTikTokAdAccountToken(input.accountId, input.accessToken); return { success: true }; }),
+      deleteAdAccount: mediaBuyerOrAdminProcedure
+        .input(z.object({ accountId: z.number() }))
+        .mutation(async ({ input }) => { await deleteTikTokAdAccount(input.accountId); return { success: true }; }),
+      syncCampaigns: mediaBuyerOrAdminProcedure
+        .mutation(async () => {
+          const account = await getActiveTikTokAdAccount();
+          if (!account) throw new TRPCError({ code: "NOT_FOUND", message: "No active TikTok ad account" });
+          const synced = await syncTikTokCampaigns(account.id);
+          return { synced };
+        }),
+    }),
+  }),
+  rakan: rakanRouter,
+  // ─── Exchange Rates ──────────────────────────────────────────────────────────
+  exchangeRates: router({
+    list: adminProcedure.query(async () => {
+      return getExchangeRates();
+    }),
+    upsert: adminProcedure
+      .input(z.object({
+        fromCurrency: z.string(),
+        toCurrency: z.string(),
+        rate: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        await upsertExchangeRate(input.fromCurrency, input.toCurrency, input.rate);
+        return { success: true };
+      }),
+    recalculate: adminProcedure.mutation(async () => {
+      const { recalculateAllDealValues } = await import("./lib/currency");
+      await recalculateAllDealValues();
+      return { success: true };
+    }),
+    autoSync: adminProcedure.mutation(async () => {
+      const result = await syncExchangeRates();
+      return result;
+    }),
+  }),
+});
+export type AppRouter = typeof appRouter;
