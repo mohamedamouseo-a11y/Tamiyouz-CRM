@@ -411,4 +411,35 @@ export class MetaLeadgenService {
 
     return { processed, skipped };
   }
+  /**
+   * Auto-subscribe all enabled pages to leadgen webhook events.
+   * Called on server startup to ensure subscriptions persist across restarts and token changes.
+   */
+  static async autoSubscribeAllPages() {
+    try {
+      const db = await getDb();
+      const configs = await db
+        .select()
+        .from(metaLeadgenConfig)
+        .where(eq(metaLeadgenConfig.isEnabled, 1));
+
+      if (!configs.length) {
+        console.log("[MetaLeadgen] No enabled pages found for auto-subscribe.");
+        return;
+      }
+
+      for (const config of configs) {
+        try {
+          await this.subscribePageWebhook(config.pageId, config.pageAccessToken);
+          console.log(`[MetaLeadgen] Auto-subscribed page ${config.pageName || config.pageId} to leadgen events.`);
+        } catch (err: any) {
+          console.error(`[MetaLeadgen] Auto-subscribe failed for page ${config.pageName || config.pageId}:`, err?.response?.data || err.message);
+        }
+      }
+      console.log(`[MetaLeadgen] Auto-subscribe complete. Processed ${configs.length} page(s).`);
+    } catch (err: any) {
+      console.error("[MetaLeadgen] Auto-subscribe error:", err.message);
+    }
+  }
+
 }

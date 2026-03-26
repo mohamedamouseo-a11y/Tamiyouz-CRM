@@ -268,6 +268,11 @@ startServer().then(() => {
   startSyncScheduler().catch((err) => {
     console.error("[SyncEngine] Failed to start sync scheduler:", err);
   });
+
+  // Auto-subscribe Meta leadgen pages to webhook events on startup
+  MetaLeadgenService.autoSubscribeAllPages().catch((err) => {
+    console.error("[MetaLeadgen] Failed to auto-subscribe pages:", err);
+  });
   // Start notification engine
   startNotificationEngine();
   // Start exchange rate auto-sync scheduler

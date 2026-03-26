@@ -175,6 +175,13 @@ const sections: HelpSection[] = [
         { questionKey: "helpMetaLeadgenQ6", answerKey: "helpMetaLeadgenA6" },
         { questionKey: "helpMetaLeadgenQ7", answerKey: "helpMetaLeadgenA7" },
         { questionKey: "helpMetaLeadgenQ8", answerKey: "helpMetaLeadgenA8" },
+
+        { questionKey: "helpMetaLeadgenQ9", answerKey: "helpMetaLeadgenA9" },
+        { questionKey: "helpMetaLeadgenQ10", answerKey: "helpMetaLeadgenA10" },
+        { questionKey: "helpMetaLeadgenQ11", answerKey: "helpMetaLeadgenA11" },
+        { questionKey: "helpMetaLeadgenQ12", answerKey: "helpMetaLeadgenA12" },
+        { questionKey: "helpMetaLeadgenQ13", answerKey: "helpMetaLeadgenA13" },
+        { questionKey: "helpMetaLeadgenQ14", answerKey: "helpMetaLeadgenA14" },
       ],
     },
     {
