@@ -188,7 +188,7 @@ export default function MetaCampaigns() {
   const fmt = {
     budget: (amount: string | null) => {
       if (!amount || amount === "0.00") return "—";
-      return `$${parseFloat(amount).toLocaleString()}`;
+      return `${parseFloat(amount).toLocaleString()} ج.م`;
     },
     number: (val: string | number | null | undefined) => {
       if (!val || val === "0") return "—";
@@ -200,7 +200,7 @@ export default function MetaCampaigns() {
       if (!val) return "—";
       const num = typeof val === "string" ? parseFloat(val) : val;
       if (isNaN(num)) return "—";
-      return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
     },
     percent: (val: string | number | null | undefined) => {
       if (!val || val === "0") return "—";
@@ -1039,8 +1039,8 @@ export default function MetaCampaigns() {
                 <div>
                   <Label>
                     {editBudget.budgetType === "daily"
-                      ? (isRTL ? "الميزانية اليومية ($)" : "Daily Budget ($)")
-                      : (isRTL ? "الميزانية الإجمالية ($)" : "Lifetime Budget ($)")}
+                      ? (isRTL ? "الميزانية اليومية (ج.م)" : "Daily Budget (EGP)")
+                      : (isRTL ? "الميزانية الإجمالية (ج.م)" : "Lifetime Budget (EGP)")}
                   </Label>
                   <Input
                     type="number" step="0.01" min="1"
@@ -1050,7 +1050,7 @@ export default function MetaCampaigns() {
                     className="mt-1" dir="ltr"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    {isRTL ? `الميزانية الحالية: $${editBudget.currentAmount}` : `Current: $${editBudget.currentAmount}`}
+                    {isRTL ? `الميزانية الحالية: ${editBudget.currentAmount} ج.م` : `Current: ${editBudget.currentAmount} EGP`}
                   </p>
                 </div>
               </div>
