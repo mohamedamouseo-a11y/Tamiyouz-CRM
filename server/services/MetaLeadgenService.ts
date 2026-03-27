@@ -456,6 +456,13 @@ export class MetaLeadgenService {
               const leadgenId = graphLead.id;
               if (!leadgenId) continue;
 
+              // Skip Meta test leads
+              const leadName = graphLead.field_data?.find(f => f.name === "full_name")?.values?.[0] ?? "";
+              if (leadName.toLowerCase().includes("test lead") || leadName.includes("<test")) {
+                skipped += 1;
+                continue;
+              }
+
               // Check for duplicate by externalId
               const [existingById] = await db
                 .select({ id: leads.id })
