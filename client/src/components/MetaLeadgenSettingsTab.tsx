@@ -13,6 +13,7 @@ import {
   PlugZap,
   XCircle,
   Globe,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -132,6 +133,8 @@ export default function MetaLeadgenSettingsTab() {
     pageName: "",
   });
   const [mappingDialog, setMappingDialog] = useState<{ open: boolean; config: any | null }>({ open: false, config: null });
+  const [assignmentDialog, setAssignmentDialog] = useState<{ open: boolean; config: any | null }>({ open: false, config: null });
+  const [editAssignment, setEditAssignment] = useState<{ rule: string; fixedOwnerId: string }>({ rule: "round_robin", fixedOwnerId: "" });
 
   const [form, setForm] = useState({
     pageId: "",
@@ -229,6 +232,22 @@ export default function MetaLeadgenSettingsTab() {
       fieldMapping: mappingState,
     });
     setMappingDialog({ open: false, config: null });
+  };
+
+  const handleSaveAssignment = () => {
+    if (!assignmentDialog.config) return;
+    const config = assignmentDialog.config;
+    upsertMutation.mutate({
+      id: config.id,
+      pageId: config.pageId,
+      pageName: config.pageName,
+      pageAccessToken: config.pageAccessToken,
+      assignmentRule: editAssignment.rule as any,
+      fixedOwnerId: editAssignment.rule === "fixed_owner" && editAssignment.fixedOwnerId ? Number(editAssignment.fixedOwnerId) : null,
+      isEnabled: config.isEnabled,
+      fieldMapping: config.fieldMapping || {},
+    });
+    setAssignmentDialog({ open: false, config: null });
   };
 
   const currentVerifyToken = configs[0]?.webhookVerifyToken || "";
@@ -489,6 +508,21 @@ export default function MetaLeadgenSettingsTab() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
+                          setEditAssignment({
+                            rule: config.assignmentRule || "round_robin",
+                            fixedOwnerId: config.fixedOwnerId ? String(config.fixedOwnerId) : "",
+                          });
+                          setAssignmentDialog({ open: true, config });
+                        }}
+                      >
+                        <Users className="h-4 w-4" />
+                        <span className="ml-1">{isRTL ? "التوزيع" : "Assignment"}</span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
                           setMappingState({ ...defaultMapping, ...(config.fieldMapping || {}) });
                           setMappingDialog({ open: true, config });
                         }}
@@ -640,6 +674,89 @@ export default function MetaLeadgenSettingsTab() {
               {isRTL ? "إلغاء" : "Cancel"}
             </Button>
             <Button onClick={handleSaveMapping}>{isRTL ? "حفظ الربط" : "Save Mapping"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assignment Rule Dialog */}
+      <Dialog open={assignmentDialog.open} onOpenChange={(open) => setAssignmentDialog((s) => ({ ...s, open }))}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>
+              {isRTL
+                ? `تعديل التوزيع: ${assignmentDialog.config?.pageName || assignmentDialog.config?.pageId || ""}`
+                : `Edit Assignment: ${assignmentDialog.config?.pageName || assignmentDialog.config?.pageId || ""}`}
+            </DialogTitle>
+            <DialogDescription>
+              {isRTL
+                ? "اختر كيف يتم توزيع الليدز الجديدة على فريق المبيعات."
+                : "Choose how new leads are distributed to the sales team."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="space-y-2">
+              <Label>{isRTL ? "قاعدة التوزيع" : "Assignment Rule"}</Label>
+              <Select value={editAssignment.rule} onValueChange={(value) => setEditAssignment((s) => ({ ...s, rule: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="round_robin">{isRTL ? "توزيع دائري" : "Round Robin"}</SelectItem>
+                  <SelectItem value="fixed_owner">{isRTL ? "مالك ثابت" : "Fixed Owner"}</SelectItem>
+                  <SelectItem value="by_campaign">{isRTL ? "حسب الحملة" : "By Campaign"}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {editAssignment.rule === "round_robin"
+                  ? (isRTL ? "يتم توزيع الليدز بالتساوي على جميع موظفي المبيعات النشطين بالتناوب." : "Leads are distributed equally among all active sales agents in rotation.")
+                  : editAssignment.rule === "fixed_owner"
+                    ? (isRTL ? "جميع الليدز تذهب لموظف مبيعات واحد محدد." : "All leads go to one specific sales agent.")
+                    : (isRTL ? "يتم توزيع الليدز حسب إعدادات كل حملة." : "Leads are distributed based on each campaign's settings.")}
+              </p>
+            </div>
+
+            {editAssignment.rule === "fixed_owner" && (
+              <div className="space-y-2">
+                <Label>{isRTL ? "تعيين إلى" : "Assign to"}</Label>
+                <Select value={editAssignment.fixedOwnerId} onValueChange={(value) => setEditAssignment((s) => ({ ...s, fixedOwnerId: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={isRTL ? "اختر المستخدم" : "Select user"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {salesAgents.map((user: any) => (
+                      <SelectItem key={user.id} value={String(user.id)}>
+                        {user.name || `#${user.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {editAssignment.rule === "round_robin" && (
+              <div className="rounded-lg border p-3 space-y-2">
+                <div className="text-sm font-medium">{isRTL ? "موظفو المبيعات النشطون" : "Active Sales Agents"}</div>
+                <div className="flex flex-wrap gap-2">
+                  {salesAgents.map((user: any) => (
+                    <Badge key={user.id} variant="secondary">{user.name || `#${user.id}`}</Badge>
+                  ))}
+                </div>
+                {!salesAgents.length && (
+                  <p className="text-xs text-muted-foreground">{isRTL ? "لا يوجد موظفو مبيعات نشطون" : "No active sales agents found"}</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignmentDialog({ open: false, config: null })}>
+              {isRTL ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button onClick={handleSaveAssignment} disabled={upsertMutation.isPending || (editAssignment.rule === "fixed_owner" && !editAssignment.fixedOwnerId)}>
+              {upsertMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+              <span className="ml-2">{isRTL ? "حفظ التوزيع" : "Save Assignment"}</span>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

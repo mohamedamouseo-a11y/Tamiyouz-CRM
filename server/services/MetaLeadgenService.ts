@@ -111,12 +111,24 @@ async function getActiveSalesAgents() {
     .where(and(eq(users.role, "SalesAgent"), eq(users.isActive, 1), isNull(users.deletedAt)));
 }
 
-async function assignRoundRobinLead(agentIds: number[]) {
+async function assignRoundRobinLead(configId: number, agentIds: number[]) {
   if (!agentIds.length) return null;
   const db = await getDb();
-  const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(leads);
-  const nextIndex = Number(count || 0) % agentIds.length;
-  return agentIds[nextIndex] ?? null;
+  // Use the persistent round_robin_index from the config
+  const [config] = await db
+    .select({ roundRobinIndex: metaLeadgenConfig.roundRobinIndex })
+    .from(metaLeadgenConfig)
+    .where(eq(metaLeadgenConfig.id, configId))
+    .limit(1);
+  const currentIndex = config?.roundRobinIndex ?? 0;
+  const nextIndex = currentIndex % agentIds.length;
+  const ownerId = agentIds[nextIndex] ?? null;
+  // Increment the round robin index in the database
+  await db
+    .update(metaLeadgenConfig)
+    .set({ roundRobinIndex: currentIndex + 1 })
+    .where(eq(metaLeadgenConfig.id, configId));
+  return ownerId;
 }
 
 async function assignByCampaign(campaignName?: string | null) {
@@ -154,7 +166,7 @@ async function assignOwner(config: LeadgenConfigRow, campaignName?: string | nul
   }
 
   const salesAgents = await getActiveSalesAgents();
-  return assignRoundRobinLead(salesAgents.map((agent) => agent.id));
+  return assignRoundRobinLead(config.id, salesAgents.map((agent) => agent.id));
 }
 
 async function verifyWebhookSignature(rawBody: string, signatureHeader?: string | null) {
