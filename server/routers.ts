@@ -3609,5 +3609,24 @@ byLeadStageChanges: protectedProcedure
       return result;
     }),
   }),
+  metaAudit: router({
+    compareLeads: mediaBuyerOrAdminProcedure
+      .input(z.object({
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
+      }))
+      .query(async ({ input }) => {
+        return compareMetaVsCrmLeads(input.dateFrom, input.dateTo);
+      }),
+    calculateRoas: mediaBuyerOrAdminProcedure
+      .input(z.object({
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
+        datePreset: z.string().optional().default("last_30d"),
+      }))
+      .query(async ({ input }) => {
+        return calculateRoas(input.dateFrom, input.dateTo, input.datePreset);
+      }),
+  }),
 });
 export type AppRouter = typeof appRouter;
