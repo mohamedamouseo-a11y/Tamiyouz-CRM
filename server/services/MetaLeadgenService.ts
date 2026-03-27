@@ -409,6 +409,16 @@ export class MetaLeadgenService {
             .limit(1);
 
           if (existing.length) {
+            // Update existing lead's form data
+            try {
+              const mappedLeadForUpdate = mapMetaFields(graphLead.field_data ?? [], (config.fieldMapping as Record<string, string>) ?? {});
+              await db.update(leads).set({
+                customFieldsData: mappedLeadForUpdate.customFieldsData,
+              }).where(eq(leads.id, existing[0].id));
+              console.log(`[MetaLeadgen:Webhook] Updated existing lead ${existing[0].id} with new form data`);
+            } catch (updateErr: any) {
+              console.error(`[MetaLeadgen:Webhook] Failed to update existing lead:`, updateErr.message);
+            }
             skipped += 1;
             continue;
           }
@@ -602,8 +612,9 @@ export class MetaLeadgenService {
 
                 imported += 1;
                 console.log(`[MetaLeadgen:Poll] Imported lead ${leadgenId} (${mappedLead.name}) from form ${form.name}`);
-              } catch (insertErr: any) {
-                console.error(`[MetaLeadgen:Poll] Failed to insert lead ${leadgenId}:`, insertErr.message);
+              }
+              } catch (leadErr: any) {
+                console.error(`[MetaLeadgen:Poll] Failed to process lead ${leadgenId}:`, leadErr.message);
                 errors += 1;
               }
             }
