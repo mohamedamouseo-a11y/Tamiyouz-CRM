@@ -175,14 +175,12 @@ export async function fetchAllCampaignInsights(accountDbId: number, datePreset: 
     const insights = await fetchCampaignInsights(c.campaignId, account[0].accessToken, datePreset);
     if (insights) {
       // Extract leads count from actions
-      // Find leads from all possible lead action types
-      const leadActionTypes = ["lead", "leadgen.other", "onsite_conversion.lead_grouped", "offsite_conversion.fb_pixel_lead"];
-      const leadAction = insights.actions?.find((a: any) => leadActionTypes.includes(a.action_type));
+      const leadAction = insights.actions?.find((a: any) => a.action_type === "lead" || a.action_type === "onsite_conversion.lead_grouped");
       const purchaseAction = insights.actions?.find((a: any) => a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase");
       const messagingAction = insights.actions?.find((a: any) => a.action_type === "onsite_conversion.messaging_conversation_started_7d");
 
       // Extract CPL from cost_per_action_type
-      const cplAction = insights.cost_per_action_type?.find((a: any) => leadActionTypes.includes(a.action_type));
+      const cplAction = insights.cost_per_action_type?.find((a: any) => a.action_type === "lead" || a.action_type === "onsite_conversion.lead_grouped");
       const costPerPurchase = insights.cost_per_action_type?.find((a: any) => a.action_type === "purchase" || a.action_type === "offsite_conversion.fb_pixel_purchase");
       const costPerMessage = insights.cost_per_action_type?.find((a: any) => a.action_type === "onsite_conversion.messaging_conversation_started_7d");
 

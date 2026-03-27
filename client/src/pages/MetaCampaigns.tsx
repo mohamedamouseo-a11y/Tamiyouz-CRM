@@ -882,143 +882,166 @@ export default function MetaCampaigns() {
 
         {/* ═══ Campaign Details Drawer ════════════════════════════════════ */}
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-          <SheetContent className="w-full sm:max-w-xl overflow-y-auto" side={isRTL ? "left" : "right"}>
+          <SheetContent className="w-full sm:max-w-lg overflow-y-auto p-0" side={isRTL ? "left" : "right"}>
             {selectedCampaign && (() => {
               const ci = insights[selectedCampaign.campaignId] || {};
               return (
-                <>
-                  <SheetHeader className="pb-4">
-                    <SheetTitle className="text-lg">
-                      {selectedCampaign.campaignName}
-                    </SheetTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                      {getStatusBadge(selectedCampaign.status)}
-                      <Badge variant="outline" className="text-xs">
-                        <Target size={10} className="mr-1" />
+                <div className="flex flex-col h-full">
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-5 text-white">
+                    <SheetHeader className="p-0">
+                      <SheetTitle className="text-base font-bold text-white leading-tight">
+                        {selectedCampaign.campaignName}
+                      </SheetTitle>
+                    </SheetHeader>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge className={`text-[10px] px-2 py-0.5 ${
+                        selectedCampaign.status === "ACTIVE" 
+                          ? "bg-emerald-400/20 text-emerald-100 border-emerald-300/30" 
+                          : "bg-white/15 text-white/80 border-white/20"
+                      }`}>
+                        {selectedCampaign.status === "ACTIVE" && <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-300 inline-block animate-pulse" />}
+                        {selectedCampaign.status === "ACTIVE" ? (isRTL ? "نشط" : "Active") : (isRTL ? "متوقف" : "Paused")}
+                      </Badge>
+                      <Badge className="text-[10px] px-2 py-0.5 bg-white/15 text-white/80 border-white/20">
+                        <Target size={9} className="mr-1" />
                         {selectedCampaign.objective || "—"}
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      ID: {selectedCampaign.campaignId}
-                    </p>
-                  </SheetHeader>
-
-                  <Separator className="my-4" />
-
-                  {/* Quick Actions */}
-                  <div className="flex items-center gap-2 mb-6">
-                    {(selectedCampaign.status === "ACTIVE" || selectedCampaign.status === "PAUSED") && (
-                      <Button
-                        size="sm"
-                        variant={selectedCampaign.status === "ACTIVE" ? "destructive" : "default"}
-                        onClick={() => handleStatusChange(selectedCampaign.id, selectedCampaign.status === "ACTIVE" ? "PAUSED" : "ACTIVE")}
-                        disabled={updatingId === selectedCampaign.id}
-                      >
-                        {updatingId === selectedCampaign.id ? (
-                          <Loader2 size={14} className="animate-spin mr-1" />
-                        ) : selectedCampaign.status === "ACTIVE" ? (
-                          <Pause size={14} className="mr-1" />
-                        ) : (
-                          <Play size={14} className="mr-1" />
-                        )}
-                        {selectedCampaign.status === "ACTIVE"
-                          ? (isRTL ? "إيقاف" : "Pause")
-                          : (isRTL ? "تشغيل" : "Activate")}
-                      </Button>
-                    )}
-                    {selectedCampaign.dailyBudget && selectedCampaign.dailyBudget !== "0.00" && (
-                      <Button size="sm" variant="outline"
-                        onClick={() => openBudgetEdit(selectedCampaign.id, selectedCampaign.campaignName, "daily", selectedCampaign.dailyBudget)}>
-                        <DollarSign size={14} className="mr-1" />
-                        {isRTL ? "تعديل الميزانية" : "Edit Budget"}
-                      </Button>
-                    )}
+                    <p className="text-[10px] text-blue-200 mt-2 font-mono">{selectedCampaign.campaignId}</p>
+                    {/* Quick Actions */}
+                    <div className="flex items-center gap-2 mt-3">
+                      {(selectedCampaign.status === "ACTIVE" || selectedCampaign.status === "PAUSED") && (
+                        <Button
+                          size="sm"
+                          className={`h-7 text-xs ${
+                            selectedCampaign.status === "ACTIVE"
+                              ? "bg-red-500/20 hover:bg-red-500/30 text-white border-red-300/30"
+                              : "bg-emerald-500/20 hover:bg-emerald-500/30 text-white border-emerald-300/30"
+                          }`}
+                          variant="outline"
+                          onClick={() => handleStatusChange(selectedCampaign.id, selectedCampaign.status === "ACTIVE" ? "PAUSED" : "ACTIVE")}
+                          disabled={updatingId === selectedCampaign.id}
+                        >
+                          {updatingId === selectedCampaign.id ? (
+                            <Loader2 size={12} className="animate-spin mr-1" />
+                          ) : selectedCampaign.status === "ACTIVE" ? (
+                            <Pause size={12} className="mr-1" />
+                          ) : (
+                            <Play size={12} className="mr-1" />
+                          )}
+                          {selectedCampaign.status === "ACTIVE" ? (isRTL ? "إيقاف" : "Pause") : (isRTL ? "تشغيل" : "Activate")}
+                        </Button>
+                      )}
+                      {selectedCampaign.dailyBudget && selectedCampaign.dailyBudget !== "0.00" && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20"
+                          onClick={() => openBudgetEdit(selectedCampaign.id, selectedCampaign.campaignName, "daily", selectedCampaign.dailyBudget)}>
+                          <Pencil size={12} className="mr-1" />
+                          {isRTL ? "تعديل الميزانية" : "Edit Budget"}
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Metrics Grid */}
-                  <div className="grid grid-cols-2 gap-3 mb-6">
-                    <Card className="border bg-blue-50/50">
-                      <CardContent className="p-3">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{isRTL ? "الإنفاق" : "Spend"}</p>
-                        <p className="text-lg font-bold mt-1">{fmt.currency(ci.spend)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="border bg-emerald-50/50">
-                      <CardContent className="p-3">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{isRTL ? "العملاء" : "Leads"}</p>
-                        <p className="text-lg font-bold mt-1 text-emerald-600">{ci.leads && ci.leads !== "0" ? ci.leads : (ci.messages && ci.messages !== "0" ? `${ci.messages} msg` : "—")}</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="border bg-violet-50/50">
-                      <CardContent className="p-3">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">CPL</p>
-                        <p className="text-lg font-bold mt-1">{ci.cpl ? fmt.currency(ci.cpl) : (ci.costPerMessage ? fmt.currency(ci.costPerMessage) : "—")}</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="border bg-amber-50/50">
-                      <CardContent className="p-3">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">ROAS</p>
-                        <p className="text-lg font-bold mt-1">{ci.roas ? `${parseFloat(ci.roas).toFixed(2)}x` : "—"}</p>
-                      </CardContent>
-                    </Card>
-                  </div>
+                  {/* Content */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {/* KPI Mini Cards */}
+                    <div className="grid grid-cols-4 gap-2">
+                      <div className="rounded-lg bg-blue-50 border border-blue-100 p-2.5 text-center">
+                        <p className="text-[9px] text-blue-500 font-semibold uppercase tracking-wider">{isRTL ? "الإنفاق" : "Spend"}</p>
+                        <p className="text-sm font-bold mt-0.5 text-blue-700">{fmt.currency(ci.spend)}</p>
+                      </div>
+                      <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-2.5 text-center">
+                        <p className="text-[9px] text-emerald-500 font-semibold uppercase tracking-wider">{isRTL ? "العملاء" : "Leads"}</p>
+                        <p className="text-sm font-bold mt-0.5 text-emerald-700">{ci.leads && ci.leads !== "0" ? ci.leads : (ci.messages && ci.messages !== "0" ? ci.messages : "—")}</p>
+                      </div>
+                      <div className="rounded-lg bg-violet-50 border border-violet-100 p-2.5 text-center">
+                        <p className="text-[9px] text-violet-500 font-semibold uppercase tracking-wider">CPL</p>
+                        <p className="text-sm font-bold mt-0.5 text-violet-700">{ci.cpl ? fmt.currency(ci.cpl) : (ci.costPerMessage ? fmt.currency(ci.costPerMessage) : "—")}</p>
+                      </div>
+                      <div className="rounded-lg bg-amber-50 border border-amber-100 p-2.5 text-center">
+                        <p className="text-[9px] text-amber-500 font-semibold uppercase tracking-wider">ROAS</p>
+                        <p className="text-sm font-bold mt-0.5 text-amber-700">{ci.roas ? `${parseFloat(ci.roas).toFixed(2)}x` : "—"}</p>
+                      </div>
+                    </div>
 
-                  {/* Detailed Metrics */}
-                  <Card className="mb-6">
-                    <CardHeader className="pb-2 pt-4 px-4">
-                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        <BarChart3 size={16} />
-                        {isRTL ? "المقاييس التفصيلية" : "Detailed Metrics"}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="px-4 pb-4">
-                      <div className="space-y-3">
+                    {/* Performance Metrics */}
+                    <div className="rounded-lg border bg-card">
+                      <div className="px-3 py-2.5 border-b bg-muted/30">
+                        <h4 className="text-xs font-semibold flex items-center gap-1.5">
+                          <BarChart3 size={13} className="text-primary" />
+                          {isRTL ? "مقاييس الأداء" : "Performance Metrics"}
+                        </h4>
+                      </div>
+                      <div className="divide-y">
                         {[
-                          { label: isRTL ? "مرات الظهور" : "Impressions", value: fmt.number(ci.impressions), icon: Eye },
-                          { label: isRTL ? "النقرات" : "Clicks", value: fmt.number(ci.clicks), icon: MousePointer },
-                          { label: "CTR", value: fmt.percent(ci.ctr), icon: TrendingUp },
-                          { label: "CPC", value: fmt.currency(ci.cpc), icon: DollarSign },
-                          { label: "CPM", value: fmt.currency(ci.cpm), icon: BarChart3 },
-                          { label: isRTL ? "الميزانية اليومية" : "Daily Budget", value: fmt.budget(selectedCampaign.dailyBudget), icon: Zap },
-                          { label: isRTL ? "الميزانية الإجمالية" : "Lifetime Budget", value: fmt.budget(selectedCampaign.lifetimeBudget), icon: DollarSign },
+                          { label: isRTL ? "مرات الظهور" : "Impressions", value: fmt.number(ci.impressions), icon: Eye, color: "text-sky-500" },
+                          { label: isRTL ? "النقرات" : "Clicks", value: fmt.number(ci.clicks), icon: MousePointer, color: "text-indigo-500" },
+                          { label: "CTR", value: fmt.percent(ci.ctr), icon: TrendingUp, color: "text-teal-500" },
+                          { label: "CPC", value: fmt.currency(ci.cpc), icon: DollarSign, color: "text-orange-500" },
+                          { label: "CPM", value: fmt.currency(ci.cpm), icon: BarChart3, color: "text-pink-500" },
                         ].map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between py-1.5 border-b border-dashed last:border-0">
-                            <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <item.icon size={14} />
+                          <div key={idx} className="flex items-center justify-between px-3 py-2">
+                            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <item.icon size={13} className={item.color} />
                               {item.label}
                             </span>
-                            <span className="text-sm font-medium">{item.value}</span>
+                            <span className="text-xs font-semibold">{item.value}</span>
                           </div>
                         ))}
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
 
-                  {/* Campaign Info */}
-                  <Card>
-                    <CardHeader className="pb-2 pt-4 px-4">
-                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        <Megaphone size={16} />
-                        {isRTL ? "معلومات الحملة" : "Campaign Info"}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="px-4 pb-4">
-                      <div className="space-y-3">
+                    {/* Budget Info */}
+                    <div className="rounded-lg border bg-card">
+                      <div className="px-3 py-2.5 border-b bg-muted/30">
+                        <h4 className="text-xs font-semibold flex items-center gap-1.5">
+                          <DollarSign size={13} className="text-primary" />
+                          {isRTL ? "الميزانية" : "Budget"}
+                        </h4>
+                      </div>
+                      <div className="divide-y">
+                        <div className="flex items-center justify-between px-3 py-2">
+                          <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Zap size={13} className="text-yellow-500" />
+                            {isRTL ? "يومية" : "Daily"}
+                          </span>
+                          <span className="text-xs font-semibold">{fmt.budget(selectedCampaign.dailyBudget)}</span>
+                        </div>
+                        <div className="flex items-center justify-between px-3 py-2">
+                          <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <DollarSign size={13} className="text-green-500" />
+                            {isRTL ? "إجمالية" : "Lifetime"}
+                          </span>
+                          <span className="text-xs font-semibold">{fmt.budget(selectedCampaign.lifetimeBudget)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Campaign Info */}
+                    <div className="rounded-lg border bg-card">
+                      <div className="px-3 py-2.5 border-b bg-muted/30">
+                        <h4 className="text-xs font-semibold flex items-center gap-1.5">
+                          <Megaphone size={13} className="text-primary" />
+                          {isRTL ? "معلومات الحملة" : "Campaign Info"}
+                        </h4>
+                      </div>
+                      <div className="divide-y">
                         {[
                           { label: isRTL ? "معرف الحملة" : "Campaign ID", value: selectedCampaign.campaignId },
                           { label: isRTL ? "الحالة" : "Status", value: selectedCampaign.status },
                           { label: isRTL ? "الهدف" : "Objective", value: selectedCampaign.objective || "—" },
                           { label: isRTL ? "تاريخ الإنشاء" : "Created", value: selectedCampaign.createdAt ? new Date(selectedCampaign.createdAt).toLocaleDateString() : "—" },
                         ].map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between py-1.5 border-b border-dashed last:border-0">
-                            <span className="text-sm text-muted-foreground">{item.label}</span>
-                            <span className="text-sm font-medium">{item.value}</span>
+                          <div key={idx} className="flex items-center justify-between px-3 py-2">
+                            <span className="text-xs text-muted-foreground">{item.label}</span>
+                            <span className="text-xs font-semibold">{item.value}</span>
                           </div>
                         ))}
                       </div>
-                    </CardContent>
-                  </Card>
-                </>
+                    </div>
+                  </div>
+                </div>
               );
             })()}
           </SheetContent>
