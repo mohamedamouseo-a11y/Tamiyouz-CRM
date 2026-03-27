@@ -3441,14 +3441,16 @@ byLeadStageChanges: protectedProcedure
     // Get campaign insights/metrics
     getInsights: mediaBuyerOrAdminProcedure
       .input(z.object({
-        datePreset: z.enum(["today", "yesterday", "last_7d", "last_14d", "last_30d", "this_month", "last_month"]).optional().default("last_30d"),
+        datePreset: z.enum(["today", "yesterday", "last_7d", "last_14d", "last_30d", "this_month", "last_month", "last_90d", "last_year", "maximum"]).optional().default("last_30d"),
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
       }))
       .query(async ({ input }) => {
         const active = await getActiveMetaAdAccount();
         if (!active) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "No active ad account selected" });
         }
-        return fetchAllMetaCampaignInsights(active.id, input.datePreset);
+        return fetchAllMetaCampaignInsights(active.id, input.datePreset, input.dateFrom, input.dateTo);
       }),
 
     // ─── Meta Leadgen Webhook Integration ──────────────────────────────────────
