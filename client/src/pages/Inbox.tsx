@@ -1,6 +1,6 @@
 import CRMLayout from "@/components/CRMLayout";
 import { useEffect, useMemo, useState } from "react";
-import { Filter, MailOpen } from "lucide-react";
+import { Filter, MailOpen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,6 +38,7 @@ export default function InboxPage() {
   const [type, setType] = useState<string>("all");
   const [selectedMessage, setSelectedMessage] = useState<InboxMessage | null>(null);
   const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const listQuery = trpc.inbox.list.useQuery({
     tab: activeTab,
@@ -70,6 +71,7 @@ export default function InboxPage() {
 
   useEffect(() => {
     setPage(1);
+    setSearchQuery("");
   }, [activeTab, type]);
 
   useEffect(() => {
@@ -83,6 +85,28 @@ export default function InboxPage() {
     const role = user?.role;
     return role === "AccountManager" || role === "AccountManagerLead";
   }, [user?.role]);
+
+  /* ── Client-side search filter ── */
+  const filteredItems = useMemo(() => {
+    const items = (listQuery.data?.items ?? []) as InboxMessage[];
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase();
+    return items.filter((item) => {
+      const title = (item.titleAr || item.title || "").toLowerCase();
+      const body = (item.bodyAr || item.body || "").toLowerCase();
+      const meta = item.metadata ?? {};
+      const phone = String((meta as any).phone ?? "").toLowerCase();
+      const campaign = String((meta as any).campaignName ?? "").toLowerCase();
+      const leadName = String((meta as any).leadName ?? "").toLowerCase();
+      return (
+        title.includes(q) ||
+        body.includes(q) ||
+        phone.includes(q) ||
+        campaign.includes(q) ||
+        leadName.includes(q)
+      );
+    });
+  }, [listQuery.data?.items, searchQuery]);
 
   return (
     <CRMLayout>
@@ -116,6 +140,17 @@ export default function InboxPage() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => {
+                utils.inbox.list.invalidate();
+                utils.inbox.counts.invalidate();
+              }}
+              title={isArabic ? "تحديث" : "Refresh"}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => markAllReadMutation.mutate({ tab: activeTab })}
               disabled={markAllReadMutation.isPending}
             >
@@ -145,13 +180,14 @@ export default function InboxPage() {
               <div className="flex h-full flex-col">
                 <div className="border-b bg-muted/30 px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground">
-                    {listQuery.data?.pagination.total ?? 0}{" "}
+                    {filteredItems.length}
+                    {searchQuery.trim() ? ` / ${listQuery.data?.pagination.total ?? 0}` : ""}{" "}
                     {isArabic ? "رسالة" : "message(s)"}
                   </span>
                 </div>
                 <div className="flex-1 overflow-hidden">
                   <MessageList
-                    items={(listQuery.data?.items ?? []) as InboxMessage[]}
+                    items={filteredItems}
                     selectedId={selectedMessage?.id}
                     onSelect={async (item) => {
                       setSelectedMessage(item);
@@ -160,6 +196,8 @@ export default function InboxPage() {
                       }
                     }}
                     isArabic={isArabic}
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
                   />
                 </div>
                 {/* Pagination */}

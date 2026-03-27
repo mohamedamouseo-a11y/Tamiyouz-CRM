@@ -1,4 +1,17 @@
-import { Clock, ExternalLink, Inbox, MailCheck } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  Clock,
+  ExternalLink,
+  Inbox,
+  MailCheck,
+  Megaphone,
+  MessageSquare,
+  Phone,
+  UserCheck,
+  UserPlus,
+  UserRoundSearch,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -10,6 +23,8 @@ type Props = {
   isArabic?: boolean;
   onMarkRead?: (id: number) => void;
 };
+
+/* ── Label map ─────────────────────────────────────────────── */
 
 const LABEL_MAP: Record<string, { en: string; ar: string }> = {
   leadId: { en: "Lead ID", ar: "رقم العميل" },
@@ -77,24 +92,169 @@ function computeTimeDiff(metadata: Record<string, unknown> | null | undefined) {
   return `${days}d ${hours % 24}h`;
 }
 
+/* ── Type badge config ─────────────────────────────────────── */
+
+type BadgeConfig = {
+  label: string;
+  labelAr: string;
+  icon: typeof AlertTriangle;
+  className: string;
+};
+
+const BADGE_MAP: Record<string, BadgeConfig> = {
+  sla_breach: {
+    label: "SLA Breach",
+    labelAr: "تجاوز SLA",
+    icon: AlertTriangle,
+    className: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300",
+  },
+  new_lead: {
+    label: "New Lead",
+    labelAr: "عميل جديد",
+    icon: UserPlus,
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300",
+  },
+  lead_assigned: {
+    label: "Lead Assigned",
+    labelAr: "تم تعيين عميل",
+    icon: UserCheck,
+    className: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300",
+  },
+  lead_distribution: {
+    label: "Lead Distribution",
+    labelAr: "توزيع عملاء",
+    icon: UserRoundSearch,
+    className: "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-300",
+  },
+  meeting_reminder: {
+    label: "Meeting",
+    labelAr: "اجتماع",
+    icon: CalendarClock,
+    className: "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/30 dark:text-purple-300",
+  },
+  follow_up_reminder: {
+    label: "Follow-up",
+    labelAr: "متابعة",
+    icon: Clock,
+    className: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300",
+  },
+  reminder: {
+    label: "Reminder",
+    labelAr: "تذكير",
+    icon: CalendarClock,
+    className: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-300",
+  },
+  campaign_alert: {
+    label: "Campaign",
+    labelAr: "حملة",
+    icon: Megaphone,
+    className: "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300",
+  },
+};
+
 function getTypeBadge(type: string, isArabic?: boolean) {
-  const map: Record<string, { label: string; labelAr: string; variant: "default" | "destructive" | "secondary" | "outline" }> = {
-    sla_breach: { label: "SLA Breach", labelAr: "تجاوز SLA", variant: "destructive" },
-    new_lead: { label: "New Lead", labelAr: "عميل جديد", variant: "default" },
-    lead_assigned: { label: "Lead Assigned", labelAr: "تم تعيين عميل", variant: "default" },
-    lead_distribution: { label: "Lead Distribution", labelAr: "توزيع عملاء", variant: "secondary" },
-    meeting_reminder: { label: "Meeting", labelAr: "اجتماع", variant: "outline" },
-    follow_up_reminder: { label: "Follow-up", labelAr: "متابعة", variant: "outline" },
-    reminder: { label: "Reminder", labelAr: "تذكير", variant: "outline" },
-    campaign_alert: { label: "Campaign", labelAr: "حملة", variant: "secondary" },
+  const cfg = BADGE_MAP[type] ?? {
+    label: type,
+    labelAr: type,
+    icon: Inbox,
+    className: "border-gray-200 bg-gray-50 text-gray-700",
   };
-  const info = map[type] ?? { label: type, labelAr: type, variant: "secondary" as const };
+  const Icon = cfg.icon;
   return (
-    <Badge variant={info.variant} className="text-xs">
-      {isArabic ? info.labelAr : info.label}
+    <Badge variant="outline" className={`gap-1 text-xs ${cfg.className}`}>
+      <Icon className="h-3 w-3" />
+      {isArabic ? cfg.labelAr : cfg.label}
     </Badge>
   );
 }
+
+/* ── Lead card component ───────────────────────────────────── */
+
+function LeadCard({ message, isArabic }: { message: InboxMessage; isArabic?: boolean }) {
+  const meta = message.metadata as Record<string, unknown> | null;
+  if (!meta) return null;
+
+  const leadName = (meta.leadName as string) || null;
+  const phone = (meta.phone as string) || null;
+  const campaignName = (meta.campaignName as string) || null;
+  const assignedToName = (meta.assignedToName as string) || null;
+
+  if (!leadName && !phone) return null;
+
+  return (
+    <Card className="mb-4 overflow-hidden rounded-2xl border-emerald-200 dark:border-emerald-800">
+      {/* Green header bar */}
+      <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 text-white">
+        <UserPlus className="h-4 w-4" />
+        <span className="text-sm font-semibold">
+          {isArabic ? "بيانات العميل" : "Lead Information"}
+        </span>
+      </div>
+      <CardContent className="p-4">
+        <div className="space-y-3">
+          {/* Lead name */}
+          {leadName && (
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                <span className="text-sm font-bold">
+                  {leadName.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div>
+                <p className="text-base font-bold">{leadName}</p>
+                {assignedToName && (
+                  <p className="text-xs text-muted-foreground">
+                    {isArabic ? `معيّن لـ: ${assignedToName}` : `Assigned to: ${assignedToName}`}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Info chips */}
+          <div className="flex flex-wrap gap-2">
+            {phone && (
+              <div className="inline-flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5">
+                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-sm font-medium" dir="ltr">{phone}</span>
+              </div>
+            )}
+            {campaignName && (
+              <div className="inline-flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5">
+                <Megaphone className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-sm font-medium">{campaignName}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Quick actions */}
+          {phone && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button variant="outline" size="sm" asChild className="gap-1.5 rounded-lg">
+                <a href={`tel:${phone}`}>
+                  <Phone className="h-3.5 w-3.5" />
+                  {isArabic ? "اتصال" : "Call"}
+                </a>
+              </Button>
+              <Button variant="outline" size="sm" asChild className="gap-1.5 rounded-lg">
+                <a
+                  href={`https://wa.me/${phone.replace(/[^0-9]/g, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  {isArabic ? "واتساب" : "WhatsApp"}
+                </a>
+              </Button>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ── Main component ────────────────────────────────────────── */
 
 export function MessageDetail({ message, isArabic, onMarkRead }: Props) {
   if (!message) {
@@ -112,6 +272,7 @@ export function MessageDetail({ message, isArabic, onMarkRead }: Props) {
   const body = isArabic ? message.bodyAr || message.body : message.body;
   const metadataEntries = Object.entries(message.metadata ?? {});
   const timeDiff = computeTimeDiff(message.metadata);
+  const isLeadType = ["new_lead", "lead_assigned", "lead_distribution"].includes(message.type);
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6">
@@ -121,7 +282,7 @@ export function MessageDetail({ message, isArabic, onMarkRead }: Props) {
           <div className="mb-2 flex items-center gap-2">
             {getTypeBadge(message.type, isArabic)}
             {!message.isRead && (
-              <Badge variant="outline" className="border-blue-200 bg-blue-50 text-xs text-blue-600">
+              <Badge variant="outline" className="border-blue-200 bg-blue-50 text-xs text-blue-600 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300">
                 {isArabic ? "غير مقروء" : "Unread"}
               </Badge>
             )}
@@ -140,7 +301,7 @@ export function MessageDetail({ message, isArabic, onMarkRead }: Props) {
             <Button type="button" size="sm" asChild>
               <a href={message.link}>
                 <ExternalLink className="me-2 h-4 w-4" />
-                {isArabic ? "فتح" : "Open link"}
+                {isArabic ? "فتح الصفحة" : "Open lead"}
               </a>
             </Button>
           )}
@@ -162,10 +323,13 @@ export function MessageDetail({ message, isArabic, onMarkRead }: Props) {
         </div>
       )}
 
+      {/* Rich lead card for lead-type notifications */}
+      {isLeadType && <LeadCard message={message} isArabic={isArabic} />}
+
       {/* Metadata */}
       <Card className="rounded-2xl">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">{isArabic ? "التفاصيل" : "Metadata"}</CardTitle>
+          <CardTitle className="text-base">{isArabic ? "التفاصيل" : "Details"}</CardTitle>
         </CardHeader>
         <CardContent>
           {metadataEntries.length ? (
@@ -181,7 +345,7 @@ export function MessageDetail({ message, isArabic, onMarkRead }: Props) {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {isArabic ? "لا توجد تفاصيل إضافية لهذه الرسالة." : "No metadata found for this message."}
+              {isArabic ? "لا توجد تفاصيل إضافية لهذه الرسالة." : "No additional details for this message."}
             </p>
           )}
         </CardContent>
