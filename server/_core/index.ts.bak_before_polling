@@ -18,7 +18,7 @@ import { setupChat } from "../services/chat";
 import { startNotificationEngine } from "../notificationEngine";
 import { startExchangeRateScheduler } from "../exchangeRateSync";
 import { backupService } from "../services/BackupService";
-import { MetaLeadgenService, startMetaLeadgenPolling } from "../services/MetaLeadgenService";
+import { MetaLeadgenService } from "../services/MetaLeadgenService";
 import { restoreService } from "../services/RestoreService";
 import { promises as fs } from "fs";
 
