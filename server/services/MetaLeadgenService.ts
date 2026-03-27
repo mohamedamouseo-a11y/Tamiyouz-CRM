@@ -557,7 +557,7 @@ export class MetaLeadgenService {
 
               // Check for duplicate by phone
               const [existingByPhone] = await db
-                .select({ id: leads.id, campaignName: leads.campaignName })
+                .select({ id: leads.id })
                 .from(leads)
                 .where(eq(leads.phone, normalizedPhone))
                 .limit(1);
