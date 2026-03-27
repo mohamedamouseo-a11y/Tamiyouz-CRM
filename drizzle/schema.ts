@@ -908,6 +908,7 @@ export const metaLeadgenConfig = mysqlTable("meta_leadgen_config", {
 	lastLeadReceivedAt: timestamp("last_lead_received_at", { mode: "string" }),
 	createdAt: timestamp("created_at", { mode: "string" }).default(sql`(now())`).notNull(),
 	updatedAt: timestamp("updated_at", { mode: "string" }).default(sql`(now())`).onUpdateNow().notNull(),
+	roundRobinIndex: int("round_robin_index").default(0).notNull(),
 },
 (table) => [
 	primaryKey({ columns: [table.id], name: "meta_leadgen_config_id"}),
