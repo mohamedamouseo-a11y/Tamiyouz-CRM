@@ -39,7 +39,7 @@ import {
 } from "recharts";
 
 // ─── Types ─────────────────────────────────────────────────────────────
-type DatePreset = "today" | "yesterday" | "last_7d" | "last_14d" | "last_30d" | "this_month" | "last_month";
+type DatePreset = "today" | "yesterday" | "last_7d" | "last_14d" | "last_30d" | "last_90d" | "last_year" | "maximum" | "this_month" | "last_month" | "custom";
 type SortField = "name" | "status" | "objective" | "spend" | "impressions" | "clicks" | "ctr" | "cpc" | "cpl" | "roas" | "leads" | "dailyBudget";
 type SortDir = "asc" | "desc";
 
@@ -72,7 +72,10 @@ export default function MetaCampaigns() {
 
   // ─── State ─────────────────────────────────────────────────────────────
   const [updatingId, setUpdatingId] = useState<number | null>(null);
-  const [datePreset, setDatePreset] = useState<DatePreset>("last_30d");
+  const [datePreset, setDatePreset] = useState<DatePreset>("maximum");
+  const [customDateFrom, setCustomDateFrom] = useState<string>("");
+  const [customDateTo, setCustomDateTo] = useState<string>("");
+  const [showCustomDate, setShowCustomDate] = useState(false);
   const [editBudget, setEditBudget] = useState<{
     snapshotId: number; campaignName: string; budgetType: "daily" | "lifetime"; currentAmount: string;
   } | null>(null);
@@ -92,7 +95,10 @@ export default function MetaCampaigns() {
   const campaignsQ = trpc.meta.getCampaigns.useQuery();
   const adAccountsQ = trpc.meta.getAdAccounts.useQuery();
   const insightsQ = trpc.meta.getInsights.useQuery(
-    { datePreset },
+    {
+      datePreset: datePreset === "custom" ? "maximum" : datePreset,
+      ...(datePreset === "custom" && customDateFrom && customDateTo ? { dateFrom: customDateFrom, dateTo: customDateTo } : {}),
+    },
     { enabled: !!activeAccountQ.data }
   );
 
@@ -301,7 +307,7 @@ export default function MetaCampaigns() {
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `meta-campaigns-${datePreset}.csv`; a.click();
+    a.href = url; a.download = `meta-campaigns-${datePreset === "custom" ? `${customDateFrom}_${customDateTo}` : datePreset}.csv`; a.click();
     URL.revokeObjectURL(url);
     toast.success(isRTL ? "تم تصدير البيانات" : "Data exported successfully");
   };
@@ -323,14 +329,18 @@ export default function MetaCampaigns() {
   };
 
   // ─── Date Preset Options ───────────────────────────────────────────────
-  const datePresetOptions: { value: DatePreset; labelAr: string; labelEn: string }[] = [
+  const datePresetOptions: { value: DatePreset; labelAr: string; labelEn: string; icon?: string }[] = [
     { value: "today", labelAr: "اليوم", labelEn: "Today" },
     { value: "yesterday", labelAr: "أمس", labelEn: "Yesterday" },
     { value: "last_7d", labelAr: "آخر 7 أيام", labelEn: "Last 7 Days" },
     { value: "last_14d", labelAr: "آخر 14 يوم", labelEn: "Last 14 Days" },
     { value: "last_30d", labelAr: "آخر 30 يوم", labelEn: "Last 30 Days" },
+    { value: "last_90d", labelAr: "آخر 90 يوم", labelEn: "Last 90 Days" },
     { value: "this_month", labelAr: "هذا الشهر", labelEn: "This Month" },
     { value: "last_month", labelAr: "الشهر الماضي", labelEn: "Last Month" },
+    { value: "last_year", labelAr: "آخر سنة", labelEn: "Last Year" },
+    { value: "maximum", labelAr: "كل الفترة", labelEn: "Lifetime" },
+    { value: "custom", labelAr: "فترة مخصصة", labelEn: "Custom Range" },
   ];
 
   // ─── Sortable Header ──────────────────────────────────────────────────
@@ -398,20 +408,93 @@ export default function MetaCampaigns() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Date Preset */}
-              <Select value={datePreset} onValueChange={(v) => { setDatePreset(v as DatePreset); setCurrentPage(1); }}>
-                <SelectTrigger className="w-[160px] bg-white/10 border-white/20 text-white hover:bg-white/20 transition-colors">
-                  <Clock size={14} className="mr-1.5" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {datePresetOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {isRTL ? opt.labelAr : opt.labelEn}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Professional Date Filter */}
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20 transition-colors min-w-[180px] justify-start">
+                      <Clock size={14} className="mr-2 shrink-0" />
+                      <span className="truncate">
+                        {datePreset === "custom" && customDateFrom && customDateTo
+                          ? `${customDateFrom} → ${customDateTo}`
+                          : (isRTL
+                            ? datePresetOptions.find(o => o.value === datePreset)?.labelAr
+                            : datePresetOptions.find(o => o.value === datePreset)?.labelEn)
+                        }
+                      </span>
+                      <ChevronDown size={14} className="ml-auto shrink-0 opacity-70" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[220px]">
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">
+                      {isRTL ? "فترات سريعة" : "Quick Presets"}
+                    </DropdownMenuLabel>
+                    {datePresetOptions.filter(o => o.value !== "custom").map((opt) => (
+                      <DropdownMenuItem
+                        key={opt.value}
+                        className={`cursor-pointer ${datePreset === opt.value ? "bg-primary/10 text-primary font-medium" : ""}`}
+                        onClick={() => { setDatePreset(opt.value); setShowCustomDate(false); setCurrentPage(1); }}
+                      >
+                        {datePreset === opt.value && <span className="mr-2 h-1.5 w-1.5 rounded-full bg-primary inline-block" />}
+                        {isRTL ? opt.labelAr : opt.labelEn}
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className={`cursor-pointer ${datePreset === "custom" ? "bg-primary/10 text-primary font-medium" : ""}`}
+                      onClick={() => { setDatePreset("custom" as DatePreset); setShowCustomDate(true); }}
+                    >
+                      <Filter size={14} className="mr-2" />
+                      {isRTL ? "فترة مخصصة..." : "Custom Range..."}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Custom Date Range Inputs */}
+                {showCustomDate && (
+                  <div className="flex items-center gap-1.5 bg-white/10 rounded-lg px-2 py-1 border border-white/20">
+                    <input
+                      type="date"
+                      value={customDateFrom}
+                      onChange={(e) => setCustomDateFrom(e.target.value)}
+                      className="bg-transparent text-white text-xs border-0 outline-none w-[110px] [color-scheme:dark]"
+                      placeholder="From"
+                    />
+                    <span className="text-white/50 text-xs">→</span>
+                    <input
+                      type="date"
+                      value={customDateTo}
+                      onChange={(e) => setCustomDateTo(e.target.value)}
+                      className="bg-transparent text-white text-xs border-0 outline-none w-[110px] [color-scheme:dark]"
+                      placeholder="To"
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-white hover:bg-white/20 text-xs"
+                      onClick={() => {
+                        if (customDateFrom && customDateTo) {
+                          utils.meta.getInsights.invalidate();
+                          setCurrentPage(1);
+                          toast.success(isRTL ? "تم تطبيق الفترة المخصصة" : "Custom range applied");
+                        } else {
+                          toast.error(isRTL ? "يرجى اختيار تاريخ البداية والنهاية" : "Please select start and end dates");
+                        }
+                      }}
+                    >
+                      {isRTL ? "تطبيق" : "Apply"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 text-white/60 hover:bg-white/20 hover:text-white"
+                      onClick={() => { setShowCustomDate(false); setDatePreset("maximum"); setCustomDateFrom(""); setCustomDateTo(""); }}
+                    >
+                      <X size={12} />
+                    </Button>
+                  </div>
+                )}
+              </div>
               {/* Account Selector */}
               {adAccounts.length > 1 && (
                 <Select

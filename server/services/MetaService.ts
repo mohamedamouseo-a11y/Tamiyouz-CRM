@@ -141,10 +141,17 @@ export async function updateMetaCampaignBudget(campaignId: string, accessToken: 
 
 // ─── Fetch Campaign Insights (Metrics) from Meta API ───────────────────────
 
-export async function fetchCampaignInsights(campaignId: string, accessToken: string, datePreset: string = "last_30d") {
+export async function fetchCampaignInsights(campaignId: string, accessToken: string, datePreset: string = "last_30d", dateFrom?: string, dateTo?: string) {
   try {
+    let dateParam = '';
+    if (dateFrom && dateTo) {
+      // Custom date range: use time_range instead of date_preset
+      dateParam = `time_range={"since":"${dateFrom}","until":"${dateTo}"}`;
+    } else {
+      dateParam = `date_preset=${datePreset}`;
+    }
     const data = await metaFetch(
-      `/${campaignId}/insights?fields=spend,impressions,clicks,ctr,cpc,cpm,actions,cost_per_action_type,purchase_roas&date_preset=${datePreset}`,
+      `/${campaignId}/insights?fields=spend,impressions,clicks,ctr,cpc,cpm,actions,cost_per_action_type,purchase_roas&${dateParam}`,
       accessToken
     );
     return data.data?.[0] || null;
@@ -156,7 +163,7 @@ export async function fetchCampaignInsights(campaignId: string, accessToken: str
 
 // ─── Fetch Insights for All Active Campaigns ───────────────────────────────
 
-export async function fetchAllCampaignInsights(accountDbId: number, datePreset: string = "last_30d") {
+export async function fetchAllCampaignInsights(accountDbId: number, datePreset: string = "last_30d", dateFrom?: string, dateTo?: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -172,7 +179,7 @@ export async function fetchAllCampaignInsights(accountDbId: number, datePreset: 
 
   // Fetch insights for each campaign (batch)
   for (const c of campaigns) {
-    const insights = await fetchCampaignInsights(c.campaignId, account[0].accessToken, datePreset);
+    const insights = await fetchCampaignInsights(c.campaignId, account[0].accessToken, datePreset, dateFrom, dateTo);
     if (insights) {
       // Extract leads count from actions
       // Find leads from all possible lead action types
