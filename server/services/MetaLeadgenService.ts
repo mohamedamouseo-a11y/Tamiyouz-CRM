@@ -104,6 +104,49 @@ function mapMetaFields(
   };
 }
 
+
+/**
+ * Auto-create custom field definitions for any new Meta form fields
+ * that don't already exist in the custom_fields table.
+ */
+async function ensureCustomFieldsExist(customFieldsData: Record<string, any>) {
+  if (!customFieldsData || Object.keys(customFieldsData).length === 0) return;
+  try {
+    const db = await getDb();
+    const existing = await db
+      .select({ fieldName: customFields.fieldName })
+      .from(customFields)
+      .where(eq(customFields.entity, "Lead"));
+    const existingNames = new Set(existing.map(f => f.fieldName));
+    const skipFields = new Set(["inbox_url", "email", "city"]);
+    let order = existing.length;
+    for (const [key, _value] of Object.entries(customFieldsData)) {
+      if (skipFields.has(key)) continue;
+      if (existingNames.has(key)) continue;
+      const label = key.replace(/_/g, " ").replace(/\s+/g, " ").trim();
+      try {
+        await db.insert(customFields).values({
+          entity: "Lead",
+          fieldName: key,
+          fieldLabel: label,
+          fieldLabelAr: label,
+          fieldType: "text",
+          isRequired: 0,
+          order: order++,
+        });
+        console.log(`[MetaLeadgen] Auto-created custom field: ${key}`);
+        existingNames.add(key);
+      } catch (err: any) {
+        if (!err?.message?.includes("Duplicate")) {
+          console.error(`[MetaLeadgen] Failed to create custom field ${key}:`, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[MetaLeadgen] Failed to ensure custom fields:", err);
+  }
+}
+
 async function getActiveSalesAgents() {
   const db = await getDb();
   return db

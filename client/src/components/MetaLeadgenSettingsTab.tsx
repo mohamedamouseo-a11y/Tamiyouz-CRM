@@ -61,7 +61,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const CRM_FIELDS = [
+const BASE_CRM_FIELDS = [
   { value: "name", labelEn: "Name", labelAr: "الاسم" },
   { value: "phone", labelEn: "Phone", labelAr: "الهاتف" },
   { value: "businessProfile", labelEn: "Business Profile", labelAr: "الملف التجاري" },
@@ -148,6 +148,26 @@ export default function MetaLeadgenSettingsTab() {
 
   const configsQuery = trpc.meta.leadgen.getConfigs.useQuery();
   const statsQuery = trpc.meta.leadgen.getStats.useQuery();
+  const { data: dbCustomFields } = trpc.customFields.list.useQuery({ entity: "Lead" });
+
+  const dynamicCrmFields = useMemo(() => {
+    const fields = [...BASE_CRM_FIELDS];
+    const existingValues = new Set(fields.map(f => f.value));
+    if (dbCustomFields) {
+      for (const cf of dbCustomFields as any[]) {
+        const val = `_customField.${cf.fieldName}`;
+        if (!existingValues.has(val)) {
+          fields.push({
+            value: val,
+            labelEn: `Custom: ${cf.fieldLabel || cf.fieldName}`,
+            labelAr: `حقل مخصص: ${cf.fieldLabelAr || cf.fieldLabel || cf.fieldName}`,
+          });
+          existingValues.add(val);
+        }
+      }
+    }
+    return fields;
+  }, [dbCustomFields]);
 
   const usersQuery = trpc.users.list.useQuery();
   const configs = configsQuery.data ?? [];
@@ -655,7 +675,7 @@ export default function MetaLeadgenSettingsTab() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">{isRTL ? "بدون ربط" : "No Mapping"}</SelectItem>
-                          {CRM_FIELDS.map((field) => (
+                          {dynamicCrmFields.map((field) => (
                             <SelectItem key={field.value} value={field.value}>
                               {isRTL ? field.labelAr : field.labelEn}
                             </SelectItem>
