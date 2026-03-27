@@ -316,7 +316,7 @@ export async function calculateRoas(
   const campaignMap: Record<string, { id: string; name: string; ads: any[] }> = {};
 
   try {
-    let url = `/act_${account.adAccountId}/insights?fields=ad_id,ad_name,campaign_id,campaign_name,spend,impressions,clicks,actions,cost_per_action_type&level=ad&${dateParam}&limit=500`;
+    let url = `/${account.adAccountId}/insights?fields=ad_id,ad_name,campaign_id,campaign_name,spend,impressions,clicks,actions,cost_per_action_type&level=ad&${dateParam}&limit=500`;
     let hasMore = true;
 
     while (hasMore) {
