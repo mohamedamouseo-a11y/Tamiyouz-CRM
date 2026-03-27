@@ -10,7 +10,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useThemeTokens } from "@/contexts/ThemeTokenContext";
 import {
   ArrowLeft, ArrowRight, BarChart3, Bell, Brain, CalendarClock,
-  ChevronDown, ChevronUp, ClipboardList, DatabaseZap, FileUser, Funnel,
+  ChevronDown, ChevronUp, ClipboardList, DatabaseZap, FileUser, Filter,
   Gauge, Globe, Handshake, HardDriveDownload, HelpCircle, KeyRound,
   Languages, LayoutDashboard, LifeBuoy, Link2, LocateFixed, Megaphone,
   MessagesSquare, MoonStar, Music2, PlugZap, Presentation, RefreshCw,
@@ -28,7 +28,7 @@ const ICON: Record<string, React.ReactNode> = {
   HardDriveDownload: <HardDriveDownload className="h-5 w-5" />,
   Users: <Users className="h-5 w-5" />,
   Handshake: <Handshake className="h-5 w-5" />,
-  Funnel: <Funnel className="h-5 w-5" />,
+  Funnel: <Filter className="h-5 w-5" />,
   CalendarClock: <CalendarClock className="h-5 w-5" />,
   RefreshCw: <RefreshCw className="h-5 w-5" />,
   UserRound: <UserRound className="h-5 w-5" />,
