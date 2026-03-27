@@ -22,7 +22,6 @@ import MetaSettingsTab from "@/components/MetaSettingsTab";
 import TikTokSettingsTab from "@/components/tiktok/TikTokSettingsTab";
 import MetaLeadgenSettingsTab from "@/components/MetaLeadgenSettingsTab";
 import CurrencySettingsTab from "@/components/CurrencySettingsTab";
-import DemoSyncTab from "@/components/DemoSyncTab";
 import RakanSettingsTab from "@/components/RakanSettingsTab";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -333,7 +332,6 @@ export default function AdminSettings() {
 
   const isAdmin = ["Admin", "admin"].includes(user?.role ?? "");
   const isMediaBuyer = user?.role === "MediaBuyer";
-  const isSuperAdmin = user?.email === "admin@tamiyouz.com";
   const canAccessMeta = isAdmin || isMediaBuyer;
 
   const handleSaveTheme = () => {
