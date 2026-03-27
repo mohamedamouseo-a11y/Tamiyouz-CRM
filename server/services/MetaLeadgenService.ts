@@ -110,7 +110,7 @@ function mapMetaFields(
  * that don't already exist in the custom_fields table.
  */
 async function ensureCustomFieldsExist(customFieldsData: Record<string, any>) {
-  if (!customFieldsData || Object.keys(customFieldsData).length === 0) return;
+  if (!customFieldsData || typeof customFieldsData !== "object" || Object.keys(customFieldsData).length === 0) return;
   try {
     const db = await getDb();
     const existing = await db
@@ -395,7 +395,8 @@ export class MetaLeadgenService {
 
         try {
           const graphLead = await this.fetchLeadData(leadgenId, config.pageAccessToken);
-          const mappedLead = mapMetaFields(graphLead.field_data ?? [], (config.fieldMapping as Record<string, string>) ?? {});
+          const fieldMapping = (typeof config.fieldMapping === 'string' ? (() => { try { return JSON.parse(config.fieldMapping); } catch { return {}; } })() : config.fieldMapping) ?? {};
+              const mappedLead = mapMetaFields((graphLead.field_data || []), fieldMapping);
           await ensureCustomFieldsExist(mappedLead.customFieldsData);
           const normalizedPhone = normalizeSaudiPhone(mappedLead.phone);
 
@@ -411,7 +412,7 @@ export class MetaLeadgenService {
           if (existing.length) {
             // Update existing lead's form data
             try {
-              const mappedLeadForUpdate = mapMetaFields(graphLead.field_data ?? [], (config.fieldMapping as Record<string, string>) ?? {});
+              const mappedLeadForUpdate = mapMetaFields((graphLead.field_data || []), (config.fieldMapping as Record<string, string>) ?? {});
               await db.update(leads).set({
                 customFieldsData: mappedLeadForUpdate.customFieldsData,
               }).where(eq(leads.id, existing[0].id));
@@ -542,7 +543,9 @@ export class MetaLeadgenService {
                 continue;
               }
 
-              const mappedLead = mapMetaFields(graphLead.field_data ?? [], (config.fieldMapping as Record<string, string>) ?? {});
+              try {
+              const fieldMapping = (typeof config.fieldMapping === 'string' ? (() => { try { return JSON.parse(config.fieldMapping); } catch { return {}; } })() : config.fieldMapping) ?? {};
+              const mappedLead = mapMetaFields((graphLead.field_data || []), fieldMapping);
               await ensureCustomFieldsExist(mappedLead.customFieldsData);
               const normalizedPhone = normalizeSaudiPhone(mappedLead.phone);
 
@@ -554,12 +557,30 @@ export class MetaLeadgenService {
 
               // Check for duplicate by phone
               const [existingByPhone] = await db
-                .select({ id: leads.id })
+                .select({ id: leads.id, campaignName: leads.campaignName })
                 .from(leads)
                 .where(eq(leads.phone, normalizedPhone))
                 .limit(1);
 
               if (existingByPhone) {
+                // Update existing lead with new form data from this campaign
+                try {
+                  await db.update(leads).set({
+                    customFieldsData: mappedLead.customFieldsData,
+                    sourceMetadata: {
+                      page_id: config.pageId,
+                      form_id: graphLead.form_id || form.id || null,
+                      ad_id: graphLead.ad_id || null,
+                      campaign_id: graphLead.campaign_id || null,
+                      campaign_name: graphLead.campaign_name || null,
+                      provider: "meta_leadgen",
+                      synced_via: "polling_update",
+                    },
+                  }).where(eq(leads.id, existingByPhone.id));
+                  console.log(`[MetaLeadgen:Poll] Updated existing lead ${existingByPhone.id} with new form data from ${graphLead.campaign_name || "unknown"}`);
+                } catch (updateErr: any) {
+                  console.error(`[MetaLeadgen:Poll] Failed to update existing lead ${existingByPhone.id}:`, updateErr.message);
+                }
                 skipped += 1;
                 continue;
               }
@@ -576,7 +597,6 @@ export class MetaLeadgenService {
                 }
               }
 
-              try {
                 await db.insert(leads).values({
                   name: mappedLead.name || null,
                   phone: normalizedPhone,
@@ -612,9 +632,8 @@ export class MetaLeadgenService {
 
                 imported += 1;
                 console.log(`[MetaLeadgen:Poll] Imported lead ${leadgenId} (${mappedLead.name}) from form ${form.name}`);
-              }
               } catch (leadErr: any) {
-                console.error(`[MetaLeadgen:Poll] Failed to process lead ${leadgenId}:`, leadErr.message);
+                console.error(`[MetaLeadgen:Poll] Failed to process lead ${leadgenId}:`, leadErr.message, leadErr.stack);
                 errors += 1;
               }
             }
