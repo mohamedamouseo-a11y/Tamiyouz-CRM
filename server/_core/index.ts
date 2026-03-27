@@ -273,6 +273,8 @@ startServer().then(() => {
   MetaLeadgenService.autoSubscribeAllPages().catch((err) => {
     console.error("[MetaLeadgen] Failed to auto-subscribe pages:", err);
   });
+  // Start Meta leadgen polling scheduler (fallback for webhook)
+  startMetaLeadgenPolling();
   // Start notification engine
   startNotificationEngine();
   // Start exchange rate auto-sync scheduler
