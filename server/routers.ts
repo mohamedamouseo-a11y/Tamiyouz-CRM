@@ -207,6 +207,7 @@ import {
   fetchAllCampaignInsights as fetchAllMetaCampaignInsights,
 } from "./services/MetaService";
 import { MetaLeadgenService } from "./services/MetaLeadgenService";
+import { compareMetaVsCrmLeads, calculateRoas } from "./services/MetaAuditService";
 import { getMetaCombinedAnalytics } from "./services/metaCombinedAnalyticsService";
 import { getTikTokCampaignAnalytics } from "./services/tiktok/tiktokCampaignsService";
 import { getTikTokIntegration, upsertTikTokIntegration, deleteTikTokIntegration, getTikTokAdAccounts, addTikTokAdAccount, selectTikTokAdAccount, updateTikTokAdAccountToken, deleteTikTokAdAccount, syncTikTokCampaigns, getActiveTikTokAdAccount } from "./services/tiktok/tiktokSettingsService";
@@ -3509,6 +3510,23 @@ byLeadStageChanges: protectedProcedure
         }))
         .query(async ({ input }) => {
           return MetaLeadgenService.fetchLeadgenForms(input.pageId, input.accessToken);
+        }),
+      compareLeads: mediaBuyerOrAdminProcedure
+        .input(z.object({
+          dateFrom: z.string().optional(),
+          dateTo: z.string().optional(),
+        }))
+        .query(async ({ input }) => {
+          return compareMetaVsCrmLeads(input.dateFrom, input.dateTo);
+        }),
+      calculateRoas: mediaBuyerOrAdminProcedure
+        .input(z.object({
+          dateFrom: z.string().optional(),
+          dateTo: z.string().optional(),
+          datePreset: z.string().optional().default("last_30d"),
+        }))
+        .query(async ({ input }) => {
+          return calculateRoas(input.dateFrom, input.dateTo, input.datePreset);
         }),
     }),
   }),
