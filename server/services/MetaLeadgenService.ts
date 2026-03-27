@@ -13,6 +13,7 @@ import {
   users,
 } from "../../drizzle/schema";
 import { normalizeSaudiPhone } from "../googleSheets";
+import { notifyNewLead } from "../notificationEngine";
 
 const GRAPH_API_BASE = "https://graph.facebook.com/v21.0";
 
@@ -436,7 +437,7 @@ export class MetaLeadgenService {
             }
           }
 
-          await db.insert(leads).values({
+          const webhookInsertResult = await db.insert(leads).values({
             name: mappedLead.name || null,
             phone: normalizedPhone || null,
             country: "Saudi Arabia",
@@ -460,6 +461,16 @@ export class MetaLeadgenService {
             customFieldsData: mappedLead.customFieldsData,
             leadTime: leadTimeValue,
           });
+          const webhookCreatedId = Number((webhookInsertResult as any)[0]?.insertId ?? 0);
+          if (webhookCreatedId > 0) {
+            notifyNewLead({
+              id: webhookCreatedId,
+              name: mappedLead.name || null,
+              phone: normalizedPhone || "",
+              campaignName: graphLead.campaign_name || null,
+              ownerId: ownerId ?? null,
+            }).catch((err) => console.error("[MetaLeadgen:Webhook] notifyNewLead error:", err));
+          }
 
           await db
             .update(metaLeadgenConfig)
@@ -597,7 +608,7 @@ export class MetaLeadgenService {
                 }
               }
 
-                await db.insert(leads).values({
+                const pollInsertResult = await db.insert(leads).values({
                   name: mappedLead.name || null,
                   phone: normalizedPhone,
                   country: "Saudi Arabia",
@@ -621,6 +632,16 @@ export class MetaLeadgenService {
                   customFieldsData: mappedLead.customFieldsData,
                   leadTime: leadTimeValue,
                 });
+                const pollCreatedId = Number((pollInsertResult as any)[0]?.insertId ?? 0);
+                if (pollCreatedId > 0) {
+                  notifyNewLead({
+                    id: pollCreatedId,
+                    name: mappedLead.name || null,
+                    phone: normalizedPhone || "",
+                    campaignName: graphLead.campaign_name || null,
+                    ownerId: ownerId ?? null,
+                  }).catch((err) => console.error("[MetaLeadgen:Poll] notifyNewLead error:", err));
+                }
 
                 await db
                   .update(metaLeadgenConfig)
