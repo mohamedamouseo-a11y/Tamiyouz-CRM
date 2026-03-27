@@ -22,8 +22,8 @@ import MetaSettingsTab from "@/components/MetaSettingsTab";
 import TikTokSettingsTab from "@/components/tiktok/TikTokSettingsTab";
 import MetaLeadgenSettingsTab from "@/components/MetaLeadgenSettingsTab";
 import CurrencySettingsTab from "@/components/CurrencySettingsTab";
-import DemoSyncTab from "@/components/DemoSyncTab";
 import RakanSettingsTab from "@/components/RakanSettingsTab";
+import DemoSyncTab from "@/components/DemoSyncTab";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -416,6 +416,10 @@ export default function AdminSettings() {
             {isAdmin && <TabsTrigger value="currency" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               <DollarSign size={13} />
               <span>{isRTL ? "العملات" : "Currency"}</span>
+            </TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="demoSync" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
+              <RefreshCw size={13} />
+              <span>{isRTL ? "مزامنة الديمو" : "Demo Sync"}</span>
             </TabsTrigger>}
           </TabsList>
 
@@ -857,6 +861,10 @@ export default function AdminSettings() {
           {/* ── Currency / Exchange Rates Tab ── */}
           {isAdmin && <TabsContent value="currency" className="mt-4">
             <CurrencySettingsTab />
+          </TabsContent>}
+          {/* ── Demo Sync Tab (Super Admin only) ── */}
+          {isSuperAdmin && <TabsContent value="demoSync" className="mt-4">
+            <DemoSyncTab />
           </TabsContent>}
         </Tabs>
       </div>

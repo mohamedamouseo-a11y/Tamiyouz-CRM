@@ -235,6 +235,251 @@ async function startServer() {
     }
   });
 
+  // ── Demo Sync SSE endpoint (Super Admin only) ──────────────────────────
+  app.post("/api/demo-sync", async (req, res) => {
+    try {
+      // Auth check
+      const user = await authenticateRequest(req as any).catch(() => null);
+      if (!user) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      // Super admin check (admin@tamiyouz.com only)
+      if (user.email !== "admin@tamiyouz.com") {
+        res.status(403).json({ error: "Super Admin access required" });
+        return;
+      }
+
+      // Set SSE headers
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      });
+
+      const sendEvent = (data: Record<string, any>) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
+
+      const { execSync } = await import("child_process");
+
+      const MAIN_DIR = "/var/www/tamiyouz_crm";
+      const DEMO_DIR = "/var/www/tamiyouz_crm_demo";
+      const DEMO_DB = "tamiyouz_crm_demo";
+      const MAIN_DB = "tamiyouz_crm";
+      const DB_USER = "tamiyouz";
+      const DB_PASS = "TamiyouzDB@2025";
+
+      const steps = [
+        { percent: 5, step: "Backing up demo .env & ecosystem config", stepAr: "نسخ احتياطي لملفات الإعدادات" },
+        { percent: 15, step: "Syncing client code", stepAr: "مزامنة كود الواجهة" },
+        { percent: 25, step: "Syncing server code", stepAr: "مزامنة كود الخادم" },
+        { percent: 35, step: "Syncing shared code", stepAr: "مزامنة الكود المشترك" },
+        { percent: 40, step: "Syncing drizzle schema", stepAr: "مزامنة مخطط قاعدة البيانات" },
+        { percent: 45, step: "Syncing config files", stepAr: "مزامنة ملفات الإعدادات" },
+        { percent: 50, step: "Restoring demo config", stepAr: "استعادة إعدادات الديمو" },
+        { percent: 55, step: "Installing packages", stepAr: "تثبيت الحزم" },
+        { percent: 70, step: "Syncing database schema (new tables only)", stepAr: "مزامنة مخطط قاعدة البيانات (جداول جديدة فقط)" },
+        { percent: 85, step: "Building project", stepAr: "بناء المشروع" },
+        { percent: 95, step: "Restarting demo server", stepAr: "إعادة تشغيل خادم الديمو" },
+      ];
+
+      const runCmd = (cmd: string, label: string, labelAr: string) => {
+        try {
+          const output = execSync(cmd, { cwd: DEMO_DIR, timeout: 300000, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+          if (output && output.trim()) {
+            sendEvent({ type: "log", message: `[${label}] ${output.trim().slice(0, 500)}`, messageAr: `[${labelAr}] ${output.trim().slice(0, 500)}`, level: "info" });
+          }
+          return true;
+        } catch (err: any) {
+          const stderr = err.stderr?.toString().trim().slice(0, 500) || err.message;
+          sendEvent({ type: "log", message: `[${label}] Warning: ${stderr}`, messageAr: `[${labelAr}] تحذير: ${stderr}`, level: "warning" });
+          return false;
+        }
+      };
+
+      // Step 1: Backup demo config
+      sendEvent({ type: "progress", ...steps[0] });
+      runCmd(`cp -f ${DEMO_DIR}/ecosystem.config.cjs /tmp/demo_ecosystem.config.cjs.bak 2>/dev/null || true`, "Backup", "نسخ احتياطي");
+      runCmd(`cp -f ${DEMO_DIR}/drizzle.config.ts /tmp/demo_drizzle.config.ts.bak 2>/dev/null || true`, "Backup", "نسخ احتياطي");
+      sendEvent({ type: "log", message: "Demo config backed up", messageAr: "تم النسخ الاحتياطي لإعدادات الديمو", level: "success" });
+
+      // Step 2: Sync client
+      sendEvent({ type: "progress", ...steps[1] });
+      runCmd(`rsync -a --delete --exclude='node_modules' --exclude='.env' ${MAIN_DIR}/client/ ${DEMO_DIR}/client/`, "Client Sync", "مزامنة الواجهة");
+      sendEvent({ type: "log", message: "Client code synced", messageAr: "تم مزامنة كود الواجهة", level: "success" });
+
+      // Step 3: Sync server
+      sendEvent({ type: "progress", ...steps[2] });
+      runCmd(`rsync -a --delete --exclude='node_modules' --exclude='.env' --exclude='google-calendar-key.json' ${MAIN_DIR}/server/ ${DEMO_DIR}/server/`, "Server Sync", "مزامنة الخادم");
+      sendEvent({ type: "log", message: "Server code synced", messageAr: "تم مزامنة كود الخادم", level: "success" });
+
+      // Step 4: Sync shared
+      sendEvent({ type: "progress", ...steps[3] });
+      runCmd(`rsync -a --delete ${MAIN_DIR}/shared/ ${DEMO_DIR}/shared/`, "Shared Sync", "مزامنة المشترك");
+      sendEvent({ type: "log", message: "Shared code synced", messageAr: "تم مزامنة الكود المشترك", level: "success" });
+
+      // Step 5: Sync drizzle
+      sendEvent({ type: "progress", ...steps[4] });
+      runCmd(`rsync -a --delete ${MAIN_DIR}/drizzle/ ${DEMO_DIR}/drizzle/`, "Drizzle Sync", "مزامنة Drizzle");
+      sendEvent({ type: "log", message: "Drizzle schema synced", messageAr: "تم مزامنة مخطط Drizzle", level: "success" });
+
+      // Step 6: Sync config files (package.json, tsconfig, vite.config, etc.)
+      sendEvent({ type: "progress", ...steps[5] });
+      runCmd(`cp -f ${MAIN_DIR}/package.json ${DEMO_DIR}/package.json`, "Config", "الإعدادات");
+      runCmd(`cp -f ${MAIN_DIR}/tsconfig.json ${DEMO_DIR}/tsconfig.json`, "Config", "الإعدادات");
+      runCmd(`cp -f ${MAIN_DIR}/vite.config.ts ${DEMO_DIR}/vite.config.ts`, "Config", "الإعدادات");
+      runCmd(`cp -f ${MAIN_DIR}/components.json ${DEMO_DIR}/components.json 2>/dev/null || true`, "Config", "الإعدادات");
+      runCmd(`cp -rf ${MAIN_DIR}/patches ${DEMO_DIR}/patches 2>/dev/null || true`, "Config", "الإعدادات");
+      sendEvent({ type: "log", message: "Config files synced", messageAr: "تم مزامنة ملفات الإعدادات", level: "success" });
+
+      // Step 7: Restore demo-specific config
+      sendEvent({ type: "progress", ...steps[6] });
+      runCmd(`cp -f /tmp/demo_ecosystem.config.cjs.bak ${DEMO_DIR}/ecosystem.config.cjs 2>/dev/null || true`, "Restore", "استعادة");
+      runCmd(`cp -f /tmp/demo_drizzle.config.ts.bak ${DEMO_DIR}/drizzle.config.ts 2>/dev/null || true`, "Restore", "استعادة");
+      sendEvent({ type: "log", message: "Demo config restored", messageAr: "تم استعادة إعدادات الديمو", level: "success" });
+
+      // Step 8: npm install
+      sendEvent({ type: "progress", ...steps[7] });
+      sendEvent({ type: "log", message: "Running npm install (this may take a while)...", messageAr: "جاري تثبيت الحزم (قد يستغرق بعض الوقت)...", level: "info" });
+      const npmOk = runCmd(`cd ${DEMO_DIR} && npm install --legacy-peer-deps 2>&1 | tail -5`, "npm install", "تثبيت الحزم");
+      if (npmOk) {
+        sendEvent({ type: "log", message: "Packages installed successfully", messageAr: "تم تثبيت الحزم بنجاح", level: "success" });
+      }
+
+      // Step 9: DB schema sync (new tables only, no data)
+      sendEvent({ type: "progress", ...steps[8] });
+      try {
+        // Get tables from both databases
+        const mainTables = execSync(
+          `mysql -u ${DB_USER} -p'${DB_PASS}' -N -e "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='${MAIN_DB}' ORDER BY TABLE_NAME" 2>/dev/null`,
+          { encoding: "utf-8" }
+        ).trim().split("\n").filter(Boolean);
+
+        const demoTables = execSync(
+          `mysql -u ${DB_USER} -p'${DB_PASS}' -N -e "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='${DEMO_DB}' ORDER BY TABLE_NAME" 2>/dev/null`,
+          { encoding: "utf-8" }
+        ).trim().split("\n").filter(Boolean);
+
+        const missingTables = mainTables.filter((t: string) => !demoTables.includes(t));
+
+        if (missingTables.length > 0) {
+          sendEvent({ type: "log", message: `Found ${missingTables.length} missing tables: ${missingTables.join(", ")}`, messageAr: `تم العثور على ${missingTables.length} جداول ناقصة: ${missingTables.join(", ")}`, level: "warning" });
+
+          for (const table of missingTables) {
+            try {
+              const createStmt = execSync(
+                `mysql -u ${DB_USER} -p'${DB_PASS}' ${MAIN_DB} -N -e "SHOW CREATE TABLE \\\`${table}\\\`" 2>/dev/null | cut -f2-`,
+                { encoding: "utf-8" }
+              ).trim();
+
+              if (createStmt) {
+                execSync(
+                  `mysql -u ${DB_USER} -p'${DB_PASS}' ${DEMO_DB} -e "${createStmt.replace(/"/g, '\\"')}" 2>/dev/null`,
+                  { encoding: "utf-8" }
+                );
+                sendEvent({ type: "log", message: `Created table: ${table}`, messageAr: `تم إنشاء جدول: ${table}`, level: "success" });
+              }
+            } catch (tableErr: any) {
+              sendEvent({ type: "log", message: `Failed to create table ${table}: ${tableErr.message?.slice(0, 200)}`, messageAr: `فشل إنشاء جدول ${table}`, level: "warning" });
+            }
+          }
+        } else {
+          sendEvent({ type: "log", message: "All tables already exist in demo DB", messageAr: "جميع الجداول موجودة بالفعل في قاعدة بيانات الديمو", level: "success" });
+        }
+
+        // Also sync missing columns for existing tables
+        sendEvent({ type: "log", message: "Checking for missing columns...", messageAr: "فحص الأعمدة الناقصة...", level: "info" });
+        let columnsAdded = 0;
+        for (const table of mainTables.filter((t: string) => demoTables.includes(t))) {
+          try {
+            const mainCols = execSync(
+              `mysql -u ${DB_USER} -p'${DB_PASS}' -N -e "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='${MAIN_DB}' AND TABLE_NAME='${table}' ORDER BY ORDINAL_POSITION" 2>/dev/null`,
+              { encoding: "utf-8" }
+            ).trim().split("\n").filter(Boolean);
+
+            const demoCols = execSync(
+              `mysql -u ${DB_USER} -p'${DB_PASS}' -N -e "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='${DEMO_DB}' AND TABLE_NAME='${table}' ORDER BY ORDINAL_POSITION" 2>/dev/null`,
+              { encoding: "utf-8" }
+            ).trim().split("\n").filter(Boolean);
+
+            const missingCols = mainCols.filter((c: string) => !demoCols.includes(c));
+            for (const col of missingCols) {
+              try {
+                const colDef = execSync(
+                  `mysql -u ${DB_USER} -p'${DB_PASS}' -N -e "SELECT CONCAT(COLUMN_TYPE, IF(IS_NULLABLE='NO',' NOT NULL',''), IF(COLUMN_DEFAULT IS NOT NULL, CONCAT(' DEFAULT ', IF(DATA_TYPE IN ('varchar','text','char','enum','set'), CONCAT('\\'', COLUMN_DEFAULT, '\\''), COLUMN_DEFAULT)), '')) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='${MAIN_DB}' AND TABLE_NAME='${table}' AND COLUMN_NAME='${col}'" 2>/dev/null`,
+                  { encoding: "utf-8" }
+                ).trim();
+
+                if (colDef) {
+                  execSync(
+                    `mysql -u ${DB_USER} -p'${DB_PASS}' ${DEMO_DB} -e "ALTER TABLE \\\`${table}\\\` ADD COLUMN \\\`${col}\\\` ${colDef}" 2>/dev/null`,
+                    { encoding: "utf-8" }
+                  );
+                  sendEvent({ type: "log", message: `Added column ${table}.${col}`, messageAr: `تم إضافة عمود ${table}.${col}`, level: "success" });
+                  columnsAdded++;
+                }
+              } catch {
+                // Column might already exist or have constraints
+              }
+            }
+          } catch {
+            // Skip tables with issues
+          }
+        }
+        if (columnsAdded === 0) {
+          sendEvent({ type: "log", message: "All columns are in sync", messageAr: "جميع الأعمدة متزامنة", level: "success" });
+        } else {
+          sendEvent({ type: "log", message: `Added ${columnsAdded} missing columns`, messageAr: `تم إضافة ${columnsAdded} أعمدة ناقصة`, level: "success" });
+        }
+      } catch (dbErr: any) {
+        sendEvent({ type: "log", message: `DB sync warning: ${dbErr.message?.slice(0, 300)}`, messageAr: `تحذير مزامنة قاعدة البيانات: ${dbErr.message?.slice(0, 300)}`, level: "warning" });
+      }
+
+      // Step 10: Build
+      sendEvent({ type: "progress", ...steps[9] });
+      sendEvent({ type: "log", message: "Building project (this may take a few minutes)...", messageAr: "جاري بناء المشروع (قد يستغرق بضع دقائق)...", level: "info" });
+      const buildOk = runCmd(`cd ${DEMO_DIR} && npm run build 2>&1 | tail -10`, "Build", "البناء");
+      if (buildOk) {
+        sendEvent({ type: "log", message: "Build completed successfully", messageAr: "تم البناء بنجاح", level: "success" });
+      }
+
+      // Step 11: Restart PM2
+      sendEvent({ type: "progress", ...steps[10] });
+      runCmd("pm2 restart tamiyouz-crm-demo", "PM2 Restart", "إعادة التشغيل");
+      sendEvent({ type: "log", message: "Demo server restarted", messageAr: "تم إعادة تشغيل خادم الديمو", level: "success" });
+
+      // Wait a moment for the server to start
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Verify demo is running
+      try {
+        const healthCheck = execSync("curl -s -o /dev/null -w '%{http_code}' http://localhost:3003/", { encoding: "utf-8" }).trim();
+        if (healthCheck === "200") {
+          sendEvent({ type: "log", message: "Demo server is healthy (HTTP 200)", messageAr: "خادم الديمو يعمل بشكل سليم (HTTP 200)", level: "success" });
+        } else {
+          sendEvent({ type: "log", message: `Demo server returned HTTP ${healthCheck}`, messageAr: `خادم الديمو أرجع HTTP ${healthCheck}`, level: "warning" });
+        }
+      } catch {
+        sendEvent({ type: "log", message: "Could not verify demo health", messageAr: "لم يتمكن من التحقق من صحة الديمو", level: "warning" });
+      }
+
+      // Done!
+      sendEvent({ type: "done" });
+      res.end();
+    } catch (err: any) {
+      if (!res.headersSent) {
+        res.status(500).json({ error: err.message ?? "Sync failed" });
+      } else {
+        try {
+          res.write(`data: ${JSON.stringify({ type: "error", message: err.message, messageAr: `خطأ: ${err.message}` })}\n\n`);
+        } catch {}
+        res.end();
+      }
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
