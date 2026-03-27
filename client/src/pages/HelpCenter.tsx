@@ -1850,21 +1850,7 @@ export default function HelpCenter() {
                         </AccordionTrigger>
                         <AccordionContent className="pb-4 ps-10">
                           <div
-                            className="prose prose-sm max-w-none text-muted-foreground
-                              prose-headings:text-foreground prose-headings:font-semibold
-                              prose-h2:text-base prose-h2:mt-4 prose-h2:mb-2
-                              prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-1
-                              prose-p:leading-relaxed prose-p:mb-2
-                              prose-ul:my-2 prose-ul:ps-4 prose-li:my-0.5
-                              prose-ol:my-2 prose-ol:ps-4
-                              prose-strong:text-foreground prose-strong:font-semibold
-                              [&_.tip]:bg-blue-50 [&_.tip]:border-s-4 [&_.tip]:border-blue-400 [&_.tip]:p-3 [&_.tip]:rounded-e-lg [&_.tip]:my-3 [&_.tip]:text-blue-800 [&_.tip]:text-xs
-                              [&_.warning]:bg-amber-50 [&_.warning]:border-s-4 [&_.warning]:border-amber-400 [&_.warning]:p-3 [&_.warning]:rounded-e-lg [&_.warning]:my-3 [&_.warning]:text-amber-800 [&_.warning]:text-xs
-                              [&_.note]:bg-slate-50 [&_.note]:border-s-4 [&_.note]:border-slate-300 [&_.note]:p-3 [&_.note]:rounded-e-lg [&_.note]:my-3 [&_.note]:text-slate-700 [&_.note]:text-xs
-                              [&_.steps]:counter-reset [&_.steps]:list-none [&_.steps]:ps-0
-                              [&_.steps_li]:relative [&_.steps_li]:ps-8 [&_.steps_li]:pb-3
-                              [&_.steps_li:before]:absolute [&_.steps_li:before]:start-0 [&_.steps_li:before]:top-0 [&_.steps_li:before]:w-6 [&_.steps_li:before]:h-6 [&_.steps_li:before]:rounded-full [&_.steps_li:before]:bg-primary/10 [&_.steps_li:before]:text-primary [&_.steps_li:before]:text-xs [&_.steps_li:before]:font-bold [&_.steps_li:before]:flex [&_.steps_li:before]:items-center [&_.steps_li:before]:justify-center [&_.steps_li:before]:counter-increment [&_.steps_li:before]:content-[counter(steps)]
-                            "
+                            className="article-content max-w-none"
                             dangerouslySetInnerHTML={{ __html: isEn ? art.answerEn : art.answerAr }}
                           />
                         </AccordionContent>
