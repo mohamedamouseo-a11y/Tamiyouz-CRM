@@ -1607,21 +1607,22 @@ const categories = buildCategories();
 const popularArticles = ARTICLES.filter((a) => a.popular);
 
 export default function HelpCenter() {
-  const { t, isRTL, language } = useLanguage();
+  const { t, isRTL, lang } = useLanguage();
   const { tokens } = useThemeTokens();
   const [, navigate] = useLocation();
-  const [, params] = useRoute("/help-center/:catId/:secId");
-  const [, catOnlyParams] = useRoute("/help-center/:catId");
+  const [, params] = useRoute("/help-center/:slug");
 
-  const isEn = language === "en";
+  const isEn = lang === "en";
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategoryId, setActiveCategoryId] = useState(categories[0]?.id || "");
   const [expandedArticle, setExpandedArticle] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const urlCatId = params?.catId || catOnlyParams?.catId || null;
-  const urlSecId = params?.secId || null;
+  // Parse slug: "catId--secId" or "catId"
+  const slug = params?.slug || null;
+  const urlCatId = slug ? slug.split("--")[0] : null;
+  const urlSecId = slug && slug.includes("--") ? slug.split("--")[1] : null;
 
   const activeCategory = useMemo(
     () => categories.find((c) => c.id === (urlCatId || activeCategoryId)) || categories[0],
@@ -1668,12 +1669,12 @@ export default function HelpCenter() {
   }, [navigate]);
 
   const handleSectionClick = useCallback((catId: string, secId: string) => {
-    navigate(`/help-center/${catId}/${secId}`);
+    navigate(`/help-center/${catId}--${secId}`);
   }, [navigate]);
 
   const handleSearchResultClick = useCallback((result: SearchResult) => {
     setSearchQuery("");
-    navigate(`/help-center/${result.categoryId}/${result.sectionId}`);
+    navigate(`/help-center/${result.categoryId}--${result.sectionId}`);
     setTimeout(() => setExpandedArticle(result.id), 100);
   }, [navigate]);
 
