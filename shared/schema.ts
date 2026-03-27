@@ -903,6 +903,7 @@ export const metaLeadgenConfig = mysqlTable("meta_leadgen_config", {
 	isEnabled: tinyint("is_enabled").default(1).notNull(),
 	assignmentRule: mysqlEnum("assignment_rule", ["round_robin", "fixed_owner", "by_campaign"]).default("round_robin").notNull(),
 	fixedOwnerId: int("fixed_owner_id"),
+	roundRobinIndex: int("round_robin_index").default(0).notNull(),
 	fieldMapping: json("field_mapping"),
 	totalLeadsReceived: int("total_leads_received").default(0).notNull(),
 	lastLeadReceivedAt: timestamp("last_lead_received_at", { mode: "string" }),
