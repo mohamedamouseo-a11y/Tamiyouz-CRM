@@ -21,7 +21,6 @@ import BackupTab from "@/components/BackupTab";
 import MetaSettingsTab from "@/components/MetaSettingsTab";
 import TikTokSettingsTab from "@/components/tiktok/TikTokSettingsTab";
 import MetaLeadgenSettingsTab from "@/components/MetaLeadgenSettingsTab";
-import MetaAuditTab from "@/components/MetaAuditTab";
 import CurrencySettingsTab from "@/components/CurrencySettingsTab";
 import RakanSettingsTab from "@/components/RakanSettingsTab";
 import { useState } from "react";
@@ -407,9 +406,6 @@ export default function AdminSettings() {
             </TabsTrigger>}
             {canAccessMeta && <TabsTrigger value="metaLeadgen" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               <Webhook size={13} />{isRTL ? "ويب هوك Meta" : "Meta Leadgen"}
-            </TabsTrigger>}
-            {canAccessMeta && <TabsTrigger value="metaAudit" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
-              <BarChart3 size={13} />{isRTL ? "تدقيق Meta" : "Meta Audit"}
             </TabsTrigger>}
             <TabsTrigger value="rakan" className="gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all data-[state=active]:shadow-md" style={{ "--tw-data-active-bg": "linear-gradient(135deg,#7c3aed,#4f46e5)" } as React.CSSProperties}>
               <Sparkles size={13} className="text-violet-500 data-[state=active]:text-white" />
@@ -850,9 +846,6 @@ export default function AdminSettings() {
             <MetaLeadgenSettingsTab />
           </TabsContent>}
 
-          {canAccessMeta && <TabsContent value="metaAudit" className="mt-4">
-            <MetaAuditTab />
-          </TabsContent>}
 
           {/* ── Rakan AI Tab (visible to all roles) ── */}
           <TabsContent value="rakan" className="mt-4">

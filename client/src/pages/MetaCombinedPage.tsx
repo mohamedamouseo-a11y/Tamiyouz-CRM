@@ -6,6 +6,7 @@ import MetaCombinedFilters from "@/components/MetaCombinedFilters";
 import MetaCombinedSummaryCards from "@/components/MetaCombinedSummaryCards";
 import MetaCombinedCharts from "@/components/MetaCombinedCharts";
 import MetaCombinedTable from "@/components/MetaCombinedTable";
+import MetaCombinedAudit from "@/components/MetaCombinedAudit";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw, BarChart3, Table2, LayoutGrid } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -174,6 +175,15 @@ export default function MetaCombinedPage() {
                 />
               </div>
             )}
+
+            {/* Leads Comparison & ROAS Audit */}
+            <div className="animate-in slide-in-from-bottom-4 duration-500">
+              <MetaCombinedAudit
+                dateFrom={filters.dateFrom}
+                dateTo={filters.dateTo}
+                datePreset={filters.datePreset}
+              />
+            </div>
           </>
         )}
       </div>
