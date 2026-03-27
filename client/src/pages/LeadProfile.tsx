@@ -917,8 +917,9 @@ export default function LeadProfile() {
               )}
 
             <Tabs defaultValue="info" className="space-y-4">
-              <TabsList className="grid grid-cols-4 w-full md:w-auto md:inline-grid">
+              <TabsList className="grid grid-cols-5 w-full md:w-auto md:inline-grid">
                 <TabsTrigger value="info">{t("infoTab" as any)}</TabsTrigger>
+                <TabsTrigger value="formData">{t("formDataTab" as any)}</TabsTrigger>
                 <TabsTrigger value="activities">{t("activitiesTab" as any)}</TabsTrigger>
                 <TabsTrigger value="notes">{t("notesTab" as any)}</TabsTrigger>
                 <TabsTrigger value="reminders">{t("remindersTab" as any)}</TabsTrigger>
@@ -1087,6 +1088,65 @@ export default function LeadProfile() {
                         )}
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="formData" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-semibold">{t("formDataTitle" as any)}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const customData = (lead as any).customFieldsData;
+                      const sourceData = (lead as any).sourceMetadata;
+                      if (!customData || Object.keys(customData).length === 0) {
+                        return (
+                          <div className="py-8 text-center text-muted-foreground text-sm">
+                            <FileText size={32} className="mx-auto mb-2 opacity-30" />
+                            <p>{t("noFormData" as any)}</p>
+                          </div>
+                        );
+                      }
+                      const cleanLabel = (key: string) => {
+                        return key
+                          .replace(/_/g, " ")
+                          .replace(/؟/g, "؟")
+                          .replace(/\s+/g, " ")
+                          .trim();
+                      };
+                      return (
+                        <div className="space-y-3">
+                          {Object.entries(customData)
+                            .filter(([key]) => key !== "inbox_url")
+                            .map(([key, value]) => (
+                            <div key={key} className="flex flex-col gap-1 border-b border-border/50 pb-2 last:border-0">
+                              <span className="text-xs font-medium text-muted-foreground">{cleanLabel(key)}</span>
+                              <span className="text-sm text-foreground">{String(value).replace(/_/g, " ") || "—"}</span>
+                            </div>
+                          ))}
+                          {customData.inbox_url && (
+                            <div className="flex flex-col gap-1 border-b border-border/50 pb-2">
+                              <span className="text-xs font-medium text-muted-foreground">Inbox URL</span>
+                              <a href={customData.inbox_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                                <Link2 size={12} /> {t("openInbox" as any)}
+                              </a>
+                            </div>
+                          )}
+                          {sourceData && (
+                            <div className="mt-4 pt-3 border-t">
+                              <span className="text-xs font-semibold text-muted-foreground mb-2 block">{t("sourceInfo" as any)}</span>
+                              {sourceData.provider && <InfoRow label={t("provider" as any)} value={sourceData.provider} />}
+                              {sourceData.synced_via && <InfoRow label={t("syncMethod" as any)} value={sourceData.synced_via} />}
+                              {sourceData.campaign_id && <InfoRow label="Campaign ID" value={sourceData.campaign_id} mono />}
+                              {sourceData.form_id && <InfoRow label="Form ID" value={sourceData.form_id} mono />}
+                              {sourceData.ad_id && <InfoRow label="Ad ID" value={sourceData.ad_id} mono />}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               </TabsContent>

@@ -6,6 +6,7 @@ import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   campaigns,
+  customFields,
   leads,
   metaIntegrations,
   metaLeadgenConfig,
@@ -352,6 +353,7 @@ export class MetaLeadgenService {
         try {
           const graphLead = await this.fetchLeadData(leadgenId, config.pageAccessToken);
           const mappedLead = mapMetaFields(graphLead.field_data ?? [], (config.fieldMapping as Record<string, string>) ?? {});
+          await ensureCustomFieldsExist(mappedLead.customFieldsData);
           const normalizedPhone = normalizeSaudiPhone(mappedLead.phone);
 
           const duplicateFilters = [eq(leads.externalId, leadgenId)];
@@ -488,6 +490,7 @@ export class MetaLeadgenService {
               }
 
               const mappedLead = mapMetaFields(graphLead.field_data ?? [], (config.fieldMapping as Record<string, string>) ?? {});
+              await ensureCustomFieldsExist(mappedLead.customFieldsData);
               const normalizedPhone = normalizeSaudiPhone(mappedLead.phone);
 
               // Skip leads without a valid phone number
