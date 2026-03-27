@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 import NotificationCenter from "@/components/NotificationCenter";
+import SLAAlertBell from "@/components/SLAAlertBell";
 import RakanWidget from "@/components/RakanWidget";
 
 interface NavItem {
@@ -456,14 +457,7 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
 
             {/* SLA Alert Bell */}
             {slaLeads && slaLeads.total > 0 && (
-              <Link href="/leads?slaBreached=true">
-                <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl bg-muted/50 hover:bg-destructive/10 hover:text-destructive transition-all duration-200">
-                  <Bell size={17} strokeWidth={1.8} />
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse px-1">
-                    {slaLeads.total > 9 ? "9+" : slaLeads.total}
-                  </span>
-                </Button>
-              </Link>
+              <SLAAlertBell isRTL={isRTL} total={slaLeads.total} />
             )}
           </div>
         </header>
