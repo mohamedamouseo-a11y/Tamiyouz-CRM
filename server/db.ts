@@ -270,6 +270,9 @@ export async function getLeads(filters: LeadFilters = {}) {
       contactTime: leads.contactTime,
       createdAt: leads.createdAt,
       updatedAt: leads.updatedAt,
+      customFieldsData: leads.customFieldsData,
+      sourceMetadata: leads.sourceMetadata,
+      externalId: leads.externalId,
       ownerName: users.name,
     })
     .from(leads)
@@ -313,6 +316,9 @@ export async function getLeadById(id: number): Promise<any | undefined> {
       createdAt: leads.createdAt,
       updatedAt: leads.updatedAt,
       deletedAt: leads.deletedAt,
+      customFieldsData: leads.customFieldsData,
+      sourceMetadata: leads.sourceMetadata,
+      externalId: leads.externalId,
       ownerName: users.name,
     })
     .from(leads)
