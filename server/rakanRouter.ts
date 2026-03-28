@@ -24,6 +24,7 @@ export const rakanRouter = router({
     .input(z.object({
       message: z.string().min(1).max(2000),
       ttsVoice: z.enum(["ar_formal", "ar_egyptian", "ar_gulf", "en", "none"]).default("ar_formal"),
+      currentRoute: z.string().default("/"),
     }))
     .mutation(async ({ input, ctx }) => {
       const user = ctx.user;
@@ -41,7 +42,8 @@ export const rakanRouter = router({
           user.role as UserRole,
           user.name ?? "مستخدم",
           input.message,
-          input.ttsVoice
+          input.ttsVoice,
+          input.currentRoute
         );
         return result;
       } catch (err: any) {
@@ -52,7 +54,7 @@ export const rakanRouter = router({
         if (err.message?.includes("FORBIDDEN_REPORT_ACCESS")) {
           throw new TRPCError({ code: "FORBIDDEN", message: "ليس لديك صلاحية لهذا التقرير." });
         }
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Rakan encountered an error. Please try again." });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "واجه راكان خطأ أثناء التحليل. حاول مرة أخرى." });
       }
     }),
 

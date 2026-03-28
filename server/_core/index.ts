@@ -23,6 +23,7 @@ import { restoreService } from "../services/RestoreService";
 import { promises as fs } from "fs";
 import { handleTamaraWebhook, verifyTamaraWebhookRequest } from "../services/tamaraService";
 import { handlePaymobWebhook } from "../services/paymobService";
+import { initRakanAdvisoryEngine } from "../services/rakanAdvisoryEngine";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -591,6 +592,8 @@ startServer().then(() => {
   startMetaLeadgenPolling();
   // Start notification engine
   startNotificationEngine();
+  // Start Rakan advisory engine
+  initRakanAdvisoryEngine();
   // Start exchange rate auto-sync scheduler
   startExchangeRateScheduler();
 }).catch(console.error);

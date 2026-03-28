@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface ReportPayload {
@@ -203,6 +204,7 @@ function useSpeechRecognition() {
 // ─── Main Widget ───────────────────────────────────────────────────────────────
 export default function RakanWidget() {
   const { user } = useAuth();
+  const [location] = useLocation();
   const { lang } = useLanguage();
   const isRTL = lang === "ar";
 
@@ -261,6 +263,7 @@ export default function RakanWidget() {
           chatMutation.mutate({
             message: text,
             ttsVoice: ttsEnabled ? ttsVoice : "none",
+            currentRoute: location || "/",
           });
 
           setTimeout(scrollToBottom, 50);
@@ -384,6 +387,7 @@ export default function RakanWidget() {
     chatMutation.mutate({
       message: text,
       ttsVoice: ttsEnabled ? ttsVoice : "none",
+      currentRoute: location || "/",
     });
 
     setTimeout(scrollToBottom, 50);
