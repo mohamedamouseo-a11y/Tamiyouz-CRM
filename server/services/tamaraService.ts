@@ -1,0 +1,430 @@
+import axios from "axios";
+import jwt from "jsonwebtoken";
+import { drizzle } from "drizzle-orm/mysql2";
+import { eq, sql } from "drizzle-orm";
+import { int, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import mysql from "mysql2/promise";
+
+const TAMARA_BASE_URL = process.env.TAMARA_BASE_URL || "https://api.tamara.co";
+
+// ─── DB Connection ─────────────────────────────────────────────────────────────
+let _db: ReturnType<typeof drizzle> | null = null;
+function getDb() {
+  if (!_db && process.env.DATABASE_URL) {
+    _db = drizzle(process.env.DATABASE_URL);
+  }
+  if (!_db) throw new Error("DB not initialized");
+  return _db;
+}
+
+let _pool: mysql.Pool | null = null;
+function getPool() {
+  if (!_pool && process.env.DATABASE_URL) {
+    _pool = mysql.createPool(process.env.DATABASE_URL);
+  }
+  if (!_pool) throw new Error("Pool not initialized");
+  return _pool;
+}
+
+// ─── Tamara Settings Table (inline Drizzle schema) ─────────────────────────────
+const tamaraSettings = mysqlTable("tamara_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  settingKey: varchar("settingKey", { length: 100 }).notNull().unique(),
+  settingValue: text("settingValue").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow(),
+});
+
+// ─── Types ─────────────────────────────────────────────────────────────────────
+export type TamaraSettings = {
+  tamara_api_token: string;
+  tamara_public_key: string;
+  tamara_notification_token: string;
+  tamara_merchant_id: string;
+  tamara_enabled: boolean;
+};
+
+type TamaraCheckoutResponse = {
+  order_id: string;
+  checkout_id: string;
+  checkout_url: string;
+  status?: string;
+};
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+function splitName(fullName?: string | null) {
+  const clean = (fullName || "").trim().replace(/\s+/g, " ");
+  if (!clean) {
+    return { firstName: "Customer", lastName: "Name" };
+  }
+
+  const parts = clean.split(" ");
+  const firstName = parts.shift() || "Customer";
+  const lastName = parts.join(" ") || "Name";
+  return { firstName, lastName };
+}
+
+function normalizeSaudiPhone(phone?: string | null) {
+  const raw = (phone || "").replace(/[^\d+]/g, "");
+  if (!raw) return "966500000000";
+
+  const digitsOnly = raw.replace(/\D/g, "");
+
+  if (digitsOnly.startsWith("966")) return digitsOnly;
+  if (digitsOnly.startsWith("05")) return `966${digitsOnly.slice(1)}`;
+  if (digitsOnly.startsWith("5") && digitsOnly.length === 9) return `966${digitsOnly}`;
+  if (digitsOnly.startsWith("00966")) return digitsOnly.slice(2);
+
+  return digitsOnly;
+}
+
+function countryCodeFromCountry(country?: string | null) {
+  const value = (country || "").trim().toLowerCase();
+
+  if (["sa", "ksa", "saudi", "saudi arabia", "السعودية", "المملكة العربية السعودية"].includes(value)) {
+    return "SA";
+  }
+  if (["ae", "uae", "united arab emirates", "الإمارات"].includes(value)) {
+    return "AE";
+  }
+  if (["kw", "kuwait", "الكويت"].includes(value)) {
+    return "KW";
+  }
+  if (["bh", "bahrain", "البحرين"].includes(value)) {
+    return "BH";
+  }
+  if (["om", "oman", "عمان"].includes(value)) {
+    return "OM";
+  }
+
+  return "SA";
+}
+
+function dealIdFromOrderReference(orderReferenceId: string) {
+  const normalized = (orderReferenceId || "").trim();
+
+  const dealMatch = normalized.match(/^DEAL_(\d+)$/i);
+  if (dealMatch) return Number(dealMatch[1]);
+
+  const numericMatch = normalized.match(/(\d+)/);
+  if (numericMatch) return Number(numericMatch[1]);
+
+  throw new Error(`Unable to parse deal id from Tamara order_reference_id: ${orderReferenceId}`);
+}
+
+// ─── Notification Helpers ──────────────────────────────────────────────────────
+async function tryInsertInAppNotification(userId: number, title: string, message: string) {
+  try {
+    const pool = getPool();
+    await pool.execute(
+      `INSERT INTO in_app_notifications (userId, type, title, body, isRead, createdAt)
+       VALUES (?, 'system', ?, ?, 0, NOW())`,
+      [userId, title, message],
+    );
+  } catch (err) {
+    console.warn("[Tamara] Failed to insert in-app notification:", err);
+  }
+}
+
+async function resolveResponsibleUserId(leadId?: number | null, dealId?: number | null) {
+  const pool = getPool();
+
+  if (leadId) {
+    try {
+      const [rows] = await pool.execute(
+        "SELECT assignedTo FROM leads WHERE id = ? LIMIT 1",
+        [Number(leadId)],
+      ) as any;
+      const userId = Number(rows?.[0]?.assignedTo || 0);
+      if (userId > 0) return userId;
+    } catch {}
+  }
+
+  return null;
+}
+
+async function sendPaymentSuccessNotification(params: { dealId: number; leadId?: number | null; orderId: string }) {
+  const userId = await resolveResponsibleUserId(params.leadId, params.dealId);
+  if (!userId) {
+    console.warn("[Tamara] Could not resolve responsible user for the paid deal.");
+    return;
+  }
+
+  await tryInsertInAppNotification(
+    userId,
+    "Tamara payment approved",
+    `Deal #${params.dealId} was successfully approved and authorised via Tamara. Order ID: ${params.orderId}`,
+  );
+}
+
+// ─── Settings CRUD ─────────────────────────────────────────────────────────────
+export async function getTamaraSettings(): Promise<TamaraSettings> {
+  const db = getDb();
+  const rows = await db.select().from(tamaraSettings);
+
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    map.set(row.settingKey, row.settingValue || "");
+  }
+
+  return {
+    tamara_api_token: map.get("tamara_api_token") || "",
+    tamara_public_key: map.get("tamara_public_key") || "",
+    tamara_notification_token: map.get("tamara_notification_token") || "",
+    tamara_merchant_id: map.get("tamara_merchant_id") || "",
+    tamara_enabled: (map.get("tamara_enabled") || "false") === "true",
+  };
+}
+
+export async function updateTamaraSettings(input: TamaraSettings) {
+  const db = getDb();
+  const pairs: Record<string, string> = {
+    tamara_api_token: input.tamara_api_token || "",
+    tamara_public_key: input.tamara_public_key || "",
+    tamara_notification_token: input.tamara_notification_token || "",
+    tamara_merchant_id: input.tamara_merchant_id || "",
+    tamara_enabled: input.tamara_enabled ? "true" : "false",
+  };
+
+  for (const [settingKey, settingValue] of Object.entries(pairs)) {
+    await db
+      .insert(tamaraSettings)
+      .values({ settingKey, settingValue })
+      .onDuplicateKeyUpdate({
+        set: {
+          settingValue,
+          updatedAt: sql`CURRENT_TIMESTAMP`,
+        },
+      });
+  }
+
+  return await getTamaraSettings();
+}
+
+// ─── Checkout Session ──────────────────────────────────────────────────────────
+export async function createTamaraCheckoutSession(dealId: number): Promise<TamaraCheckoutResponse> {
+  const settings = await getTamaraSettings();
+  const pool = getPool();
+
+  if (!settings.tamara_enabled) {
+    throw new Error("Tamara is disabled from admin settings.");
+  }
+
+  if (!settings.tamara_api_token) {
+    throw new Error("Tamara API token is missing.");
+  }
+
+  // Fetch deal
+  const [dealRows] = await pool.execute(
+    "SELECT * FROM deals WHERE id = ? AND deletedAt IS NULL LIMIT 1",
+    [dealId],
+  ) as any;
+  const deal = dealRows?.[0];
+
+  if (!deal) {
+    throw new Error("Deal not found.");
+  }
+
+  if (deal.status !== "Pending") {
+    throw new Error("Tamara checkout can only be created for pending deals.");
+  }
+
+  if (!deal.leadId) {
+    throw new Error("This deal is not linked to a lead.");
+  }
+
+  // Fetch lead
+  const [leadRows] = await pool.execute(
+    "SELECT * FROM leads WHERE id = ? LIMIT 1",
+    [deal.leadId],
+  ) as any;
+  const lead = leadRows?.[0];
+
+  if (!lead) {
+    throw new Error("Lead not found.");
+  }
+
+  const amount = Number(deal.valueSar || 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Deal amount is invalid.");
+  }
+
+  const currency = deal.currency || "SAR";
+  const { firstName, lastName } = splitName(lead.name);
+
+  const payload = {
+    total_amount: {
+      amount,
+      currency,
+    },
+    shipping_amount: {
+      amount: 0,
+      currency,
+    },
+    tax_amount: {
+      amount: 0,
+      currency,
+    },
+    order_reference_id: `DEAL_${deal.id}`,
+    order_number: `DEAL_${deal.id}`,
+    items: [
+      {
+        name: `CRM Deal #${deal.id}`,
+        type: "Digital",
+        reference_id: `DEAL_${deal.id}`,
+        sku: `DEAL_${deal.id}`,
+        quantity: 1,
+        total_amount: {
+          amount,
+          currency,
+        },
+      },
+    ],
+    consumer: {
+      first_name: firstName,
+      last_name: lastName,
+      phone_number: normalizeSaudiPhone(lead.phone),
+      email: lead.email || "no-email@example.com",
+    },
+    country_code: countryCodeFromCountry(lead.country),
+    description: `Payment for deal #${deal.id}`,
+    merchant_url: {
+      success: `https://sales.tamiyouzplaform.com/leads/${lead.id}?payment=success`,
+      failure: `https://sales.tamiyouzplaform.com/leads/${lead.id}?payment=failure`,
+      cancel: `https://sales.tamiyouzplaform.com/leads/${lead.id}?payment=cancel`,
+      notification: `https://sales.tamiyouzplaform.com/api/tamara/webhook`,
+    },
+  };
+
+  const response = await axios.post<TamaraCheckoutResponse>(`${TAMARA_BASE_URL}/checkout`, payload, {
+    headers: {
+      Authorization: `Bearer ${settings.tamara_api_token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  return response.data;
+}
+
+// ─── Authorise Order ───────────────────────────────────────────────────────────
+export async function authoriseTamaraOrder(orderId: string) {
+  const settings = await getTamaraSettings();
+
+  if (!settings.tamara_api_token) {
+    throw new Error("Tamara API token is missing.");
+  }
+
+  const response = await axios.post(
+    `${TAMARA_BASE_URL}/orders/${orderId}/authorise`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${settings.tamara_api_token}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  return response.data;
+}
+
+// ─── Webhook Verification ──────────────────────────────────────────────────────
+export async function verifyTamaraWebhookRequest(params: {
+  headers: Record<string, string | string[] | undefined>;
+  query?: Record<string, unknown>;
+}) {
+  const settings = await getTamaraSettings();
+
+  if (!settings.tamara_notification_token) {
+    throw new Error("Tamara notification token is missing.");
+  }
+
+  const authorizationHeader = params.headers.authorization || params.headers.Authorization;
+  const headerToken = Array.isArray(authorizationHeader)
+    ? authorizationHeader[0]
+    : authorizationHeader?.toString().replace(/^Bearer\s+/i, "").trim();
+
+  const queryToken =
+    typeof params.query?.tamaraToken === "string"
+      ? params.query.tamaraToken
+      : Array.isArray(params.query?.tamaraToken)
+        ? String(params.query?.tamaraToken[0] || "")
+        : "";
+
+  const webhookJwt = headerToken || queryToken;
+
+  if (!webhookJwt) {
+    throw new Error("Tamara webhook token is missing.");
+  }
+
+  jwt.verify(webhookJwt, settings.tamara_notification_token, {
+    algorithms: ["HS256"],
+  });
+
+  return true;
+}
+
+// ─── Webhook Handler ───────────────────────────────────────────────────────────
+export async function handleTamaraWebhook(payload: any) {
+  const pool = getPool();
+  const status = payload?.status || payload?.order_status || payload?.data?.status;
+  const orderId = payload?.order_id || payload?.data?.order_id;
+  const orderReferenceId = payload?.order_reference_id || payload?.data?.order_reference_id;
+
+  if (status !== "approved") {
+    return {
+      ok: true,
+      ignored: true,
+      reason: `Unhandled status: ${status || "unknown"}`,
+    };
+  }
+
+  if (!orderId) {
+    throw new Error("Tamara webhook payload does not include order_id.");
+  }
+
+  if (!orderReferenceId) {
+    throw new Error("Tamara webhook payload does not include order_reference_id.");
+  }
+
+  const dealId = dealIdFromOrderReference(orderReferenceId);
+
+  // Fetch deal
+  const [dealRows] = await pool.execute(
+    "SELECT * FROM deals WHERE id = ? LIMIT 1",
+    [dealId],
+  ) as any;
+  const deal = dealRows?.[0];
+
+  if (!deal) {
+    throw new Error(`Deal #${dealId} was not found.`);
+  }
+
+  if (deal.status === "Won") {
+    return {
+      ok: true,
+      ignored: true,
+      reason: "Deal already marked as Won.",
+    };
+  }
+
+  await authoriseTamaraOrder(orderId);
+
+  // Update deal status to Won
+  await pool.execute(
+    "UPDATE deals SET status = 'Won', closedAt = NOW(), updatedAt = NOW() WHERE id = ?",
+    [dealId],
+  );
+
+  await sendPaymentSuccessNotification({
+    dealId,
+    leadId: deal.leadId,
+    orderId,
+  });
+
+  return {
+    ok: true,
+    dealId,
+    orderId,
+    newStatus: "Won",
+  };
+}

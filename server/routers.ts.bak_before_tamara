@@ -3620,7 +3620,6 @@ byLeadStageChanges: protectedProcedure
     }),
   }),
   rakan: rakanRouter,
-  tamara: tamaraRouter,
   // ─── Exchange Rates ──────────────────────────────────────────────────────────
   exchangeRates: router({
     list: adminProcedure.query(async () => {
