@@ -53,6 +53,8 @@ import {
   Eye,
   XCircle,
   Activity,
+  ExternalLink,
+  CreditCard,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -311,6 +313,7 @@ export default function LeadProfile() {
   const [showAssign, setShowAssign] = useState(false);
   const [assignRole, setAssignRole] = useState<string>("collaborator");
   const [noteText, setNoteText] = useState("");
+  const [tamaraLoading, setTamaraLoading] = useState(false);
 
   const { data: lead, isLoading, refetch } = trpc.leads.byId.useQuery({ id: leadId }, { enabled: Number.isFinite(leadId) });
   const { data: activities, refetch: refetchActivities } = trpc.activities.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
@@ -325,6 +328,7 @@ export default function LeadProfile() {
   const { data: attachments, refetch: refetchAttachments } = trpc.attachments.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const { data: leadAssignments, refetch: refetchAssignments } = trpc.assignments.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const { data: stageChanges } = trpc.auditLogs.byLeadStageChanges.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
+  const { data: tamaraStatus } = trpc.tamara.isEnabled.useQuery();
   const { data: slaConfig } = trpc.sla.get.useQuery();
 
   const { data: allUsers } = trpc.users.list.useQuery(undefined, { enabled: true });
@@ -382,6 +386,27 @@ export default function LeadProfile() {
       refetchDeal();
     },
   });
+
+  const tamaraCheckout = trpc.tamara.createCheckout.useMutation({
+    onSuccess: (data) => {
+      setTamaraLoading(false);
+      if (data.checkout_url) {
+        window.open(data.checkout_url, "_blank");
+      } else {
+        toast.error(isRTL ? "لم يتم الحصول على رابط الدفع" : "Failed to get checkout URL");
+      }
+    },
+    onError: (e) => {
+      setTamaraLoading(false);
+      toast.error(e.message);
+    },
+  });
+
+  const handleTamaraPayment = () => {
+    if (!deal?.id) return;
+    setTamaraLoading(true);
+    tamaraCheckout.mutate({ dealId: deal.id });
+  };
 
   const createNote = trpc.notes.create.useMutation({
     onSuccess: () => {
@@ -1345,6 +1370,31 @@ export default function LeadProfile() {
                             <SelectItem value="Lost">{t("Lost")}</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                    )}
+                    {tamaraStatus?.enabled && deal.status === "Pending" && (
+                      <div className="pt-3 border-t border-border/50 mt-3">
+                        <Button
+                          size="sm"
+                          className="w-full gap-2 text-white font-medium"
+                          style={{ background: "linear-gradient(135deg, #c084fc 0%, #f472b6 50%, #fb923c 100%)" }}
+                          onClick={handleTamaraPayment}
+                          disabled={tamaraLoading}
+                        >
+                          {tamaraLoading ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M4.5 12.5C4.5 12.5 4.5 8 8 8C11.5 8 11.5 12.5 11.5 12.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                              <circle cx="17" cy="10.5" r="4" fill="white" />
+                            </svg>
+                          )}
+                          {isRTL ? "ادفع عبر تمارا" : "Pay with Tamara"}
+                          <ExternalLink size={12} />
+                        </Button>
+                        <p className="text-[10px] text-muted-foreground text-center mt-1.5">
+                          {isRTL ? "الدفع بالتقسيط عبر تمارا" : "Pay in installments via Tamara"}
+                        </p>
                       </div>
                     )}
                   </div>

@@ -40,6 +40,11 @@ export const tamaraRouter = router({
       return await updateTamaraSettings(input);
     }),
 
+  isEnabled: protectedProcedure.query(async () => {
+    const settings = await getTamaraSettings();
+    return { enabled: settings.tamara_enabled };
+  }),
+
   createCheckout: protectedProcedure
     .input(
       z.object({
