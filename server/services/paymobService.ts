@@ -222,13 +222,13 @@ async function getAdminsAndManagers() {
   return ((rows as any[]) || []).map((row: any) => Number(row.id)).filter(Boolean);
 }
 
-async function tryInsertInAppNotification(userId: number, title: string, body: string) {
+async function tryInsertInAppNotification(userId: number, title: string, body: string, titleAr?: string, bodyAr?: string) {
   if (!userId) return;
   try {
     const pool = getPool();
     await pool.execute(
-      `INSERT INTO in_app_notifications (userId, type, title, body, isRead, createdAt) VALUES (?, 'system', ?, ?, 0, NOW())`,
-      [userId, title, body],
+      `INSERT INTO in_app_notifications (userId, type, title, titleAr, body, bodyAr, isRead, createdAt) VALUES (?, 'system', ?, ?, ?, ?, 0, NOW())`,
+      [userId, title, titleAr || title, body, bodyAr || body],
     );
   } catch (error) {
     console.warn("[Paymob] Failed to insert in-app notification:", error);
@@ -269,10 +269,12 @@ async function sendPaymobPaymentNotification(params: {
   const admins = await getAdminsAndManagers();
   admins.forEach((id) => recipients.add(id));
 
-  const title = `بيموب | دفعة مقبوضة - ${params.leadName}`;
-  const body = `تم استلام دفعة ناجحة للصفقة #${params.dealId} عبر Paymob. رقم العملية المرجعي: ${params.orderId}.`;
+  const titleEn = `Paymob | Payment Received - ${params.leadName}`;
+  const bodyEn = `A successful payment was received for Deal #${params.dealId} via Paymob. Reference: ${params.orderId}.`;
+  const titleAr = `بيموب | دفعة مقبوضة - ${params.leadName}`;
+  const bodyAr = `تم استلام دفعة ناجحة للصفقة #${params.dealId} عبر Paymob. رقم العملية المرجعي: ${params.orderId}.`;
   for (const userId of recipients) {
-    await tryInsertInAppNotification(userId, title, body);
+    await tryInsertInAppNotification(userId, titleEn, bodyEn, titleAr, bodyAr);
   }
   await insertAuditLog({
     action: "paymob_payment",
@@ -302,10 +304,12 @@ async function sendPaymobContractPaymentNotification(params: {
   const admins = await getAdminsAndManagers();
   admins.forEach((id) => recipients.add(id));
 
-  const title = `بيموب | دفعة عقد مقبوضة - ${params.clientName}`;
-  const body = `تم استلام دفعة ناجحة للعقد #${params.contractId} عبر Paymob. رقم العملية المرجعي: ${params.orderId}.`;
+  const titleEn = `Paymob | Contract Payment Received - ${params.clientName}`;
+  const bodyEn = `A successful payment was received for Contract #${params.contractId} via Paymob. Reference: ${params.orderId}.`;
+  const titleAr = `بيموب | دفعة عقد مقبوضة - ${params.clientName}`;
+  const bodyAr = `تم استلام دفعة ناجحة للعقد #${params.contractId} عبر Paymob. رقم العملية المرجعي: ${params.orderId}.`;
   for (const userId of recipients) {
-    await tryInsertInAppNotification(userId, title, body);
+    await tryInsertInAppNotification(userId, titleEn, bodyEn, titleAr, bodyAr);
   }
   await insertAuditLog({
     action: "paymob_contract_payment",

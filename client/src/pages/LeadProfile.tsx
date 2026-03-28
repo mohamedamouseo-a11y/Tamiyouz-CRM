@@ -1437,7 +1437,7 @@ export default function LeadProfile() {
                         </p>
                       </div>
                     )}
-                    {paymobStatus?.enabled && deal.status === "Pending" && (
+                    {((deal as any).currency === "EGP" ? paymobStatus?.eg : paymobStatus?.sa) && deal.status === "Pending" && (
                       <div className="pt-3 border-t border-border/50 mt-3">
                         <Button
                           size="sm"

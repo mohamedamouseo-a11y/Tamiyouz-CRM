@@ -712,7 +712,7 @@ export default function ClientProfile({ params }: RouteProps) {
                           <TableHead>Status</TableHead>
                           <TableHead>Renewal</TableHead>
                           {tamaraStatus?.enabled && <TableHead>Tamara</TableHead>}
-                          {paymobStatus?.enabled && <TableHead>Paymob</TableHead>}
+                          {(paymobStatus?.eg || paymobStatus?.sa) && <TableHead>Paymob</TableHead>}
                           <TableHead></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -765,9 +765,9 @@ export default function ClientProfile({ params }: RouteProps) {
                                 )}
                               </TableCell>
                             )}
-                            {paymobStatus?.enabled && (
+                            {(paymobStatus?.eg || paymobStatus?.sa) && (
                               <TableCell>
-                                {Number(c.charges) > 0 ? (
+                                {Number(c.charges) > 0 && ((c.currency || "SAR") === "EGP" ? paymobStatus?.eg : paymobStatus?.sa) ? (
                                   <Button
                                     size="sm"
                                     className="gap-1.5 text-white text-xs font-medium"
