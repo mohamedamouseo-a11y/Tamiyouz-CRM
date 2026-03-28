@@ -8,74 +8,134 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
 
+type CountryForm = {
+  api_key: string;
+  hmac_secret: string;
+  base_url: string;
+  integration_id_card: string;
+  integration_id_wallet: string;
+  iframe_id: string;
+  enabled: boolean;
+};
+
 type FormState = {
-  paymob_api_key: string;
-  paymob_hmac_secret: string;
-  paymob_integration_id_card_eg: string;
-  paymob_integration_id_card_sa: string;
-  paymob_integration_id_wallet_eg: string;
-  paymob_iframe_id: string;
-  paymob_enabled: boolean;
+  eg: CountryForm;
+  sa: CountryForm;
+};
+
+const defaultCountry: CountryForm = {
+  api_key: "",
+  hmac_secret: "",
+  base_url: "",
+  integration_id_card: "",
+  integration_id_wallet: "",
+  iframe_id: "",
+  enabled: false,
 };
 
 const defaultForm: FormState = {
-  paymob_api_key: "",
-  paymob_hmac_secret: "",
-  paymob_integration_id_card_eg: "",
-  paymob_integration_id_card_sa: "",
-  paymob_integration_id_wallet_eg: "",
-  paymob_iframe_id: "",
-  paymob_enabled: false,
+  eg: { ...defaultCountry, base_url: "https://accept.paymob.com" },
+  sa: { ...defaultCountry, base_url: "https://ksa.paymob.com" },
 };
+
+type Country = "eg" | "sa";
 
 export default function PaymobSettingsTab() {
   const utils = trpc.useUtils?.();
   const settingsQuery = trpc.paymob.getSettings.useQuery();
   const updateMutation = trpc.paymob.updateSettings.useMutation({
     onSuccess: async () => {
-      if (utils?.paymob?.getSettings) {
-        await utils.paymob.getSettings.invalidate();
-      }
-      if (utils?.paymob?.isEnabled) {
-        await utils.paymob.isEnabled.invalidate();
-      }
+      if (utils?.paymob?.getSettings) await utils.paymob.getSettings.invalidate();
+      if (utils?.paymob?.isEnabled) await utils.paymob.isEnabled.invalidate();
     },
   });
 
   const [form, setForm] = React.useState<FormState>(defaultForm);
+  const [activeCountry, setActiveCountry] = React.useState<Country>("eg");
 
   React.useEffect(() => {
     if (settingsQuery.data) {
       setForm({
-        paymob_api_key: settingsQuery.data.paymob_api_key || "",
-        paymob_hmac_secret: settingsQuery.data.paymob_hmac_secret || "",
-        paymob_integration_id_card_eg: settingsQuery.data.paymob_integration_id_card_eg || "",
-        paymob_integration_id_card_sa: settingsQuery.data.paymob_integration_id_card_sa || "",
-        paymob_integration_id_wallet_eg: settingsQuery.data.paymob_integration_id_wallet_eg || "",
-        paymob_iframe_id: settingsQuery.data.paymob_iframe_id || "",
-        paymob_enabled: !!settingsQuery.data.paymob_enabled,
+        eg: {
+          api_key: settingsQuery.data.eg?.api_key || "",
+          hmac_secret: settingsQuery.data.eg?.hmac_secret || "",
+          base_url: settingsQuery.data.eg?.base_url || "https://accept.paymob.com",
+          integration_id_card: settingsQuery.data.eg?.integration_id_card || "",
+          integration_id_wallet: settingsQuery.data.eg?.integration_id_wallet || "",
+          iframe_id: settingsQuery.data.eg?.iframe_id || "",
+          enabled: !!settingsQuery.data.eg?.enabled,
+        },
+        sa: {
+          api_key: settingsQuery.data.sa?.api_key || "",
+          hmac_secret: settingsQuery.data.sa?.hmac_secret || "",
+          base_url: settingsQuery.data.sa?.base_url || "https://ksa.paymob.com",
+          integration_id_card: settingsQuery.data.sa?.integration_id_card || "",
+          integration_id_wallet: settingsQuery.data.sa?.integration_id_wallet || "",
+          iframe_id: settingsQuery.data.sa?.iframe_id || "",
+          enabled: !!settingsQuery.data.sa?.enabled,
+        },
       });
     }
   }, [settingsQuery.data]);
 
-  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+  const setCountryField = <K extends keyof CountryForm>(key: K, value: CountryForm[K]) => {
+    setForm((prev) => ({
+      ...prev,
+      [activeCountry]: { ...prev[activeCountry], [key]: value },
+    }));
   };
 
   const handleSave = async () => {
     await updateMutation.mutateAsync(form);
   };
 
+  const current = form[activeCountry];
+  const isEgypt = activeCountry === "eg";
+
   return (
     <Card className="border-border/60 shadow-sm">
       <CardHeader>
         <CardTitle className="text-base font-semibold">Paymob Settings</CardTitle>
         <CardDescription>
-          Configure Paymob for Egypt and Saudi Arabia, including card payments and Egypt mobile wallets.
+          Configure Paymob payment gateways for Egypt and Saudi Arabia independently.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {/* Country Selector */}
+        <div className="flex gap-2 p-1 rounded-xl bg-muted/50 border border-border/60">
+          <button
+            type="button"
+            onClick={() => setActiveCountry("eg")}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              activeCountry === "eg"
+                ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground border border-border/60"
+                : "text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-zinc-800/50"
+            }`}
+          >
+            <span className="text-lg">🇪🇬</span>
+            Egypt (EGP)
+            {form.eg.enabled && (
+              <span className="ml-1 h-2 w-2 rounded-full bg-emerald-500 inline-block" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveCountry("sa")}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              activeCountry === "sa"
+                ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground border border-border/60"
+                : "text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-zinc-800/50"
+            }`}
+          >
+            <span className="text-lg">🇸🇦</span>
+            Saudi Arabia (SAR)
+            {form.sa.enabled && (
+              <span className="ml-1 h-2 w-2 rounded-full bg-emerald-500 inline-block" />
+            )}
+          </button>
+        </div>
+
         {settingsQuery.isLoading ? (
           <div className="flex items-center gap-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -89,87 +149,103 @@ export default function PaymobSettingsTab() {
           </div>
         ) : null}
 
+        {/* Country Settings Form */}
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="paymob_api_key">API Key</Label>
+            <Label htmlFor="api_key">API Key</Label>
             <Input
-              id="paymob_api_key"
+              id="api_key"
               type="password"
-              value={form.paymob_api_key}
-              onChange={(e) => setField("paymob_api_key", e.target.value)}
-              placeholder="Enter Paymob API key"
+              value={current.api_key}
+              onChange={(e) => setCountryField("api_key", e.target.value)}
+              placeholder={`Enter ${isEgypt ? "Egypt" : "Saudi"} Paymob API key`}
             />
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="paymob_hmac_secret">HMAC Secret</Label>
+            <Label htmlFor="hmac_secret">HMAC Secret</Label>
             <Input
-              id="paymob_hmac_secret"
+              id="hmac_secret"
               type="password"
-              value={form.paymob_hmac_secret}
-              onChange={(e) => setField("paymob_hmac_secret", e.target.value)}
-              placeholder="Enter webhook HMAC secret"
+              value={current.hmac_secret}
+              onChange={(e) => setCountryField("hmac_secret", e.target.value)}
+              placeholder={`Enter ${isEgypt ? "Egypt" : "Saudi"} webhook HMAC secret`}
             />
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="base_url">Base URL</Label>
+            <Input
+              id="base_url"
+              value={current.base_url}
+              onChange={(e) => setCountryField("base_url", e.target.value)}
+              placeholder={isEgypt ? "https://accept.paymob.com" : "https://ksa.paymob.com"}
+            />
+            <p className="text-xs text-muted-foreground">
+              {isEgypt
+                ? "Default: https://accept.paymob.com"
+                : "Default: https://ksa.paymob.com"}
+            </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="paymob_integration_id_card_eg">Integration ID — Card Egypt</Label>
+            <Label htmlFor="integration_id_card">Integration ID — Card</Label>
             <Input
-              id="paymob_integration_id_card_eg"
-              value={form.paymob_integration_id_card_eg}
-              onChange={(e) => setField("paymob_integration_id_card_eg", e.target.value)}
+              id="integration_id_card"
+              value={current.integration_id_card}
+              onChange={(e) => setCountryField("integration_id_card", e.target.value)}
               placeholder="e.g. 1234567"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="paymob_integration_id_card_sa">Integration ID — Card Saudi</Label>
-            <Input
-              id="paymob_integration_id_card_sa"
-              value={form.paymob_integration_id_card_sa}
-              onChange={(e) => setField("paymob_integration_id_card_sa", e.target.value)}
-              placeholder="e.g. 7654321"
-            />
-          </div>
+          {isEgypt && (
+            <div className="space-y-2">
+              <Label htmlFor="integration_id_wallet">Integration ID — Wallet</Label>
+              <Input
+                id="integration_id_wallet"
+                value={current.integration_id_wallet}
+                onChange={(e) => setCountryField("integration_id_wallet", e.target.value)}
+                placeholder="e.g. 998877"
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
-            <Label htmlFor="paymob_integration_id_wallet_eg">Integration ID — Wallet Egypt</Label>
+            <Label htmlFor="iframe_id">iframe ID</Label>
             <Input
-              id="paymob_integration_id_wallet_eg"
-              value={form.paymob_integration_id_wallet_eg}
-              onChange={(e) => setField("paymob_integration_id_wallet_eg", e.target.value)}
-              placeholder="e.g. 998877"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="paymob_iframe_id">iframe ID</Label>
-            <Input
-              id="paymob_iframe_id"
-              value={form.paymob_iframe_id}
-              onChange={(e) => setField("paymob_iframe_id", e.target.value)}
+              id="iframe_id"
+              value={current.iframe_id}
+              onChange={(e) => setCountryField("iframe_id", e.target.value)}
               placeholder="e.g. 123456"
             />
           </div>
         </div>
 
+        {/* Enable Toggle */}
         <div className="flex items-center justify-between rounded-2xl border p-4">
           <div className="space-y-1 pr-4">
-            <p className="text-sm font-medium">Enable Paymob</p>
+            <p className="text-sm font-medium">
+              Enable Paymob — {isEgypt ? "Egypt" : "Saudi Arabia"}
+            </p>
             <p className="text-xs text-muted-foreground">
-              Turn this on to show Paymob payment actions in deals and contracts.
+              Turn this on to allow {isEgypt ? "EGP" : "SAR"} payments via Paymob for this gateway.
             </p>
           </div>
-
           <Switch
-            checked={form.paymob_enabled}
-            onCheckedChange={(checked) => setField("paymob_enabled", checked)}
+            checked={current.enabled}
+            onCheckedChange={(checked) => setCountryField("enabled", checked)}
           />
         </div>
 
+        {/* Save Button */}
         <div className="flex items-center justify-between gap-3">
           <div className="text-xs text-muted-foreground">
             {updateMutation.isSuccess ? "Settings saved successfully." : ""}
+            {updateMutation.isError ? (
+              <span className="text-destructive">
+                Error: {updateMutation.error?.message || "Failed to save"}
+              </span>
+            ) : null}
           </div>
 
           <Button
@@ -184,7 +260,7 @@ export default function PaymobSettingsTab() {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            Save Paymob Settings
+            Save All Settings
           </Button>
         </div>
       </CardContent>

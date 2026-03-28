@@ -6,17 +6,23 @@ import {
   createPaymobCheckoutForContract,
   createPaymobCheckoutForDeal,
   getPaymobSettings,
+  isPaymobEnabled,
   updatePaymobSettings,
 } from "./services/paymobService";
 
+const countrySettingsSchema = z.object({
+  api_key: z.string().default(""),
+  hmac_secret: z.string().default(""),
+  base_url: z.string().default(""),
+  integration_id_card: z.string().default(""),
+  integration_id_wallet: z.string().default(""),
+  iframe_id: z.string().default(""),
+  enabled: z.boolean().default(false),
+});
+
 const paymobSettingsSchema = z.object({
-  paymob_api_key: z.string().default(""),
-  paymob_hmac_secret: z.string().default(""),
-  paymob_integration_id_card_eg: z.string().default(""),
-  paymob_integration_id_card_sa: z.string().default(""),
-  paymob_integration_id_wallet_eg: z.string().default(""),
-  paymob_iframe_id: z.string().default(""),
-  paymob_enabled: z.boolean().default(false),
+  eg: countrySettingsSchema,
+  sa: countrySettingsSchema,
 });
 
 const checkoutSchema = z.object({
@@ -54,8 +60,7 @@ export const paymobRouter = router({
     }),
 
   isEnabled: protectedProcedure.query(async () => {
-    const settings = await getPaymobSettings();
-    return { enabled: settings.paymob_enabled };
+    return await isPaymobEnabled();
   }),
 
   createCheckout: protectedProcedure
