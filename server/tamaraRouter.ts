@@ -4,6 +4,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import {
   createTamaraCheckoutSession,
+  createTamaraCheckoutForContract,
   getTamaraSettings,
   updateTamaraSettings,
 } from "./services/tamaraService";
@@ -53,6 +54,23 @@ export const tamaraRouter = router({
     )
     .mutation(async ({ input }) => {
       const session = await createTamaraCheckoutSession(input.dealId);
+
+      return {
+        order_id: session.order_id,
+        checkout_id: session.checkout_id,
+        checkout_url: session.checkout_url,
+        status: session.status,
+      };
+    }),
+
+  createContractCheckout: protectedProcedure
+    .input(
+      z.object({
+        contractId: z.number().int().positive(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const session = await createTamaraCheckoutForContract(input.contractId);
 
       return {
         order_id: session.order_id,

@@ -472,3 +472,93 @@ export async function handleTamaraWebhook(payload: any) {
     newStatus: "Won",
   };
 }
+
+
+// ─── Contract Checkout (Account Management) ──────────────────────────────────
+export async function createTamaraCheckoutForContract(contractId: number): Promise<TamaraCheckoutResponse> {
+  const settings = await getTamaraSettings();
+  const pool = getPool();
+
+  if (!settings.tamara_enabled) {
+    throw new Error("Tamara is disabled from admin settings.");
+  }
+  if (!settings.tamara_api_token) {
+    throw new Error("Tamara API token is missing.");
+  }
+
+  // Fetch contract
+  const [contractRows] = await pool.execute(
+    "SELECT * FROM contracts WHERE id = ? AND deletedAt IS NULL LIMIT 1",
+    [contractId],
+  ) as any;
+  const contract = contractRows?.[0];
+  if (!contract) throw new Error("Contract not found.");
+
+  const amount = Number(contract.charges || 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Contract charges are invalid or zero.");
+  }
+  const currency = contract.currency || "SAR";
+
+  // Fetch client
+  const [clientRows] = await pool.execute(
+    "SELECT * FROM clients WHERE id = ? AND deletedAt IS NULL LIMIT 1",
+    [contract.clientId],
+  ) as any;
+  const client = clientRows?.[0];
+  if (!client) throw new Error("Client not found.");
+
+  // Resolve customer name: prefer clients.leadName, fallback to leads table
+  let customerName = client.leadName || "";
+  if (!customerName && client.leadId) {
+    const [leadRows] = await pool.execute("SELECT name FROM leads WHERE id = ? LIMIT 1", [client.leadId]) as any;
+    customerName = leadRows?.[0]?.name || "Customer";
+  }
+  if (!customerName) customerName = "Customer";
+
+  const customerPhone = client.phone || client.contactPhone || "";
+  const customerEmail = client.contactEmail || "no-email@example.com";
+
+  const { firstName, lastName } = splitName(customerName);
+
+  const payload = {
+    total_amount: { amount, currency },
+    shipping_amount: { amount: 0, currency },
+    tax_amount: { amount: 0, currency },
+    order_reference_id: `CONTRACT_${contractId}`,
+    order_number: `CONTRACT_${contractId}`,
+    items: [
+      {
+        name: contract.contractName || `Contract Renewal #${contractId}`,
+        type: "Digital",
+        reference_id: `CONTRACT_${contractId}`,
+        sku: `CONTRACT_${contractId}`,
+        quantity: 1,
+        total_amount: { amount, currency },
+      },
+    ],
+    consumer: {
+      first_name: firstName,
+      last_name: lastName,
+      phone_number: normalizeSaudiPhone(customerPhone),
+      email: customerEmail,
+    },
+    country_code: "SA",
+    description: `Payment for contract renewal #${contractId}`,
+    merchant_url: {
+      success: `https://sales.tamiyouzplaform.com/clients/${contract.clientId}?payment=success`,
+      failure: `https://sales.tamiyouzplaform.com/clients/${contract.clientId}?payment=failure`,
+      cancel: `https://sales.tamiyouzplaform.com/clients/${contract.clientId}?payment=cancel`,
+      notification: `https://sales.tamiyouzplaform.com/api/tamara/webhook`,
+    },
+  };
+
+  const response = await axios.post<TamaraCheckoutResponse>(`${TAMARA_BASE_URL}/checkout`, payload, {
+    headers: {
+      Authorization: `Bearer ${settings.tamara_api_token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  return response.data;
+}
