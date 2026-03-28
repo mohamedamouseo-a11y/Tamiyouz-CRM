@@ -231,7 +231,7 @@ export async function buildDbContext(
         `
           SELECT COALESCE(SUM(spend), 0) AS totalAdSpend
           FROM (
-            SELECT CAST(spend AS DECIMAL(12,2)) AS spend
+            SELECT CAST(COALESCE(dailyBudget, 0) AS DECIMAL(12,2)) AS spend
             FROM meta_campaign_snapshots
             WHERE syncedAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)
 
@@ -239,7 +239,7 @@ export async function buildDbContext(
 
             SELECT CAST(spend AS DECIMAL(12,2)) AS spend
             FROM tiktok_campaign_snapshots
-            WHERE syncedAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            WHERE synced_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
           ) x
         `
       ) as any;
@@ -292,15 +292,15 @@ export async function buildDbContext(
             SUM(conversions) AS totalConversions,
             ROUND(AVG(NULLIF(cpa, 0)), 2) AS avgCpa
           FROM (
-            SELECT 'Meta' AS platform, campaignName, CAST(spend AS DECIMAL(12,2)) AS spend, CAST(conversions AS UNSIGNED) AS conversions, CAST(cpa AS DECIMAL(12,2)) AS cpa
+            SELECT 'Meta' AS platform, campaignName, CAST(COALESCE(dailyBudget, 0) AS DECIMAL(12,2)) AS spend, 0 AS conversions, 0 AS cpa
             FROM meta_campaign_snapshots
             WHERE syncedAt >= DATE_SUB(NOW(), INTERVAL 14 DAY)
 
             UNION ALL
 
-            SELECT 'TikTok' AS platform, campaignName, CAST(spend AS DECIMAL(12,2)) AS spend, CAST(conversions AS UNSIGNED) AS conversions, CAST(cpa AS DECIMAL(12,2)) AS cpa
+            SELECT 'TikTok' AS platform, campaign_name AS campaignName, CAST(COALESCE(spend, 0) AS DECIMAL(12,2)) AS spend, CAST(COALESCE(conversions, 0) AS UNSIGNED) AS conversions, CAST(COALESCE(cpa, 0) AS DECIMAL(12,2)) AS cpa
             FROM tiktok_campaign_snapshots
-            WHERE syncedAt >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+            WHERE synced_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)
           ) t
           WHERE campaignName IS NOT NULL AND campaignName <> ''
           GROUP BY platform, campaignName

@@ -207,9 +207,9 @@ async function runMediaBuyingAdvisor(): Promise<AdvisoryRunSummary> {
         SELECT
           'Meta' AS platform,
           campaignName,
-          CAST(spend AS DECIMAL(12,2)) AS spend,
-          CAST(conversions AS UNSIGNED) AS conversions,
-          CAST(cpa AS DECIMAL(12,2)) AS cpa,
+          CAST(COALESCE(dailyBudget, 0) AS DECIMAL(12,2)) AS spend,
+          0 AS conversions,
+          0 AS cpa,
           syncedAt,
           ROW_NUMBER() OVER (PARTITION BY campaignName ORDER BY syncedAt DESC, id DESC) AS rn
         FROM meta_campaign_snapshots
@@ -220,16 +220,16 @@ async function runMediaBuyingAdvisor(): Promise<AdvisoryRunSummary> {
       latest_tiktok AS (
         SELECT
           'TikTok' AS platform,
-          campaignName,
-          CAST(spend AS DECIMAL(12,2)) AS spend,
-          CAST(conversions AS UNSIGNED) AS conversions,
-          CAST(cpa AS DECIMAL(12,2)) AS cpa,
-          syncedAt,
-          ROW_NUMBER() OVER (PARTITION BY campaignName ORDER BY syncedAt DESC, id DESC) AS rn
+          campaign_name AS campaignName,
+          CAST(COALESCE(spend, 0) AS DECIMAL(12,2)) AS spend,
+          CAST(COALESCE(conversions, 0) AS UNSIGNED) AS conversions,
+          CAST(COALESCE(cpa, 0) AS DECIMAL(12,2)) AS cpa,
+          synced_at,
+          ROW_NUMBER() OVER (PARTITION BY campaign_name ORDER BY synced_at DESC, id DESC) AS rn
         FROM tiktok_campaign_snapshots
-        WHERE campaignName IS NOT NULL
-          AND campaignName <> ''
-          AND syncedAt >= DATE_SUB(NOW(), INTERVAL 3 DAY)
+        WHERE campaign_name IS NOT NULL
+          AND campaign_name <> ''
+          AND synced_at >= DATE_SUB(NOW(), INTERVAL 3 DAY)
       ),
       latest AS (
         SELECT platform, campaignName, spend, conversions, cpa FROM latest_meta WHERE rn = 1
