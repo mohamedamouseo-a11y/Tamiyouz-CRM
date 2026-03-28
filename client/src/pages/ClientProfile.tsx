@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Phone, Mail, MessageCircle, Users, CheckCircle, Clock, GripVertical } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MessageCircle, Users, CheckCircle, Clock, GripVertical, Loader2, ExternalLink } from "lucide-react";
+import { toast } from "sonner";
 import { Link } from "wouter";
 
 function toDateInput(value: unknown) {
@@ -94,6 +95,21 @@ export default function ClientProfile({ params }: RouteProps) {
   const tasksQ = trpc.clientTasks.list.useQuery({ clientId: id }, { enabled: Number.isFinite(id) });
   const onboardingQ = trpc.onboarding.getItems.useQuery({ clientId: id }, { enabled: Number.isFinite(id) });
   const usersListQ = trpc.usersList.list.useQuery();
+
+  // ─── Tamara ─────────────────────────────────────────────────────────────────
+  const { data: tamaraStatus } = trpc.tamara.isEnabled.useQuery();
+  const [tamaraLoadingId, setTamaraLoadingId] = React.useState<number | null>(null);
+  const tamaraCheckout = trpc.tamara.createContractCheckout.useMutation({
+    onSuccess: (data) => {
+      setTamaraLoadingId(null);
+      if (data.checkout_url) window.open(data.checkout_url, "_blank");
+      toast.success("Tamara checkout created");
+    },
+    onError: (err) => {
+      setTamaraLoadingId(null);
+      toast.error("Tamara error", { description: err.message });
+    },
+  });
 
   // Phase 4+5 queries
   const objectivesQ = trpc.objectives.list.useQuery({ clientId: id }, { enabled: Number.isFinite(id) });
@@ -680,6 +696,7 @@ export default function ClientProfile({ params }: RouteProps) {
                           <TableHead>Currency</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Renewal</TableHead>
+                          {tamaraStatus?.enabled && <TableHead>Tamara</TableHead>}
                           <TableHead></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -703,6 +720,35 @@ export default function ClientProfile({ params }: RouteProps) {
                                 {String(c.contractRenewalStatus ?? "New")}
                               </Badge>
                             </TableCell>
+                            {tamaraStatus?.enabled && (
+                              <TableCell>
+                                {Number(c.charges) > 0 ? (
+                                  <Button
+                                    size="sm"
+                                    className="gap-1.5 text-white text-xs font-medium"
+                                    style={{ background: "linear-gradient(135deg, #c084fc 0%, #f472b6 50%, #fb923c 100%)" }}
+                                    disabled={tamaraLoadingId === c.id}
+                                    onClick={() => {
+                                      setTamaraLoadingId(c.id);
+                                      tamaraCheckout.mutate({ contractId: c.id });
+                                    }}
+                                  >
+                                    {tamaraLoadingId === c.id ? (
+                                      <Loader2 size={12} className="animate-spin" />
+                                    ) : (
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M4.5 12.5C4.5 12.5 4.5 8 8 8C11.5 8 11.5 12.5 11.5 12.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                                        <circle cx="17" cy="10.5" r="4" fill="white" />
+                                      </svg>
+                                    )}
+                                    Pay
+                                    <ExternalLink size={10} />
+                                  </Button>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            )}
                             <TableCell>
                               <Button variant="ghost" size="sm" onClick={() => openEditContract(c)}>Edit</Button>
                             </TableCell>
