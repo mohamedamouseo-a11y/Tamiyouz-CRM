@@ -155,7 +155,6 @@ import {
   getLeadAssignments,
   getLeadAssignmentHistory,
   getLeadsByAssignment,
-  checkLeadAccess,
   getMyCollaboratedLeads,
   getMyWatchingLeads,
   createLeadAssignment,
@@ -576,8 +575,8 @@ export const appRouter = router({
         const filters: any = { ...input };
         // ── ROW-LEVEL SECURITY ──
         if (ctx.user.role === "SalesAgent") {
-          // SalesAgent sees leads they own OR are assigned to (via lead_assignments)
-          filters.assignedUserId = ctx.user.id;
+          // SalesAgent sees ONLY their own leads
+          filters.ownerId = ctx.user.id;
         }
         // SalesManager sees all leads (no team filter needed for now since teamId is not widely used)
         const [items, total] = await Promise.all([
@@ -594,11 +593,7 @@ export const appRouter = router({
         if (!lead) throw new TRPCError({ code: "NOT_FOUND" });
         // ── ROW-LEVEL SECURITY ──
         if (ctx.user.role === "SalesAgent" && lead.ownerId !== ctx.user.id) {
-          // Check if user has access via lead_assignments
-          const access = await checkLeadAccess(input.id, ctx.user.id);
-          if (!access.hasAccess) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied: this lead is not assigned to you" });
-          }
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied: this lead is not assigned to you" });
         }
         return lead;
       }),
@@ -1583,37 +1578,6 @@ attachments: router({
           reason: input.reason,
           notes: input.notes,
         });
-        // Send notification to the assigned user
-        try {
-          const roleLabels: Record<string, string> = {
-            collaborator: "Collaborator",
-            client_success: "Client Success",
-            account_manager: "Account Manager",
-            observer: "Observer",
-          };
-          const roleLabelsAr: Record<string, string> = {
-            collaborator: "متعاون",
-            client_success: "نجاح العملاء",
-            account_manager: "مدير حسابات",
-            observer: "مراقب",
-          };
-          const roleLabel = roleLabels[input.role] ?? input.role;
-          const roleLabelAr = roleLabelsAr[input.role] ?? input.role;
-          const leadDisplay = lead.name || lead.phone || `#${lead.id}`;
-          await createInAppNotification({
-            userId: input.userId,
-            type: "lead_assigned" as any,
-            title: `You've been assigned as ${roleLabel} on lead: ${leadDisplay}`,
-            titleAr: `تم تعيينك ك${roleLabelAr} على الليد: ${leadDisplay}`,
-            body: input.reason ? `Reason: ${input.reason}` : null,
-            bodyAr: input.reason ? `السبب: ${input.reason}` : null,
-            isRead: false,
-            link: `/leads/${input.leadId}`,
-            metadata: { leadId: input.leadId, trigger: "lead_assigned", assignmentRole: input.role },
-          } as any);
-        } catch (e) {
-          console.error("[Notification] Failed to notify assignment:", e);
-        }
         return { id, success: true };
       }),
     remove: protectedProcedure

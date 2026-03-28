@@ -210,7 +210,6 @@ export async function deleteUser(id: number, deletedByUserId?: number): Promise<
 // ─── Leads ────────────────────────────────────────────────────────────────────
 export interface LeadFilters {
   ownerId?: number;
-  assignedUserId?: number;
   stage?: string;
   leadQuality?: string;
   campaignName?: string;
@@ -228,26 +227,7 @@ export async function getLeads(filters: LeadFilters = {}) {
   if (!db) return [];
 
   const conditions = [isNull(leads.deletedAt)];
-  if (filters.assignedUserId) {
-    // Show leads where user is owner OR has an active assignment
-    const assignedLeadIds = await db.execute(sql\`
-      SELECT DISTINCT leadId FROM lead_assignments
-      WHERE userId = \${filters.assignedUserId} AND isActive = 1
-    \`);
-    const ids = ((assignedLeadIds as any)[0] ?? []).map((r: any) => r.leadId);
-    if (ids.length > 0) {
-      conditions.push(
-        or(
-          eq(leads.ownerId, filters.assignedUserId),
-          inArray(leads.id, ids)
-        )!
-      );
-    } else {
-      conditions.push(eq(leads.ownerId, filters.assignedUserId));
-    }
-  } else if (filters.ownerId) {
-    conditions.push(eq(leads.ownerId, filters.ownerId));
-  }
+  if (filters.ownerId) conditions.push(eq(leads.ownerId, filters.ownerId));
   if (filters.stage) conditions.push(eq(leads.stage, filters.stage));
   if (filters.leadQuality) conditions.push(eq(leads.leadQuality, filters.leadQuality as any));
   if (filters.campaignName) conditions.push(eq(leads.campaignName, filters.campaignName));
@@ -450,26 +430,7 @@ export async function getLeadsCount(filters: LeadFilters = {}): Promise<number> 
   if (!db) return 0;
 
   const conditions = [isNull(leads.deletedAt)];
-  if (filters.assignedUserId) {
-    // Show leads where user is owner OR has an active assignment
-    const assignedLeadIds = await db.execute(sql\`
-      SELECT DISTINCT leadId FROM lead_assignments
-      WHERE userId = \${filters.assignedUserId} AND isActive = 1
-    \`);
-    const ids = ((assignedLeadIds as any)[0] ?? []).map((r: any) => r.leadId);
-    if (ids.length > 0) {
-      conditions.push(
-        or(
-          eq(leads.ownerId, filters.assignedUserId),
-          inArray(leads.id, ids)
-        )!
-      );
-    } else {
-      conditions.push(eq(leads.ownerId, filters.assignedUserId));
-    }
-  } else if (filters.ownerId) {
-    conditions.push(eq(leads.ownerId, filters.ownerId));
-  }
+  if (filters.ownerId) conditions.push(eq(leads.ownerId, filters.ownerId));
   if (filters.stage) conditions.push(eq(leads.stage, filters.stage));
   if (filters.leadQuality) conditions.push(eq(leads.leadQuality, filters.leadQuality as any));
   if (filters.campaignName) conditions.push(eq(leads.campaignName, filters.campaignName));
