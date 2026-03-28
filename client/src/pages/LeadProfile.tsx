@@ -316,6 +316,7 @@ export default function LeadProfile() {
   const [noteText, setNoteText] = useState("");
   const [tamaraLoading, setTamaraLoading] = useState(false);
   const [sendViaTamara, setSendViaTamara] = useState(false);
+  const [paymobLoading, setPaymobLoading] = useState(false);
 
   const { data: lead, isLoading, refetch } = trpc.leads.byId.useQuery({ id: leadId }, { enabled: Number.isFinite(leadId) });
   const { data: activities, refetch: refetchActivities } = trpc.activities.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
@@ -331,6 +332,7 @@ export default function LeadProfile() {
   const { data: leadAssignments, refetch: refetchAssignments } = trpc.assignments.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const { data: stageChanges } = trpc.auditLogs.byLeadStageChanges.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const { data: tamaraStatus } = trpc.tamara.isEnabled.useQuery();
+  const { data: paymobStatus } = trpc.paymob.isEnabled.useQuery();
   const { data: slaConfig } = trpc.sla.get.useQuery();
 
   const { data: allUsers } = trpc.users.list.useQuery(undefined, { enabled: true });
@@ -422,6 +424,28 @@ export default function LeadProfile() {
     if (!deal?.id) return;
     setTamaraLoading(true);
     tamaraCheckout.mutate({ dealId: deal.id });
+  };
+
+  const paymobCheckout = trpc.paymob.createCheckout.useMutation({
+    onSuccess: (data) => {
+      setPaymobLoading(false);
+      if (data.iframe_url) {
+        window.open(data.iframe_url, "_blank", "noopener,noreferrer");
+        toast.success(isRTL ? "تم إنشاء جلسة دفع Paymob" : "Paymob checkout created");
+      } else {
+        toast.error(isRTL ? "لم يتم الحصول على رابط الدفع" : "Failed to get checkout URL");
+      }
+    },
+    onError: (e) => {
+      setPaymobLoading(false);
+      toast.error(e.message);
+    },
+  });
+
+  const handlePaymobPayment = () => {
+    if (!deal?.id) return;
+    setPaymobLoading(true);
+    paymobCheckout.mutate({ dealId: deal.id, paymentMethod: "card" });
   };
 
   const createNote = trpc.notes.create.useMutation({
@@ -1410,6 +1434,26 @@ export default function LeadProfile() {
                         </Button>
                         <p className="text-[10px] text-muted-foreground text-center mt-1.5">
                           {isRTL ? "الدفع بالتقسيط عبر تمارا" : "Pay in installments via Tamara"}
+                        </p>
+                      </div>
+                    )}
+                    {paymobStatus?.enabled && deal.status === "Pending" && (
+                      <div className="pt-3 border-t border-border/50 mt-3">
+                        <Button
+                          size="sm"
+                          className="w-full gap-2 text-white font-medium"
+                          style={{ background: "linear-gradient(135deg, #3b82f6 0%, #10b981 100%)" }}
+                          onClick={handlePaymobPayment}
+                          disabled={paymobLoading}
+                        >
+                          {paymobLoading ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : null}
+                          {isRTL ? "ادفع عبر Paymob" : "Pay with Paymob"}
+                          <ExternalLink size={12} />
+                        </Button>
+                        <p className="text-[10px] text-muted-foreground text-center mt-1.5">
+                          {isRTL ? "الدفع بالبطاقة أو المحفظة عبر Paymob" : "Pay by card or wallet via Paymob"}
                         </p>
                       </div>
                     )}

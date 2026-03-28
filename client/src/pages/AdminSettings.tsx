@@ -24,6 +24,7 @@ import MetaLeadgenSettingsTab from "@/components/MetaLeadgenSettingsTab";
 import CurrencySettingsTab from "@/components/CurrencySettingsTab";
 import RakanSettingsTab from "@/components/RakanSettingsTab";
 import TamaraSettingsTab from "@/components/TamaraSettingsTab";
+import PaymobSettingsTab from "@/components/PaymobSettingsTab";
 import DemoSyncTab from "@/components/DemoSyncTab";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -416,6 +417,9 @@ export default function AdminSettings() {
             </TabsTrigger>
             {isAdmin && <TabsTrigger value="tamara" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               Tamara
+            </TabsTrigger>}
+            {isAdmin && <TabsTrigger value="paymob" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
+              Paymob
             </TabsTrigger>}
             {isAdmin && <TabsTrigger value="currency" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               <DollarSign size={13} />
@@ -865,6 +869,10 @@ export default function AdminSettings() {
           {/* ── Currency / Exchange Rates Tab ── */}
           {isAdmin && <TabsContent value="tamara" className="mt-4">
             <TamaraSettingsTab />
+          </TabsContent>}
+
+          {isAdmin && <TabsContent value="paymob" className="mt-4">
+            <PaymobSettingsTab />
           </TabsContent>}
 
           {isAdmin && <TabsContent value="currency" className="mt-4">

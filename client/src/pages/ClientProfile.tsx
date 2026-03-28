@@ -111,6 +111,21 @@ export default function ClientProfile({ params }: RouteProps) {
     },
   });
 
+  // ─── Paymob ─────────────────────────────────────────────────────────────────
+  const { data: paymobStatus } = trpc.paymob.isEnabled.useQuery();
+  const [paymobLoadingId, setPaymobLoadingId] = React.useState<number | null>(null);
+  const paymobCheckout = trpc.paymob.createContractCheckout.useMutation({
+    onSuccess: (data) => {
+      setPaymobLoadingId(null);
+      if (data.iframe_url) window.open(data.iframe_url, "_blank", "noopener,noreferrer");
+      toast.success("Paymob checkout created");
+    },
+    onError: (err) => {
+      setPaymobLoadingId(null);
+      toast.error("Paymob error", { description: err.message });
+    },
+  });
+
   // Phase 4+5 queries
   const objectivesQ = trpc.objectives.list.useQuery({ clientId: id }, { enabled: Number.isFinite(id) });
   const deliverablesQ = trpc.deliverables.list.useQuery({ clientId: id }, { enabled: Number.isFinite(id) });
@@ -697,6 +712,7 @@ export default function ClientProfile({ params }: RouteProps) {
                           <TableHead>Status</TableHead>
                           <TableHead>Renewal</TableHead>
                           {tamaraStatus?.enabled && <TableHead>Tamara</TableHead>}
+                          {paymobStatus?.enabled && <TableHead>Paymob</TableHead>}
                           <TableHead></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -741,6 +757,30 @@ export default function ClientProfile({ params }: RouteProps) {
                                         <circle cx="17" cy="10.5" r="4" fill="white" />
                                       </svg>
                                     )}
+                                    Pay
+                                    <ExternalLink size={10} />
+                                  </Button>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            )}
+                            {paymobStatus?.enabled && (
+                              <TableCell>
+                                {Number(c.charges) > 0 ? (
+                                  <Button
+                                    size="sm"
+                                    className="gap-1.5 text-white text-xs font-medium"
+                                    style={{ background: "linear-gradient(135deg, #3b82f6 0%, #10b981 100%)" }}
+                                    disabled={paymobLoadingId === c.id}
+                                    onClick={() => {
+                                      setPaymobLoadingId(c.id);
+                                      paymobCheckout.mutate({ contractId: c.id, paymentMethod: "card" });
+                                    }}
+                                  >
+                                    {paymobLoadingId === c.id ? (
+                                      <Loader2 size={12} className="animate-spin" />
+                                    ) : null}
                                     Pay
                                     <ExternalLink size={10} />
                                   </Button>

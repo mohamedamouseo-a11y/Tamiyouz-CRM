@@ -22,6 +22,7 @@ import { MetaLeadgenService, startMetaLeadgenPolling } from "../services/MetaLea
 import { restoreService } from "../services/RestoreService";
 import { promises as fs } from "fs";
 import { handleTamaraWebhook, verifyTamaraWebhookRequest } from "../services/tamaraService";
+import { handlePaymobWebhook } from "../services/paymobService";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -498,6 +499,56 @@ async function startServer() {
       });
     }
   });
+// ── Paymob Webhook ──────────────────────────────────────────────────────────
+  app.post("/api/paymob/webhook", async (req, res) => {
+    try {
+      const hmac = typeof req.query.hmac === "string" ? req.query.hmac : undefined;
+      const result = await handlePaymobWebhook(req.body, hmac);
+      return res.status(200).json({ ok: true, result });
+    } catch (error) {
+      console.error("[Paymob webhook:POST] error:", error);
+      return res.status(400).json({
+        ok: false,
+        message: error instanceof Error ? error.message : "Invalid Paymob webhook request.",
+      });
+    }
+  });
+
+  app.get("/api/paymob/webhook", async (req, res) => {
+    try {
+      const hmac = typeof req.query.hmac === "string" ? req.query.hmac : undefined;
+      const result = await handlePaymobWebhook(req.query, hmac);
+      const success = String(req.query.success || "false") === "true";
+      const pending = String(req.query.pending || "false") === "true";
+      return res.status(200).send(`
+        <!doctype html>
+        <html lang="en">
+          <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Paymob Payment Status</title>
+            <style>body{font-family:Arial,sans-serif;background:#0b1020;color:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}.card{max-width:560px;width:calc(100% - 32px);background:#111827;border:1px solid #1f2937;border-radius:16px;padding:24px;box-shadow:0 10px 40px rgba(0,0,0,.25)}.ok{color:#34d399}.warn{color:#fbbf24}.muted{color:#cbd5e1}</style>
+          </head>
+          <body>
+            <div class="card">
+              <h2 class="${success && !pending ? "ok" : "warn"}">${success && !pending ? "Payment processed successfully" : "Payment is pending or failed"}</h2>
+              <p class="muted">You can close this page and return to the CRM.</p>
+            </div>
+          </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("[Paymob webhook:GET] error:", error);
+      return res.status(400).send(`
+        <!doctype html>
+        <html lang="en">
+          <head><meta charset="utf-8" /><title>Paymob Payment Status</title></head>
+          <body style="font-family:Arial,sans-serif;padding:24px;">
+            <h2>Invalid Paymob callback</h2>
+            <p>${error instanceof Error ? error.message : "Invalid callback request."}</p>
+          </body>
+        </html>
+      `);
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
