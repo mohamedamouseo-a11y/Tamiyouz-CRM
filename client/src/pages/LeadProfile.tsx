@@ -20,6 +20,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useThemeTokens } from "@/contexts/ThemeTokenContext";
 import { trpc } from "@/lib/trpc";
@@ -314,6 +315,7 @@ export default function LeadProfile() {
   const [assignRole, setAssignRole] = useState<string>("collaborator");
   const [noteText, setNoteText] = useState("");
   const [tamaraLoading, setTamaraLoading] = useState(false);
+  const [sendViaTamara, setSendViaTamara] = useState(false);
 
   const { data: lead, isLoading, refetch } = trpc.leads.byId.useQuery({ id: leadId }, { enabled: Number.isFinite(leadId) });
   const { data: activities, refetch: refetchActivities } = trpc.activities.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
@@ -376,10 +378,11 @@ export default function LeadProfile() {
       setShowDeal(false);
       refetchDeal();
       dealReset();
-      // Auto-trigger Tamara checkout if enabled and deal is Pending
-      if (tamaraStatus?.enabled && newDeal?.id) {
+      // Auto-trigger Tamara checkout if user toggled sendViaTamara
+      if (sendViaTamara && tamaraStatus?.enabled && newDeal?.id) {
         setTamaraLoading(true);
         tamaraCheckout.mutate({ dealId: newDeal.id });
+        setSendViaTamara(false);
       }
     },
     onError: (e) => toast.error(e.message),
@@ -390,6 +393,14 @@ export default function LeadProfile() {
       toast.success(t("success"));
       refetchDeal();
     },
+  });
+
+  const cancelDeal = trpc.deals.cancel.useMutation({
+    onSuccess: () => {
+      toast.success(isRTL ? "تم إلغاء الصفقة بنجاح" : "Deal cancelled successfully");
+      refetchDeal();
+    },
+    onError: (e) => toast.error(e.message),
   });
 
   const tamaraCheckout = trpc.tamara.createCheckout.useMutation({
@@ -1402,6 +1413,24 @@ export default function LeadProfile() {
                         </p>
                       </div>
                     )}
+                    {canEdit && deal.status !== "Won" && (
+                      <div className="pt-2 border-t border-border/50 mt-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="w-full gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            if (confirm(isRTL ? "هل أنت متأكد من إلغاء هذه الصفقة؟" : "Are you sure you want to cancel this deal?")) {
+                              cancelDeal.mutate({ id: deal.id, leadId });
+                            }
+                          }}
+                          disabled={cancelDeal.isPending}
+                        >
+                          {cancelDeal.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          {isRTL ? "إلغاء الصفقة" : "Cancel Deal"}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -1666,6 +1695,15 @@ export default function LeadProfile() {
               <Label>{t("notes")}</Label>
               <Textarea {...dealRegister("notes")} rows={2} />
             </div>
+            {tamaraStatus?.enabled && (
+              <div className="flex items-center justify-between rounded-lg border p-3" style={{ borderColor: "#c084fc40", background: "linear-gradient(135deg, #c084fc10 0%, #f472b610 50%, #fb923c10 100%)" }}>
+                <div>
+                  <p className="text-sm font-medium">{isRTL ? "إرسال رابط تمارا" : "Send Tamara Payment Link"}</p>
+                  <p className="text-[10px] text-muted-foreground">{isRTL ? "ادفع بالتقسيط عبر تمارا" : "Auto-send installment payment link"}</p>
+                </div>
+                <Switch checked={sendViaTamara} onCheckedChange={setSendViaTamara} />
+              </div>
+            )}
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={() => setShowDeal(false)}>{t("cancel")}</Button>
               <Button type="submit" style={{ background: tokens.primaryColor }} className="text-white" disabled={createDeal.isPending}>

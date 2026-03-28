@@ -143,17 +143,61 @@ async function resolveResponsibleUserId(leadId?: number | null, dealId?: number 
 }
 
 async function sendPaymentSuccessNotification(params: { dealId: number; leadId?: number | null; orderId: string }) {
-  const userId = await resolveResponsibleUserId(params.leadId, params.dealId);
-  if (!userId) {
-    console.warn("[Tamara] Could not resolve responsible user for the paid deal.");
-    return;
+  const pool = getPool();
+
+  // Get lead info for better notification
+  let leadName = "Lead";
+  let leadPhone = "";
+  let dealValue = "";
+  if (params.leadId) {
+    try {
+      const [leadRows] = await pool.execute("SELECT name, phone FROM leads WHERE id = ? LIMIT 1", [params.leadId]) as any;
+      if (leadRows?.[0]) {
+        leadName = leadRows[0].name || leadRows[0].phone || "Lead";
+        leadPhone = leadRows[0].phone || "";
+      }
+    } catch {}
+  }
+  try {
+    const [dealRows] = await pool.execute("SELECT valueSar, currency FROM deals WHERE id = ? LIMIT 1", [params.dealId]) as any;
+    if (dealRows?.[0]) {
+      dealValue = `${dealRows[0].valueSar || "0"} ${dealRows[0].currency || "SAR"}`;
+    }
+  } catch {}
+
+  const title = `\u062a\u0645\u0627\u0631\u0627 | \u062f\u0641\u0639\u0629 \u0645\u0642\u0628\u0648\u0636\u0629 - ${leadName}`;
+  const body = `Deal #${params.dealId} (${dealValue}) was paid via Tamara. Order: ${params.orderId}`;
+  const bodyAr = `\u062a\u0645 \u062f\u0641\u0639\u0647\u0627 \u0639\u0628\u0631 \u062a\u0645\u0627\u0631\u0627 (${dealValue}) .\u0627\u0644\u0635\u0641\u0642\u0629 #${params.dealId} \u0631\u0642\u0645 \u0627\u0644\u0637\u0644\u0628: ${params.orderId}`;
+
+  // Notify the responsible sales agent
+  const salesUserId = await resolveResponsibleUserId(params.leadId, params.dealId);
+  if (salesUserId) {
+    await tryInsertInAppNotification(salesUserId, title, body);
   }
 
-  await tryInsertInAppNotification(
-    userId,
-    "Tamara payment approved",
-    `Deal #${params.dealId} was successfully approved and authorised via Tamara. Order ID: ${params.orderId}`,
-  );
+  // Notify all admins
+  try {
+    const [adminRows] = await pool.execute(
+      "SELECT id FROM users WHERE role IN ('Admin', 'admin', 'SalesManager') AND isActive = 1 AND deletedAt IS NULL"
+    ) as any;
+    for (const admin of (adminRows || [])) {
+      if (admin.id === salesUserId) continue; // skip if already notified
+      await tryInsertInAppNotification(admin.id, title, body);
+    }
+  } catch (err) {
+    console.warn("[Tamara] Failed to notify admins:", err);
+  }
+
+  // Create audit log entry
+  try {
+    await pool.execute(
+      `INSERT INTO audit_logs (userId, userName, userRole, action, entityType, entityId, entityName, details, createdAt)
+       VALUES (0, 'Tamara System', 'system', 'tamara_payment', 'deals', ?, ?, ?, NOW())`,
+      [params.dealId, leadName, JSON.stringify({ orderId: params.orderId, dealValue, leadId: params.leadId, event: "payment_approved" })]
+    );
+  } catch (err) {
+    console.warn("[Tamara] Failed to create audit log:", err);
+  }
 }
 
 // ─── Settings CRUD ─────────────────────────────────────────────────────────────

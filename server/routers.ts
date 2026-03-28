@@ -1008,6 +1008,30 @@ export const appRouter = router({
         const { id, ...data } = input;
         return updateDeal(id, data as any);
       }),
+
+    cancel: notMediaBuyerProcedure
+      .input(z.object({ id: z.number(), leadId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        // ROW_LEVEL_SECURITY
+        if (ctx.user.role === "SalesAgent") {
+          const lead = await getLeadById(input.leadId);
+          if (!lead || lead.ownerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        await softDeleteDeal(input.id, ctx.user.id);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name ?? null,
+          userRole: ctx.user.role,
+          action: "cancel_deal",
+          entityType: "deals",
+          entityId: input.id,
+          entityName: `Deal #${input.id}`,
+          details: { leadId: input.leadId, cancelledBy: ctx.user.name },
+        });
+        return { success: true };
+      }),
   }),
 
   // ─── Campaigns ────────────────────────────────────────────────────────────

@@ -190,6 +190,14 @@ export async function getAllUsers(): Promise<User[]> {
   return db.select().from(users).where(isNull(users.deletedAt)).orderBy(users.name);
 }
 
+// Helper: get user display name by ID (used in notifications)
+async function _getUserNameById(userId: number): Promise<string> {
+  const db = await getDb();
+  if (!db) return "Unknown";
+  const [user] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId)).limit(1);
+  return user?.name ?? "Unknown";
+}
+
 export async function getUsersByRole(role: string): Promise<User[]> {
   const db = await getDb();
   if (!db) return [];
