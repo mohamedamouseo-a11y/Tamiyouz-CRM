@@ -15,7 +15,8 @@ import {
   Languages, LayoutDashboard, LifeBuoy, Link2, LocateFixed, Megaphone,
   MessagesSquare, MoonStar, Music2, PlugZap, Presentation, RefreshCw,
   Rocket, Rows3, Search, Settings2, ShieldCheck, SlidersHorizontal,
-  Sparkles, UserRound, Users, X, BookOpen, Mail, Phone, MessageCircle
+  Sparkles, UserRound, Users, X, BookOpen, Mail, Phone, MessageCircle,
+  CreditCard
 } from "lucide-react";
 
 
@@ -53,6 +54,7 @@ const ICON: Record<string, React.ReactNode> = {
   MoonStar: <MoonStar className="h-5 w-5" />,
   Languages: <Languages className="h-5 w-5" />,
   KeyRound: <KeyRound className="h-5 w-5" />,
+  CreditCard: <CreditCard className="h-5 w-5" />,
 };
 const getIcon = (name: string) => ICON[name] || <HelpCircle className="h-5 w-5" />;
 
@@ -314,6 +316,13 @@ const SECTIONS_META: Record<string, { nameEn: string; nameAr: string; descriptio
     "descriptionEn": "Recover access and apply better password security.",
     "descriptionAr": "استعد الوصول وطبّق ممارسات أمان أفضل لكلمة المرور.",
     "icon": "KeyRound"
+  },
+  "tamara-payments": {
+    "nameEn": "Tamara Payments",
+    "nameAr": "مدفوعات تمارا",
+    "descriptionEn": "Send installment payment links via Tamara for deals and contract renewals.",
+    "descriptionAr": "أرسل روابط دفع بالتقسيط عبر تمارا للصفقات وتجديد العقود.",
+    "icon": "CreditCard"
   }
 }
 ;
@@ -352,7 +361,8 @@ const CATEGORIES_RAW: Array<{ id: string; nameEn: string; nameAr: string; descri
       "activities",
       "renewals",
       "customers",
-      "customer-profile"
+      "customer-profile",
+      "tamara-payments"
     ]
   },
   {
@@ -1568,6 +1578,51 @@ const ARTICLES: Article[] =
       "permissions",
       "filters",
       "data"
+    ],
+    "popular": false
+  },
+  {
+    "id": "tamara-getting-started",
+    "categoryId": "sales-customers",
+    "sectionId": "tamara-payments",
+    "questionEn": "How do I start using Tamara Payments in Tamiyouz CRM?",
+    "questionAr": "كيف أبدأ باستخدام مدفوعات تمارا في Tamiyouz CRM؟",
+    "answerEn": "<h2>Getting Started with Tamara Payments in Tamiyouz CRM</h2><p><strong>Tamara</strong> is a Buy Now, Pay Later (BNPL) payment gateway integrated into Tamiyouz CRM. It allows your clients to pay in installments (split into 3 payments) for both new deals and contract renewals.</p><h3>Prerequisites</h3><ul><li><strong>Tamara must be enabled</strong> by an Admin from the <em>Settings</em> page.</li><li>The Admin must configure the <strong>API Token</strong>, <strong>Notification URL</strong> (webhook), and <strong>Merchant URL</strong>.</li><li>Once enabled, Tamara buttons will appear automatically for Sales Agents and Account Managers.</li></ul><h3>For Sales Agents — Sending Tamara Links for Deals</h3><ol><li>Open a <strong>Lead Profile</strong> page and click <strong>New Deal</strong>.</li><li>Fill in the deal details (package, value, currency).</li><li>Toggle the <strong>Send via Tamara</strong> switch to enable installment payment.</li><li>Click <strong>Create Deal</strong>. A Tamara checkout page will open in a new tab.</li><li>Share the payment link with the client or let them complete the payment.</li><li>Once the client pays, the deal status automatically changes to <strong>Won</strong>.</li><li>Notifications are sent to the responsible sales agent, all admins, and sales managers.</li></ol><h3>For Account Managers — Sending Tamara Links for Contract Renewals</h3><ol><li>Open a <strong>Client Profile</strong> page and go to the <strong>Contracts</strong> tab.</li><li>Find the contract you want to renew in the contracts table.</li><li>Click the <strong>Pay</strong> button (purple gradient) in the Tamara column.</li><li>A Tamara checkout page will open in a new tab.</li><li>Once the client pays, the contract status changes to <strong>Active</strong> and renewal status to <strong>Renewed</strong>.</li><li>Notifications are sent to the responsible account manager and all admins.</li></ol><h3>What Happens After Payment?</h3><ul><li><strong>Automatic Status Update:</strong> Deal becomes \"Won\" or Contract becomes \"Renewed\".</li><li><strong>In-App Notifications:</strong> Sent to the responsible team member and all admins.</li><li><strong>Audit Log:</strong> Every Tamara transaction is recorded in the audit log for traceability.</li></ul><div class=\"tip\">💡 Tip: Make sure the client's phone number is in the correct Saudi format (+966XXXXXXXXX) for Tamara to process the payment correctly.</div><div class=\"note\">📝 Note: The Tamara Pay button only appears when Tamara is enabled in the system settings. Contact your admin if you don't see it.</div>",
+    "answerAr": "<h2>كيفية البدء باستخدام مدفوعات تمارا في Tamiyouz CRM</h2><p><strong>تمارا</strong> هي بوابة دفع بنظام \"اشترِ الآن وادفع لاحقاً\" (BNPL) مدمجة في Tamiyouz CRM. تتيح لعملائك الدفع بالتقسيط (مقسمة على 3 دفعات) سواء للصفقات الجديدة أو تجديد العقود.</p><h3>المتطلبات الأساسية</h3><ul><li><strong>يجب تفعيل تمارا</strong> من قبل المسؤول (Admin) من صفحة <em>الإعدادات</em>.</li><li>يجب على المسؤول إعداد <strong>رمز API</strong> و<strong>رابط الإشعارات</strong> (webhook) و<strong>رابط المتجر</strong>.</li><li>بمجرد التفعيل، ستظهر أزرار تمارا تلقائياً لموظفي المبيعات ومديري الحسابات.</li></ul><h3>لموظفي المبيعات — إرسال روابط تمارا للصفقات</h3><ol><li>افتح صفحة <strong>ملف العميل المحتمل</strong> واضغط على <strong>صفقة جديدة</strong>.</li><li>أدخل تفاصيل الصفقة (الباقة، القيمة، العملة).</li><li>فعّل مفتاح <strong>الإرسال عبر تمارا</strong> لتفعيل الدفع بالتقسيط.</li><li>اضغط <strong>إنشاء صفقة</strong>. ستفتح صفحة دفع تمارا في تبويب جديد.</li><li>شارك رابط الدفع مع العميل أو اتركه يكمل الدفع.</li><li>بمجرد دفع العميل، تتغير حالة الصفقة تلقائياً إلى <strong>مكتسبة (Won)</strong>.</li><li>يتم إرسال إشعارات لموظف المبيعات المسؤول وجميع المسؤولين ومديري المبيعات.</li></ol><h3>لمديري الحسابات — إرسال روابط تمارا لتجديد العقود</h3><ol><li>افتح صفحة <strong>ملف العميل</strong> وانتقل إلى تبويب <strong>العقود</strong>.</li><li>ابحث عن العقد المراد تجديده في جدول العقود.</li><li>اضغط على زر <strong>Pay</strong> (بتدرج بنفسجي) في عمود تمارا.</li><li>ستفتح صفحة دفع تمارا في تبويب جديد.</li><li>بمجرد دفع العميل، تتغير حالة العقد إلى <strong>نشط (Active)</strong> وحالة التجديد إلى <strong>مُجدد (Renewed)</strong>.</li><li>يتم إرسال إشعارات لمدير الحساب المسؤول وجميع المسؤولين.</li></ol><h3>ماذا يحدث بعد الدفع؟</h3><ul><li><strong>تحديث تلقائي للحالة:</strong> الصفقة تصبح \"مكتسبة\" أو العقد يصبح \"مُجدد\".</li><li><strong>إشعارات داخلية:</strong> تُرسل للمسؤول المعني وجميع المسؤولين.</li><li><strong>سجل التدقيق:</strong> كل معاملة تمارا تُسجل في سجل العمليات للتتبع.</li></ul><div class=\"tip\">💡 نصيحة: تأكد من أن رقم هاتف العميل بالصيغة السعودية الصحيحة (+966XXXXXXXXX) حتى تتم معالجة الدفع بشكل صحيح.</div><div class=\"note\">📝 ملاحظة: زر الدفع عبر تمارا يظهر فقط عند تفعيل تمارا في إعدادات النظام. تواصل مع المسؤول إذا لم تجده.</div>",
+    "keywords": [
+      "tamara",
+      "تمارا",
+      "payments",
+      "مدفوعات",
+      "installments",
+      "تقسيط",
+      "BNPL",
+      "deals",
+      "contracts",
+      "عقود",
+      "صفقات"
+    ],
+    "popular": true
+  },
+  {
+    "id": "tamara-troubleshooting",
+    "categoryId": "sales-customers",
+    "sectionId": "tamara-payments",
+    "questionEn": "Why is Tamara Payments not working as expected?",
+    "questionAr": "لماذا لا تعمل مدفوعات تمارا كما هو متوقع؟",
+    "answerEn": "<h2>Troubleshooting Tamara Payments</h2><p>If you encounter issues with <strong>Tamara Payments</strong> in Tamiyouz CRM, follow these steps to diagnose and resolve common problems.</p><h3>Issue 1: Tamara Button Not Appearing</h3><ul><li><strong>Check Tamara Settings:</strong> Go to <em>Settings</em> and verify that Tamara is <strong>enabled</strong>. The Pay button and Send via Tamara toggle only appear when Tamara is active.</li><li><strong>Check Your Role:</strong> Tamara for deals is available to <strong>Sales Agents</strong>. Tamara for contracts is available to <strong>Account Managers</strong>. Ensure you have the correct role.</li><li><strong>Refresh the Page:</strong> After the admin enables Tamara, you may need to refresh the page for changes to take effect.</li></ul><h3>Issue 2: Payment Link Not Opening</h3><ul><li><strong>Check Browser Popup Blocker:</strong> Tamara opens the payment page in a new tab. If your browser blocks popups, the link won't open. Allow popups for the CRM domain.</li><li><strong>Verify API Token:</strong> If the admin entered an incorrect API token, the checkout session will fail. Ask the admin to verify the token in Settings.</li><li><strong>Check Client Data:</strong> Tamara requires a valid phone number and name. Ensure the lead or client profile has complete information.</li></ul><h3>Issue 3: Payment Approved but Status Not Updated</h3><ul><li><strong>Webhook URL:</strong> The Notification URL (webhook) must be correctly configured in Tamara settings. If it's wrong, Tamara can't notify the CRM about successful payments.</li><li><strong>Server Status:</strong> Ensure the CRM server is running and accessible. If the server was down when the payment was made, the webhook may have been missed.</li><li><strong>Check Audit Logs:</strong> Go to <em>Audit Log</em> and search for \"tamara_payment\" or \"tamara_contract_payment\" to see if the webhook was received.</li></ul><h3>Issue 4: Notifications Not Received</h3><ul><li><strong>Check Notification Settings:</strong> Ensure in-app notifications are enabled for your account.</li><li><strong>Verify User Role:</strong> Notifications are sent to the responsible agent/manager and all admins. If you're not in these groups, you won't receive them.</li><li><strong>Check Inbox:</strong> Notifications appear in the <strong>Inbox</strong> (bell icon). Make sure you're checking the right section.</li></ul><h3>Issue 5: How to Verify Tamara Transactions</h3><ol><li>Navigate to <strong>Audit Log</strong> from the sidebar.</li><li>Search for entries with action type <strong>tamara_payment</strong> (for deals) or <strong>tamara_contract_payment</strong> (for contracts).</li><li>Each entry shows the order ID, amount, and timestamp for full traceability.</li></ol><div class=\"tip\">💡 Tip: If a payment was made but the status didn't update, the admin can manually update the deal or contract status while investigating the webhook issue.</div><div class=\"note\">📝 Note: For persistent issues, check the server logs or contact technical support with the Tamara order ID for faster resolution.</div>",
+    "answerAr": "<h2>حل مشاكل مدفوعات تمارا</h2><p>إذا واجهت مشاكل مع <strong>مدفوعات تمارا</strong> في Tamiyouz CRM، اتبع هذه الخطوات لتشخيص وحل المشاكل الشائعة.</p><h3>المشكلة 1: زر تمارا غير ظاهر</h3><ul><li><strong>تحقق من إعدادات تمارا:</strong> اذهب إلى <em>الإعدادات</em> وتأكد من أن تمارا <strong>مفعّلة</strong>. زر الدفع ومفتاح الإرسال عبر تمارا يظهران فقط عند تفعيل تمارا.</li><li><strong>تحقق من دورك:</strong> تمارا للصفقات متاحة لـ<strong>موظفي المبيعات</strong>. تمارا للعقود متاحة لـ<strong>مديري الحسابات</strong>. تأكد من أن لديك الدور الصحيح.</li><li><strong>حدّث الصفحة:</strong> بعد تفعيل المسؤول لتمارا، قد تحتاج لتحديث الصفحة لتظهر التغييرات.</li></ul><h3>المشكلة 2: رابط الدفع لا يفتح</h3><ul><li><strong>تحقق من مانع النوافذ المنبثقة:</strong> تمارا تفتح صفحة الدفع في تبويب جديد. إذا كان المتصفح يحظر النوافذ المنبثقة، لن يفتح الرابط. اسمح بالنوافذ المنبثقة لنطاق النظام.</li><li><strong>تحقق من رمز API:</strong> إذا أدخل المسؤول رمز API خاطئ، ستفشل جلسة الدفع. اطلب من المسؤول التحقق من الرمز في الإعدادات.</li><li><strong>تحقق من بيانات العميل:</strong> تمارا تتطلب رقم هاتف واسم صالحين. تأكد من اكتمال بيانات العميل المحتمل أو العميل.</li></ul><h3>المشكلة 3: تم الدفع لكن الحالة لم تتحدث</h3><ul><li><strong>رابط الإشعارات (Webhook):</strong> يجب إعداد رابط الإشعارات بشكل صحيح في إعدادات تمارا. إذا كان خاطئاً، لن تستطيع تمارا إبلاغ النظام بالمدفوعات الناجحة.</li><li><strong>حالة السيرفر:</strong> تأكد من أن سيرفر النظام يعمل ويمكن الوصول إليه. إذا كان السيرفر متوقفاً وقت الدفع، قد يكون الإشعار قد فُقد.</li><li><strong>تحقق من سجل التدقيق:</strong> اذهب إلى <em>سجل العمليات</em> وابحث عن \"tamara_payment\" أو \"tamara_contract_payment\" للتحقق من استلام الإشعار.</li></ul><h3>المشكلة 4: الإشعارات لا تصل</h3><ul><li><strong>تحقق من إعدادات الإشعارات:</strong> تأكد من تفعيل الإشعارات الداخلية لحسابك.</li><li><strong>تحقق من دور المستخدم:</strong> الإشعارات تُرسل للموظف/المدير المسؤول وجميع المسؤولين. إذا لم تكن ضمن هذه المجموعات، لن تستقبلها.</li><li><strong>تحقق من صندوق الوارد:</strong> الإشعارات تظهر في <strong>صندوق الوارد</strong> (أيقونة الجرس). تأكد من أنك تتحقق من القسم الصحيح.</li></ul><h3>المشكلة 5: كيفية التحقق من معاملات تمارا</h3><ol><li>انتقل إلى <strong>سجل العمليات</strong> من القائمة الجانبية.</li><li>ابحث عن الإدخالات بنوع الإجراء <strong>tamara_payment</strong> (للصفقات) أو <strong>tamara_contract_payment</strong> (للعقود).</li><li>كل إدخال يعرض رقم الطلب والمبلغ والتوقيت للتتبع الكامل.</li></ol><div class=\"tip\">💡 نصيحة: إذا تم الدفع ولم تتحدث الحالة، يمكن للمسؤول تحديث حالة الصفقة أو العقد يدوياً أثناء التحقيق في مشكلة الإشعارات.</div><div class=\"note\">📝 ملاحظة: للمشاكل المستمرة، تحقق من سجلات السيرفر أو تواصل مع الدعم الفني مع رقم طلب تمارا لحل أسرع.</div>",
+    "keywords": [
+      "tamara",
+      "تمارا",
+      "troubleshooting",
+      "payments",
+      "مدفوعات",
+      "webhook",
+      "notifications",
+      "إشعارات",
+      "error",
+      "خطأ"
     ],
     "popular": false
   }
