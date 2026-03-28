@@ -541,8 +541,7 @@ export async function buildDbContext(
     parts.push("تعذر تحميل بعض المؤشرات من قاعدة البيانات. استخدم فقط ما هو متاح واذكر حدود البيانات بوضوح.");
   }
 
-  return parts.join("
-");
+  return parts.join("\n");
 }
 
 // ─── OpenAI-Compatible API Call (Fallback LLM) ──────────────────────────────
@@ -760,8 +759,7 @@ function generateStaticFallbackReply(
     parts.push(`📥 أو لو عايز تقرير Excel، قولي "عايز تقرير" وحدد النوع.`);
   }
 
-  return parts.join("
-");//\n");
+  return parts.join("\n");
 }
 
 // ─── Gemini API Call ───────────────────────────────────────────────────────────
