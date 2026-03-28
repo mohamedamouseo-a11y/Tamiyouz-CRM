@@ -230,10 +230,10 @@ export async function getLeads(filters: LeadFilters = {}) {
   const conditions = [isNull(leads.deletedAt)];
   if (filters.assignedUserId) {
     // Show leads where user is owner OR has an active assignment
-    const assignedLeadIds = await db.execute(sql\`
+    const assignedLeadIds = await db.execute(sql`
       SELECT DISTINCT leadId FROM lead_assignments
-      WHERE userId = \${filters.assignedUserId} AND isActive = 1
-    \`);
+      WHERE userId = ${filters.assignedUserId} AND isActive = 1
+    `);
     const ids = ((assignedLeadIds as any)[0] ?? []).map((r: any) => r.leadId);
     if (ids.length > 0) {
       conditions.push(
@@ -452,10 +452,10 @@ export async function getLeadsCount(filters: LeadFilters = {}): Promise<number> 
   const conditions = [isNull(leads.deletedAt)];
   if (filters.assignedUserId) {
     // Show leads where user is owner OR has an active assignment
-    const assignedLeadIds = await db.execute(sql\`
+    const assignedLeadIds = await db.execute(sql`
       SELECT DISTINCT leadId FROM lead_assignments
-      WHERE userId = \${filters.assignedUserId} AND isActive = 1
-    \`);
+      WHERE userId = ${filters.assignedUserId} AND isActive = 1
+    `);
     const ids = ((assignedLeadIds as any)[0] ?? []).map((r: any) => r.leadId);
     if (ids.length > 0) {
       conditions.push(
