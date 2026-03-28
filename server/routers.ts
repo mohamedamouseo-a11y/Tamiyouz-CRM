@@ -8,6 +8,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { rakanRouter } from "./rakanRouter";
+import { tamaraRouter } from "./tamaraRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { createSessionToken } from "./auth";
 import bcrypt from "bcryptjs";

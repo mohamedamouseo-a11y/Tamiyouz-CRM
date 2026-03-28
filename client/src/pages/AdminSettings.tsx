@@ -23,6 +23,7 @@ import TikTokSettingsTab from "@/components/tiktok/TikTokSettingsTab";
 import MetaLeadgenSettingsTab from "@/components/MetaLeadgenSettingsTab";
 import CurrencySettingsTab from "@/components/CurrencySettingsTab";
 import RakanSettingsTab from "@/components/RakanSettingsTab";
+import TamaraSettingsTab from "@/components/TamaraSettingsTab";
 import DemoSyncTab from "@/components/DemoSyncTab";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -413,6 +414,9 @@ export default function AdminSettings() {
               <Sparkles size={13} className="text-violet-500 data-[state=active]:text-white" />
               <span>{isRTL ? "راكان AI" : "Rakan AI"}</span>
             </TabsTrigger>
+            {isAdmin && <TabsTrigger value="tamara" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
+              Tamara
+            </TabsTrigger>}
             {isAdmin && <TabsTrigger value="currency" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               <DollarSign size={13} />
               <span>{isRTL ? "العملات" : "Currency"}</span>
@@ -859,6 +863,10 @@ export default function AdminSettings() {
           </TabsContent>
 
           {/* ── Currency / Exchange Rates Tab ── */}
+          {isAdmin && <TabsContent value="tamara" className="mt-4">
+            <TamaraSettingsTab />
+          </TabsContent>}
+
           {isAdmin && <TabsContent value="currency" className="mt-4">
             <CurrencySettingsTab />
           </TabsContent>}

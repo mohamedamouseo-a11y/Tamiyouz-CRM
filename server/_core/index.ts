@@ -21,6 +21,7 @@ import { backupService } from "../services/BackupService";
 import { MetaLeadgenService, startMetaLeadgenPolling } from "../services/MetaLeadgenService";
 import { restoreService } from "../services/RestoreService";
 import { promises as fs } from "fs";
+import { handleTamaraWebhook, verifyTamaraWebhookRequest } from "../services/tamaraService";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -480,6 +481,23 @@ async function startServer() {
     }
   });
 
+// ── Tamara Webhook ──────────────────────────────────────────────────────────
+  app.post("/api/tamara/webhook", async (req, res) => {
+    try {
+      await verifyTamaraWebhookRequest({
+        headers: req.headers as Record<string, string | string[] | undefined>,
+        query: req.query as Record<string, unknown>,
+      });
+      const result = await handleTamaraWebhook(req.body);
+      return res.status(200).json({ ok: true, result });
+    } catch (error) {
+      console.error("[Tamara webhook] error:", error);
+      return res.status(400).json({
+        ok: false,
+        message: error instanceof Error ? error.message : "Invalid Tamara webhook request.",
+      });
+    }
+  });
   // tRPC API
   app.use(
     "/api/trpc",
