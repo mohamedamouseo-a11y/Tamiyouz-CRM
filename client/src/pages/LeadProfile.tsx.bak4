@@ -371,16 +371,11 @@ export default function LeadProfile() {
   });
 
   const createDeal = trpc.deals.create.useMutation({
-    onSuccess: (newDeal) => {
+    onSuccess: () => {
       toast.success(t("success"));
       setShowDeal(false);
       refetchDeal();
       dealReset();
-      // Auto-trigger Tamara checkout if enabled and deal is Pending
-      if (tamaraStatus?.enabled && newDeal?.id) {
-        setTamaraLoading(true);
-        tamaraCheckout.mutate({ dealId: newDeal.id });
-      }
     },
     onError: (e) => toast.error(e.message),
   });
