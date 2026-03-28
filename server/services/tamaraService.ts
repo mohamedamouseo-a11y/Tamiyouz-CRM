@@ -99,16 +99,19 @@ function countryCodeFromCountry(country?: string | null) {
   return "SA";
 }
 
-function dealIdFromOrderReference(orderReferenceId: string) {
+function parseOrderReference(orderReferenceId: string): { type: "deal" | "contract"; id: number } {
   const normalized = (orderReferenceId || "").trim();
 
+  const contractMatch = normalized.match(/^CONTRACT_(\d+)$/i);
+  if (contractMatch) return { type: "contract", id: Number(contractMatch[1]) };
+
   const dealMatch = normalized.match(/^DEAL_(\d+)$/i);
-  if (dealMatch) return Number(dealMatch[1]);
+  if (dealMatch) return { type: "deal", id: Number(dealMatch[1]) };
 
   const numericMatch = normalized.match(/(\d+)/);
-  if (numericMatch) return Number(numericMatch[1]);
+  if (numericMatch) return { type: "deal", id: Number(numericMatch[1]) };
 
-  throw new Error(`Unable to parse deal id from Tamara order_reference_id: ${orderReferenceId}`);
+  throw new Error(`Unable to parse order_reference_id: ${orderReferenceId}`);
 }
 
 // ─── Notification Helpers ──────────────────────────────────────────────────────
@@ -197,6 +200,67 @@ async function sendPaymentSuccessNotification(params: { dealId: number; leadId?:
     );
   } catch (err) {
     console.warn("[Tamara] Failed to create audit log:", err);
+  }
+}
+
+// ─── Contract Payment Notification (Account Management) ──────────────────────
+async function sendContractPaymentNotification(params: { contractId: number; orderId: string }) {
+  const pool = getPool();
+
+  // Fetch contract
+  let contractCharges = "";
+  let clientId = 0;
+  try {
+    const [cRows] = await pool.execute("SELECT clientId, charges, currency, contractName FROM contracts WHERE id = ? LIMIT 1", [params.contractId]) as any;
+    if (cRows?.[0]) {
+      contractCharges = `${cRows[0].charges || "0"} ${cRows[0].currency || "SAR"}`;
+      clientId = cRows[0].clientId;
+    }
+  } catch {}
+
+  // Fetch client to get accountManagerId and name
+  let clientName = "Client";
+  let accountManagerId: number | null = null;
+  if (clientId) {
+    try {
+      const [clRows] = await pool.execute("SELECT leadName, phone, accountManagerId FROM clients WHERE id = ? LIMIT 1", [clientId]) as any;
+      if (clRows?.[0]) {
+        clientName = clRows[0].leadName || clRows[0].phone || "Client";
+        accountManagerId = clRows[0].accountManagerId ? Number(clRows[0].accountManagerId) : null;
+      }
+    } catch {}
+  }
+
+  const title = `\u062a\u0645\u0627\u0631\u0627 | \u062f\u0641\u0639\u0629 \u0639\u0642\u062f \u0645\u0642\u0628\u0648\u0636\u0629 - ${clientName}`;
+  const body = `Contract #${params.contractId} (${contractCharges}) was paid via Tamara. Order: ${params.orderId}`;
+
+  // Notify the Account Manager
+  if (accountManagerId) {
+    await tryInsertInAppNotification(accountManagerId, title, body);
+  }
+
+  // Notify all admins
+  try {
+    const [adminRows] = await pool.execute(
+      "SELECT id FROM users WHERE role IN ('Admin', 'admin', 'SalesManager') AND isActive = 1 AND deletedAt IS NULL"
+    ) as any;
+    for (const admin of (adminRows || [])) {
+      if (admin.id === accountManagerId) continue;
+      await tryInsertInAppNotification(admin.id, title, body);
+    }
+  } catch (err) {
+    console.warn("[Tamara] Failed to notify admins for contract payment:", err);
+  }
+
+  // Create audit log entry
+  try {
+    await pool.execute(
+      `INSERT INTO audit_logs (userId, userName, userRole, action, entityType, entityId, entityName, details, createdAt)
+       VALUES (0, 'Tamara System', 'system', 'tamara_contract_payment', 'contracts', ?, ?, ?, NOW())`,
+      [params.contractId, clientName, JSON.stringify({ orderId: params.orderId, contractCharges, clientId, event: "contract_payment_approved" })]
+    );
+  } catch (err) {
+    console.warn("[Tamara] Failed to create contract audit log:", err);
   }
 }
 
@@ -430,7 +494,38 @@ export async function handleTamaraWebhook(payload: any) {
     throw new Error("Tamara webhook payload does not include order_reference_id.");
   }
 
-  const dealId = dealIdFromOrderReference(orderReferenceId);
+  const ref = parseOrderReference(orderReferenceId);
+
+  // ─── CONTRACT payment ─────────────────────────────────────────────
+  if (ref.type === "contract") {
+    const contractId = ref.id;
+    const [cRows] = await pool.execute(
+      "SELECT * FROM contracts WHERE id = ? AND deletedAt IS NULL LIMIT 1",
+      [contractId],
+    ) as any;
+    const contract = cRows?.[0];
+    if (!contract) throw new Error(`Contract #${contractId} was not found.`);
+
+    // Avoid double-processing
+    if (contract.contractRenewalStatus === "Renewed") {
+      return { ok: true, ignored: true, reason: "Contract already marked as Renewed." };
+    }
+
+    await authoriseTamaraOrder(orderId);
+
+    // Update contract: status -> Active, renewalStatus -> Renewed
+    await pool.execute(
+      "UPDATE contracts SET status = 'Active', contractRenewalStatus = 'Renewed', updatedAt = NOW() WHERE id = ?",
+      [contractId],
+    );
+
+    await sendContractPaymentNotification({ contractId, orderId });
+
+    return { ok: true, contractId, orderId, newStatus: "Renewed" };
+  }
+
+  // ─── DEAL payment (existing flow) ─────────────────────────────────
+  const dealId = ref.id;
 
   // Fetch deal
   const [dealRows] = await pool.execute(
