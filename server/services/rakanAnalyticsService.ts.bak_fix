@@ -1205,15 +1205,15 @@ export async function getCampaignEfficiencyReport(input?: RakanDateRangeInput): 
 
   const tiktokPerformance = await queryRows<any>(
     `SELECT
-       COALESCE(NULLIF(TRIM(campaign_name), ''), CONCAT('Campaign #', campaign_id)) AS campaignName,
+       COALESCE(NULLIF(TRIM(campaignName), ''), CONCAT('Campaign #', campaignId)) AS campaignName,
        SUM(COALESCE(spend, 0)) AS spend,
        SUM(COALESCE(conversions, 0)) AS conversions,
        AVG(COALESCE(cpa, 0)) AS cpa,
        SUM(COALESCE(clicks, 0)) AS clicks,
        AVG(COALESCE(ctr, 0)) AS ctr
      FROM tiktok_campaign_snapshots
-     WHERE DATE(created_at) BETWEEN ? AND ?
-     GROUP BY COALESCE(NULLIF(TRIM(campaign_name), ''), CONCAT('Campaign #', campaign_id))
+     WHERE DATE(createdAt) BETWEEN ? AND ?
+     GROUP BY COALESCE(NULLIF(TRIM(campaignName), ''), CONCAT('Campaign #', campaignId))
      ORDER BY spend DESC
      LIMIT 25`,
     [range.dateFrom, range.dateTo],
