@@ -61,6 +61,12 @@ const entityLabels: Record<string, { en: string; ar: string }> = {
   clients: { en: "Client", ar: "عميل" },
   contracts: { en: "Contract", ar: "عقد" },
   calendar: { en: "Calendar", ar: "تقويم" },
+  follow_ups: { en: "Follow-up", ar: "متابعة" },
+  client_tasks: { en: "Task", ar: "مهمة" },
+  client_objectives: { en: "Objective", ar: "هدف" },
+  deliverables: { en: "Deliverable", ar: "مخرج" },
+  upsell_opportunities: { en: "Upsell", ar: "فرصة بيع" },
+  client_communications: { en: "Channel", ar: "قناة تواصل" },
 };
 
 const actionIcons: Record<string, React.ReactNode> = {

@@ -6,13 +6,14 @@ import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Phone, Mail, MessageCircle, Users, CheckCircle, Clock, GripVertical, Loader2, ExternalLink, Pencil } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MessageCircle, Users, CheckCircle, Clock, GripVertical, Loader2, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 
@@ -304,6 +305,48 @@ export default function ClientProfile({ params }: RouteProps) {
   const updateDeliverableM = trpc.deliverables.update.useMutation({ onSuccess: async () => { await deliverablesQ.refetch(); } });
   const createUpsellM = trpc.upsell.create.useMutation({ onSuccess: async () => { setUpsellDialogOpen(false); setUpsellForm({ title: "", potentialValue: "", notes: "" }); await upsellQ.refetch(); } });
   const updateUpsellM = trpc.upsell.update.useMutation({ onSuccess: async () => { await upsellQ.refetch(); } });
+
+  // ─── Delete Mutations ───────────────────────────────────────────────────
+  const [deleteConfirm, setDeleteConfirm] = React.useState<{ type: string; id: number; name: string } | null>(null);
+
+  const deleteFollowUpM = trpc.followUps.delete.useMutation({
+    onSuccess: async () => { await followUpsQ.refetch(); toast.success("Follow-up deleted"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteTaskM = trpc.clientTasks.delete.useMutation({
+    onSuccess: async () => { await tasksQ.refetch(); toast.success("Task deleted"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteObjectiveM = trpc.objectives.delete.useMutation({
+    onSuccess: async () => { await objectivesQ.refetch(); toast.success("Objective deleted"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteDeliverableM = trpc.deliverables.delete.useMutation({
+    onSuccess: async () => { await deliverablesQ.refetch(); toast.success("Deliverable deleted"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteUpsellM = trpc.upsell.delete.useMutation({
+    onSuccess: async () => { await upsellQ.refetch(); toast.success("Upsell deleted"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteCommunicationM = trpc.communications.delete.useMutation({
+    onSuccess: async () => { await communicationsQ.refetch(); toast.success("Channel deleted"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  function confirmDelete() {
+    if (!deleteConfirm) return;
+    const { type, id } = deleteConfirm;
+    switch (type) {
+      case "followUp": deleteFollowUpM.mutate({ id }); break;
+      case "task": deleteTaskM.mutate({ id }); break;
+      case "objective": deleteObjectiveM.mutate({ id }); break;
+      case "deliverable": deleteDeliverableM.mutate({ id }); break;
+      case "upsell": deleteUpsellM.mutate({ id }); break;
+      case "communication": deleteCommunicationM.mutate({ id }); break;
+    }
+    setDeleteConfirm(null);
+  }
   const createCommunicationM = trpc.communications.create.useMutation({ onSuccess: async () => { setCommunicationDialogOpen(false); setCommunicationForm({ channelName: "", channelType: "EmailThread", link: "", notes: "" }); await communicationsQ.refetch(); } });
 
   // ─── Edit Task State ──────────────────────────────────────────────────────
@@ -1209,6 +1252,15 @@ export default function ClientProfile({ params }: RouteProps) {
                                 >
                                   <Pencil size={14} />
                                 </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-500 hover:text-red-700"
+                                  onClick={() => setDeleteConfirm({ type: "followUp", id: fu.id, name: `${fu.type} Follow-up` })}
+                                  title="Delete"
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
                                 {fu.status !== "Completed" && (
                                   <Button
                                     variant="ghost"
@@ -1362,6 +1414,9 @@ export default function ClientProfile({ params }: RouteProps) {
                               <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => openEditTask(task)}>
                                 <Pencil size={12} className="mr-1" /> Edit
                               </Button>
+                              <Button variant="ghost" size="sm" className="h-6 text-xs px-2 text-red-500 hover:text-red-700" onClick={() => setDeleteConfirm({ type: "task", id: task.id, name: task.title })}>
+                                <Trash2 size={12} className="mr-1" /> Delete
+                              </Button>
                               {status !== "ToDo" && (
                                 <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => moveTask(task.id, status === "InProgress" ? "ToDo" : "InProgress")}>
                                   {status === "InProgress" ? "← To Do" : "← In Progress"}
@@ -1458,6 +1513,9 @@ export default function ClientProfile({ params }: RouteProps) {
                       <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => openEditObjective(obj)}>
                         <Pencil size={12} className="mr-1" /> Edit
                       </Button>
+                      <Button variant="ghost" size="sm" className="h-6 px-2 text-red-500 hover:text-red-700" onClick={() => setDeleteConfirm({ type: "objective", id: obj.id, name: obj.title })}>
+                        <Trash2 size={12} className="mr-1" /> Delete
+                      </Button>
                     </div>
                     {(obj.keyResults ?? []).map((kr: any) => {
                       const target = Number(kr.targetValue ?? 0);
@@ -1550,6 +1608,9 @@ export default function ClientProfile({ params }: RouteProps) {
                           <Button variant="ghost" size="sm" onClick={() => openEditDeliverable(item)}>
                             <Pencil size={14} />
                           </Button>
+                          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700" onClick={() => setDeleteConfirm({ type: "deliverable", id: item.id, name: item.name })}>
+                            <Trash2 size={14} />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1631,6 +1692,9 @@ export default function ClientProfile({ params }: RouteProps) {
                           <Button variant="ghost" size="sm" onClick={() => openEditUpsell(item)}>
                             <Pencil size={14} />
                           </Button>
+                          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700" onClick={() => setDeleteConfirm({ type: "upsell", id: item.id, name: item.title })}>
+                            <Trash2 size={14} />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1700,6 +1764,9 @@ export default function ClientProfile({ params }: RouteProps) {
                         <Button variant="ghost" size="sm" onClick={() => openEditCommunication(ch)}>
                           <Pencil size={14} />
                         </Button>
+                        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700" onClick={() => setDeleteConfirm({ type: "communication", id: ch.id, name: ch.channelName })}>
+                          <Trash2 size={14} />
+                        </Button>
                         {ch.link ? <a href={ch.link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">Open Link</a> : <span className="text-xs text-muted-foreground">No link</span>}
                       </div>
                     </div>
@@ -1768,6 +1835,24 @@ export default function ClientProfile({ params }: RouteProps) {
           </Tabs>
         )}
       </div>
+    
+      {/* ─── Delete Confirmation Dialog ─────────────────────────────────── */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete <strong>{deleteConfirm?.name}</strong>. This action can be undone by an admin from the Audit Log.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700 text-white">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </CRMLayout>
   );
 }
