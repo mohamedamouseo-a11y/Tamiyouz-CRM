@@ -1,13 +1,7 @@
 import cron from "node-cron";
 import mysql from "mysql2/promise";
 
-export type AdvisoryRunSummary = {
-  checked: number;
-  sent: number;
-};
-
 let _pool: mysql.Pool | null = null;
-
 function getPool() {
   if (!_pool && process.env.DATABASE_URL) {
     _pool = mysql.createPool(process.env.DATABASE_URL);
@@ -16,326 +10,225 @@ function getPool() {
   return _pool;
 }
 
-const CRON_TIMEZONE = process.env.RAKAN_CRON_TIMEZONE || "Africa/Cairo";
+const TZ = process.env.RAKAN_CRON_TIMEZONE || "Africa/Cairo";
 let started = false;
 
-function formatNumber(value: unknown, fractionDigits = 0): string {
-  const num = Number(value ?? 0);
-  if (!Number.isFinite(num)) return "0";
-  return num.toLocaleString("en-US", {
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  });
+async function getAdminUsers(): Promise<Array<{ id: number; name: string | null }>> {
+  const pool = getPool();
+  const [rows] = await pool.execute(
+    `SELECT id, name FROM users WHERE deletedAt IS NULL AND isActive = 1 AND role IN ('Admin')`,
+  );
+  return rows as Array<{ id: number; name: string | null }>;
 }
 
-async function insertSystemAdvisory(params: {
+async function insertNotification(params: {
   userId: number;
   title: string;
+  titleAr: string;
   body: string;
+  bodyAr: string;
   link?: string | null;
-  metadata?: Record<string, unknown>;
   dedupeHours?: number;
+  metadata?: Record<string, unknown>;
 }) {
   const pool = getPool();
-  const dedupeHours = Math.max(1, Number(params.dedupeHours ?? 12));
+  const dedupeHours = Math.max(1, params.dedupeHours ?? 12);
+  const [existing] = await pool.execute(
+    `SELECT id FROM in_app_notifications
+     WHERE userId = ?
+       AND type = 'system'
+       AND titleAr = ?
+       AND createdAt >= DATE_SUB(NOW(), INTERVAL ${dedupeHours} HOUR)
+     LIMIT 1`,
+    [params.userId, params.titleAr],
+  );
 
-  const [existingRows] = await pool.execute(
-    `
-      SELECT id
-      FROM in_app_notifications
-      WHERE userId = ?
-        AND type = 'system'
-        AND title = ?
-        AND createdAt >= DATE_SUB(NOW(), INTERVAL ${dedupeHours} HOUR)
-      LIMIT 1
-    `,
-    [params.userId, params.title]
-  ) as any;
-
-  if (existingRows?.length) return false;
+  if ((existing as any[]).length > 0) return false;
 
   await pool.execute(
-    `
-      INSERT INTO in_app_notifications
-      (userId, type, title, body, isRead, link, metadata, createdAt)
-      VALUES (?, 'system', ?, ?, 0, ?, ?, NOW())
-    `,
+    `INSERT INTO in_app_notifications
+      (userId, type, title, titleAr, body, bodyAr, isRead, link, metadata, createdAt)
+     VALUES (?, 'system', ?, ?, ?, ?, 0, ?, ?, NOW())`,
     [
       params.userId,
       params.title,
+      params.titleAr,
       params.body,
+      params.bodyAr,
       params.link ?? null,
-      JSON.stringify({
-        source: "rakan_advisory_engine",
-        ...(params.metadata ?? {}),
-      }),
-    ]
+      JSON.stringify(params.metadata ?? {}),
+    ],
   );
 
   return true;
 }
 
-async function getMediaBuyerIds(): Promise<number[]> {
+async function runLeadCompletenessAdvisor() {
   const pool = getPool();
   const [rows] = await pool.execute(
-    `
-      SELECT id
-      FROM users
-      WHERE role = 'MediaBuyer'
-        AND isActive = 1
-        AND deletedAt IS NULL
-    `
-  ) as any;
-
-  return rows
-    .map((row: any) => Number(row.id))
-    .filter((id: number) => Number.isFinite(id) && id > 0);
-}
-
-async function runSalesSlaAdvisor(): Promise<AdvisoryRunSummary> {
-  const pool = getPool();
-
-  const [rows] = await pool.execute(
-    `
-      SELECT
-        l.id,
-        COALESCE(l.name, CONCAT('Lead #', l.id)) AS leadName,
-        l.ownerId,
-        TIMESTAMPDIFF(MINUTE, l.createdAt, NOW()) AS waitMinutes
-      FROM leads l
-      WHERE l.deletedAt IS NULL
-        AND l.stage = 'New'
-        AND l.ownerId IS NOT NULL
-        AND l.createdAt <= DATE_SUB(NOW(), INTERVAL 30 MINUTE)
-      ORDER BY l.createdAt ASC
-      LIMIT 250
-    `
-  ) as any;
+    `SELECT
+       l.id,
+       COALESCE(NULLIF(TRIM(l.name), ''), CONCAT('Lead #', l.id)) AS leadName,
+       l.ownerId,
+       l.stage,
+       l.campaignName,
+       l.createdAt,
+       CASE
+         WHEN l.ownerId IS NULL OR l.ownerId = 0 THEN 'lead بدون مسؤول'
+         WHEN l.name IS NULL OR TRIM(l.name) = '' THEN 'الاسم غير مكتمل'
+         WHEN l.campaignName IS NULL OR TRIM(l.campaignName) = '' THEN 'الحملة غير مسجلة'
+         ELSE 'بيانات تحتاج مراجعة'
+       END AS issueLabel
+     FROM leads l
+     WHERE l.deletedAt IS NULL
+       AND l.createdAt <= DATE_SUB(NOW(), INTERVAL 6 HOUR)
+       AND (
+         l.ownerId IS NULL OR l.ownerId = 0
+         OR l.name IS NULL OR TRIM(l.name) = ''
+         OR l.campaignName IS NULL OR TRIM(l.campaignName) = ''
+       )
+     ORDER BY l.createdAt ASC
+     LIMIT 25`,
+  );
 
   let sent = 0;
-
-  for (const lead of rows as any[]) {
-    const title = "تنبيه استشاري | تأخر متابعة ليد جديد";
-    const body =
-      `استشاريًا: الليد "${lead.leadName}" ينتظر منذ أكثر من ${formatNumber(lead.waitMinutes)} دقيقة وهو ما يزال في مرحلة New. ` +
-      `الاستجابة السريعة ترفع احتمالية الإغلاق. يُنصح بالتواصل معه فورًا وتسجيل نتيجة التواصل داخل النظام.`;
-
-    const inserted = await insertSystemAdvisory({
-      userId: Number(lead.ownerId),
-      title,
-      body,
-      link: `/leads/${lead.id}`,
-      metadata: {
-        advisoryType: "sales_sla",
-        leadId: lead.id,
-      },
-      dedupeHours: 8,
-    });
-
-    if (inserted) sent += 1;
-  }
-
-  return { checked: rows.length, sent };
-}
-
-async function runAmChurnAdvisor(): Promise<AdvisoryRunSummary> {
-  const pool = getPool();
-
-  const [rows] = await pool.execute(
-    `
-      SELECT
-        c.id,
-        COALESCE(c.leadName, CONCAT('Client #', c.id)) AS clientName,
-        c.accountManagerId,
-        COALESCE(c.healthScore, 0) AS healthScore,
-        MAX(f.followUpDate) AS lastFollowUpDate
-      FROM clients c
-      LEFT JOIN follow_ups f ON f.clientId = c.id
-      WHERE c.deletedAt IS NULL
-        AND c.accountManagerId IS NOT NULL
-      GROUP BY c.id, c.leadName, c.accountManagerId, c.healthScore
-      HAVING COALESCE(c.healthScore, 0) < 50
-         OR lastFollowUpDate IS NULL
-         OR lastFollowUpDate < DATE_SUB(NOW(), INTERVAL 14 DAY)
-      ORDER BY COALESCE(c.healthScore, 0) ASC, lastFollowUpDate ASC
-      LIMIT 250
-    `
-  ) as any;
-
-  let sent = 0;
-
-  for (const client of rows as any[]) {
-    const reasons: string[] = [];
-    if (Number(client.healthScore ?? 0) < 50) {
-      reasons.push(`درجة الصحة منخفضة (${formatNumber(client.healthScore)}/100)`);
-    }
-    if (!client.lastFollowUpDate) {
-      reasons.push("لا توجد متابعة مسجلة خلال آخر 14 يومًا");
-    } else {
-      reasons.push(`آخر متابعة كانت في ${client.lastFollowUpDate}`);
-    }
-
-    const title = "تنبيه استشاري | مخاطر churn على عميل";
-    const body =
-      `استشاريًا: العميل "${client.clientName}" لديه مؤشرات تستدعي التدخل الوقائي. ${reasons.join("، ")}. ` +
-      `يُنصح بجدولة مكالمة مراجعة اليوم، وتحديد سبب التراجع، وتحديث خطة الاحتفاظ بالعميل.`;
-
-    const inserted = await insertSystemAdvisory({
-      userId: Number(client.accountManagerId),
-      title,
-      body,
-      link: `/clients/${client.id}`,
-      metadata: {
-        advisoryType: "am_churn",
-        clientId: client.id,
-      },
-      dedupeHours: 24,
-    });
-
-    if (inserted) sent += 1;
-  }
-
-  return { checked: rows.length, sent };
-}
-
-async function runMediaBuyingAdvisor(): Promise<AdvisoryRunSummary> {
-  const pool = getPool();
-
-  const [rows] = await pool.execute(
-    `
-      WITH latest_meta AS (
-        SELECT
-          'Meta' AS platform,
-          campaignName,
-          CAST(COALESCE(dailyBudget, 0) AS DECIMAL(12,2)) AS spend,
-          0 AS conversions,
-          0 AS cpa,
-          syncedAt,
-          ROW_NUMBER() OVER (PARTITION BY campaignName ORDER BY syncedAt DESC, id DESC) AS rn
-        FROM meta_campaign_snapshots
-        WHERE campaignName IS NOT NULL
-          AND campaignName <> ''
-          AND syncedAt >= DATE_SUB(NOW(), INTERVAL 3 DAY)
-      ),
-      latest_tiktok AS (
-        SELECT
-          'TikTok' AS platform,
-          campaign_name AS campaignName,
-          CAST(COALESCE(spend, 0) AS DECIMAL(12,2)) AS spend,
-          CAST(COALESCE(conversions, 0) AS UNSIGNED) AS conversions,
-          CAST(COALESCE(cpa, 0) AS DECIMAL(12,2)) AS cpa,
-          synced_at,
-          ROW_NUMBER() OVER (PARTITION BY campaign_name ORDER BY synced_at DESC, id DESC) AS rn
-        FROM tiktok_campaign_snapshots
-        WHERE campaign_name IS NOT NULL
-          AND campaign_name <> ''
-          AND synced_at >= DATE_SUB(NOW(), INTERVAL 3 DAY)
-      ),
-      latest AS (
-        SELECT platform, campaignName, spend, conversions, cpa FROM latest_meta WHERE rn = 1
-        UNION ALL
-        SELECT platform, campaignName, spend, conversions, cpa FROM latest_tiktok WHERE rn = 1
-      ),
-      bench AS (
-        SELECT
-          AVG(cpa) AS avgCpa,
-          STDDEV_POP(cpa) AS stdCpa
-        FROM latest
-        WHERE cpa > 0
-      )
-      SELECT
-        l.platform,
-        l.campaignName,
-        l.spend,
-        l.conversions,
-        l.cpa,
-        b.avgCpa,
-        b.stdCpa
-      FROM latest l
-      CROSS JOIN bench b
-      WHERE l.cpa > 0
-        AND l.cpa > GREATEST(b.avgCpa * 1.35, b.avgCpa + IFNULL(b.stdCpa, 0))
-      ORDER BY l.cpa DESC
-      LIMIT 20
-    `
-  ) as any;
-
-  const mediaBuyerIds = await getMediaBuyerIds();
-  if (!mediaBuyerIds.length) {
-    return { checked: rows.length, sent: 0 };
-  }
-
-  let sent = 0;
-
-  for (const campaign of rows as any[]) {
-    const title = "تنبيه استشاري | ارتفاع CPL/CPA في حملة إعلانية";
-    const body =
-      `استشاريًا: الحملة "${campaign.campaignName}" على ${campaign.platform} تسجل CPL/CPA مرتفعًا (${formatNumber(campaign.cpa, 2)}) ` +
-      `مقارنة بمتوسط الحساب (${formatNumber(campaign.avgCpa, 2)}). يُنصح بمراجعة الإبداع، الاستهداف، الرسائل، وتوزيع الميزانية قبل التوسع في الإنفاق.`;
-
-    for (const userId of mediaBuyerIds) {
-      const inserted = await insertSystemAdvisory({
+  for (const row of rows as any[]) {
+    const recipientIds = row.ownerId ? [Number(row.ownerId)] : (await getAdminUsers()).map((u) => u.id);
+    for (const userId of recipientIds) {
+      const inserted = await insertNotification({
         userId,
-        title,
-        body,
-        link: "/campaigns",
-        metadata: {
-          advisoryType: "media_buying_high_cpa",
-          platform: campaign.platform,
-          campaignName: campaign.campaignName,
-        },
-        dedupeHours: 18,
+        title: "Rakan Advisory | Lead data is incomplete",
+        titleAr: "تنبيه راكان | بيانات ليد غير مكتملة",
+        body: `Lead ${row.leadName} has incomplete CRM data: ${row.issueLabel}. Please review and complete the record.`,
+        bodyAr: `الليد ${row.leadName} لديه بيانات غير مكتملة داخل الـ CRM: ${row.issueLabel}. يُفضّل استكمال السجل ومراجعة المسؤول عنه.`,
+        link: `/leads/${row.id}`,
+        dedupeHours: 12,
+        metadata: { advisoryType: "lead_data_quality", leadId: row.id },
       });
-
       if (inserted) sent += 1;
     }
   }
-
-  return { checked: rows.length, sent };
+  return { checked: (rows as any[]).length, sent };
 }
 
-async function safeRun(name: string, fn: () => Promise<AdvisoryRunSummary>) {
+async function runColdMisuseAdvisor() {
+  const pool = getPool();
+  const [rows] = await pool.execute(
+    `SELECT
+       l.id,
+       COALESCE(NULLIF(TRIM(l.name), ''), CONCAT('Lead #', l.id)) AS leadName,
+       l.ownerId,
+       u.name AS ownerName,
+       l.createdAt,
+       COUNT(a.id) AS totalActivities
+     FROM leads l
+     LEFT JOIN users u ON u.id = l.ownerId
+     LEFT JOIN activities a ON a.leadId = l.id AND a.deletedAt IS NULL
+     WHERE l.deletedAt IS NULL
+       AND l.stage = 'Cold'
+       AND l.createdAt >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+     GROUP BY l.id, l.name, l.ownerId, u.name, l.createdAt
+     HAVING totalActivities = 0
+     ORDER BY l.createdAt DESC
+     LIMIT 20`,
+  );
+
+  const admins = await getAdminUsers();
+  let sent = 0;
+  for (const row of rows as any[]) {
+    const recipients = new Set<number>(admins.map((u) => u.id));
+    if (row.ownerId) recipients.add(Number(row.ownerId));
+    for (const userId of recipients) {
+      const inserted = await insertNotification({
+        userId,
+        title: "Rakan Advisory | Suspicious Cold lead",
+        titleAr: "تنبيه راكان | Lead تم تحويله إلى Cold بشكل مشكوك فيه",
+        body: `Lead ${row.leadName} was moved to Cold without any logged activity.`,
+        bodyAr: `الليد ${row.leadName} تم وضعه على Cold بدون أي Activity مسجل. يُفضّل مراجعة سبب الإغلاق وجودة المتابعة.`,
+        link: `/leads/${row.id}`,
+        dedupeHours: 24,
+        metadata: { advisoryType: "cold_misuse", leadId: row.id },
+      });
+      if (inserted) sent += 1;
+    }
+  }
+  return { checked: (rows as any[]).length, sent };
+}
+
+async function runFollowUpGapAdvisor() {
+  const pool = getPool();
+  const [rows] = await pool.execute(
+    `SELECT
+       c.id,
+       COALESCE(NULLIF(TRIM(c.leadName), ''), CONCAT('Client #', c.id)) AS clientName,
+       c.accountManagerId,
+       c.healthScore,
+       c.lastFollowUpDate,
+       c.nextFollowUpDate
+     FROM clients c
+     WHERE c.deletedAt IS NULL
+       AND (
+         c.nextFollowUpDate IS NULL
+         OR c.nextFollowUpDate < NOW()
+         OR c.lastFollowUpDate IS NULL
+         OR c.lastFollowUpDate < DATE_SUB(NOW(), INTERVAL 14 DAY)
+       )
+     ORDER BY c.nextFollowUpDate ASC, c.lastFollowUpDate ASC
+     LIMIT 25`,
+  );
+
+  const admins = await getAdminUsers();
+  let sent = 0;
+  for (const row of rows as any[]) {
+    const recipients = new Set<number>(admins.map((u) => u.id));
+    if (row.accountManagerId) recipients.add(Number(row.accountManagerId));
+    for (const userId of recipients) {
+      const inserted = await insertNotification({
+        userId,
+        title: "Rakan Advisory | Client follow-up gap",
+        titleAr: "تنبيه راكان | فجوة متابعة على عميل",
+        body: `Client ${row.clientName} needs an immediate follow-up review.`,
+        bodyAr: `العميل ${row.clientName} يحتاج إلى متابعة عاجلة. لا توجد متابعة مستقبلية واضحة أو أن آخر متابعة قديمة.`,
+        link: `/clients/${row.id}`,
+        dedupeHours: 24,
+        metadata: { advisoryType: "client_followup_gap", clientId: row.id, healthScore: row.healthScore },
+      });
+      if (inserted) sent += 1;
+    }
+  }
+  return { checked: (rows as any[]).length, sent };
+}
+
+async function safeRun(label: string, fn: () => Promise<{ checked: number; sent: number }>) {
   try {
     const result = await fn();
-    console.log(`[Rakan Advisory] ${name}: checked=${result.checked}, sent=${result.sent}`);
+    console.log(`[Rakan Advisory] ${label}: checked=${result.checked}, sent=${result.sent}`);
   } catch (error) {
-    console.error(`[Rakan Advisory] ${name} failed:`, error);
+    console.error(`[Rakan Advisory] ${label} failed`, error);
   }
 }
 
-export async function runAllRakanAdvisorsOnce() {
-  await safeRun("Sales SLA Advisor", runSalesSlaAdvisor);
-  await safeRun("AM Churn Advisor", runAmChurnAdvisor);
-  await safeRun("Media Buying Advisor", runMediaBuyingAdvisor);
+export async function runRakanAdvisorsOnce() {
+  await safeRun("Lead Completeness", runLeadCompletenessAdvisor);
+  await safeRun("Cold Misuse", runColdMisuseAdvisor);
+  await safeRun("Follow-up Gaps", runFollowUpGapAdvisor);
 }
 
-export function initRakanAdvisoryEngine() {
+export function startRakanAdvisoryEngine() {
   if (started) return;
   started = true;
 
-  cron.schedule(
-    "*/15 * * * *",
-    () => {
-      void safeRun("Sales SLA Advisor", runSalesSlaAdvisor);
-    },
-    { timezone: CRON_TIMEZONE }
-  );
+  cron.schedule("0 */6 * * *", () => {
+    void safeRun("Lead Completeness", runLeadCompletenessAdvisor);
+  }, { timezone: TZ });
 
-  cron.schedule(
-    "0 9 * * *",
-    () => {
-      void safeRun("AM Churn Advisor", runAmChurnAdvisor);
-    },
-    { timezone: CRON_TIMEZONE }
-  );
+  cron.schedule("15 9 * * *", () => {
+    void safeRun("Cold Misuse", runColdMisuseAdvisor);
+  }, { timezone: TZ });
 
-  cron.schedule(
-    "15 9 * * *",
-    () => {
-      void safeRun("Media Buying Advisor", runMediaBuyingAdvisor);
-    },
-    { timezone: CRON_TIMEZONE }
-  );
+  cron.schedule("30 9 * * *", () => {
+    void safeRun("Follow-up Gaps", runFollowUpGapAdvisor);
+  }, { timezone: TZ });
 
-  console.log(`[Rakan Advisory] Engine started. Timezone=${CRON_TIMEZONE}`);
+  console.log(`[Rakan Advisory] Started with timezone ${TZ}`);
 }

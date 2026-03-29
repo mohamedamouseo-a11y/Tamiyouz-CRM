@@ -1,15 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import crypto from "node:crypto";
 import { drizzle } from "drizzle-orm/mysql2";
 import { eq, and, desc, isNull, sql } from "drizzle-orm";
 import mysql from "mysql2/promise";
-import {
-  defaultDateRangeForReport,
-  generateRakanReport,
-  type AuthUserLike,
-  type RakanReportType,
-} from "./rakanReportGenerator";
+import { buildRakanExecutiveReport, buildReportOverview } from "./rakanExecutiveReportService";
+import { exportRakanReportBundle } from "./rakanExecutiveExportService";
+import type { RakanExecutiveReportType, RakanExportBundle } from "./rakanExecutiveTypes";
 
 // ─── DB Connection ─────────────────────────────────────────────────────────────
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -32,7 +26,7 @@ function getPool() {
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
-export type UserRole = "Admin" | "CEO" | "SalesManager" | "SalesAgent" | "MediaBuyer" | "AccountManager" | "AccountManagerLead";
+export type UserRole = "Admin" | "SalesManager" | "SalesAgent" | "MediaBuyer" | "AccountManager" | "AccountManagerLead";
 
 export interface RakanSetting {
   userId: number | null;
@@ -47,37 +41,6 @@ export interface ChatHistoryRow {
   content: string;
   audioUrl: string | null;
   createdAt: string;
-}
-
-export interface ChatHistoryItem {
-  role: "user" | "assistant";
-  content: string;
-}
-
-export interface AnalyzeIntentResult {
-  isReportRequest: boolean;
-  reportType: RakanReportType | null;
-  dateFrom: string | null;
-  dateTo: string | null;
-  confidence: number;
-  reason?: string;
-}
-
-export interface RakanReportPayload {
-  fileName: string;
-  mimeType: string;
-  url?: string;
-  base64?: string;
-}
-
-export interface RakanChatResponse {
-  kind: "text" | "report";
-  answer: string;
-  report?: RakanReportPayload;
-  // Legacy fields for backward compatibility with existing frontend
-  reply?: string;
-  audioBase64?: string | null;
-  mode?: "smart" | "normal";
 }
 
 // ─── Settings helpers ──────────────────────────────────────────────────────────
@@ -161,384 +124,220 @@ export async function clearChatHistory(userId: number): Promise<void> {
 }
 
 // ─── DB Context Builder (role-based) ──────────────────────────────────────────
-function formatMetric(value: unknown, fractionDigits = 0): string {
-  const num = Number(value ?? 0);
-  if (!Number.isFinite(num)) return "0";
-  return num.toLocaleString("en-US", {
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  });
-}
-
-function getRouteSpecificGuidance(currentRoute = "/"): string {
-  const route = currentRoute.toLowerCase();
-
-  if (route.includes("/leads")) {
-    return "أنت داخل صفحة الليدز. ركّز على ترتيب الأولويات، سرعة الاستجابة، تحليل المرحلة الحالية، جودة الليد، وأفضل خطوة تالية مقترحة دون تنفيذ أي إجراء.";
-  }
-
-  if (route.includes("/clients")) {
-    return "أنت داخل صفحة العملاء. ركّز على صحة العميل، مخاطر فقدانه، المتابعات المتأخرة، وفرص الاحتفاظ والتجديد، وقدّم توصيات فقط من دون أي تنفيذ مباشر.";
-  }
-
-  if (route.includes("/contracts")) {
-    return "أنت داخل صفحة العقود. ركّز على العقود القريبة من الانتهاء، مخاطر عدم التجديد، وأفضل توصيات التفاوض والمتابعة دون تنفيذ أي إجراء.";
-  }
-
-  if (
-    route.includes("/campaigns") ||
-    route.includes("/meta") ||
-    route.includes("/tiktok")
-  ) {
-    return "أنت داخل صفحة الحملات الإعلانية. ركّز على الإنفاق، CPL/CPA، جودة الليدز، ومواطن الهدر أو فرص التحسين، مع توصيات واضحة فقط.";
-  }
-
-  if (route.includes("/dashboard")) {
-    return "أنت داخل لوحة القيادة. ابدأ بملخص تنفيذي قصير، ثم اذكر الاختناقات، المخاطر، وأهم 3 توصيات عملية.";
-  }
-
-  return "قدّم تحليلًا إداريًا واضحًا يربط المؤشرات بالسبب المحتمل والخطوة التالية المقترحة، مع الالتزام بالدور الاستشاري فقط.";
-}
-
-export async function buildDbContext(
-  userId: number,
-  role: UserRole,
-  question: string,
-  currentRoute = "/"
-): Promise<string> {
+export async function buildDbContext(userId: number, role: UserRole, question: string): Promise<string> {
   const pool = getPool();
   const parts: string[] = [];
-  const routeGuidance = getRouteSpecificGuidance(currentRoute);
-  const executiveRole = role === "Admin" || role === "CEO";
-
-  parts.push(`سياق الشاشة الحالية: ${routeGuidance}`);
-  parts.push(`سؤال المستخدم: ${question}`);
+  const today = new Date().toISOString().split("T")[0];
 
   try {
-    if (executiveRole) {
-      const [salesRows] = await pool.execute(
-        `
-          SELECT
-            COUNT(*) AS wonDeals,
-            COALESCE(SUM(valueSar), 0) AS totalSales
-          FROM deals
-          WHERE status = 'Won'
-            AND deletedAt IS NULL
-        `
+    if (role === "Admin" || role === "SalesManager") {
+      // Full team stats
+      const [leadsToday] = await pool.execute(
+        "SELECT COUNT(*) as cnt FROM leads WHERE DATE(createdAt) = ? AND deletedAt IS NULL",
+        [today]
+      ) as any;
+      const [leadsTotal] = await pool.execute(
+        "SELECT COUNT(*) as cnt FROM leads WHERE deletedAt IS NULL"
+      ) as any;
+      const [slaBreached] = await pool.execute(
+        "SELECT COUNT(*) as cnt FROM leads WHERE slaBreached = 1 AND deletedAt IS NULL"
+      ) as any;
+      const [dealsWon] = await pool.execute(
+        "SELECT COUNT(*) as cnt, SUM(valueSar) as total FROM deals WHERE status = 'Won' AND deletedAt IS NULL"
+      ) as any;
+      const [agentPerf] = await pool.execute(
+        `SELECT u.name, COUNT(l.id) as leads, SUM(CASE WHEN d.status='Won' THEN 1 ELSE 0 END) as won
+         FROM users u LEFT JOIN leads l ON l.ownerId = u.id AND l.deletedAt IS NULL
+         LEFT JOIN deals d ON d.leadId = l.id AND d.deletedAt IS NULL
+         WHERE u.role = 'SalesAgent' AND u.deletedAt IS NULL
+         GROUP BY u.id, u.name ORDER BY leads DESC LIMIT 10`
+      ) as any;
+      const [campaigns] = await pool.execute(
+        "SELECT name, platform, isActive FROM campaigns WHERE deletedAt IS NULL ORDER BY createdAt DESC LIMIT 10"
       ) as any;
 
-      const [adSpendRows] = await pool.execute(
-        `
-          SELECT COALESCE(SUM(spend), 0) AS totalAdSpend
-          FROM (
-            SELECT CAST(COALESCE(dailyBudget, 0) AS DECIMAL(12,2)) AS spend
-            FROM meta_campaign_snapshots
-            WHERE syncedAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-
-            UNION ALL
-
-            SELECT CAST(spend AS DECIMAL(12,2)) AS spend
-            FROM tiktok_campaign_snapshots
-            WHERE synced_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-          ) x
-        `
-      ) as any;
-
-      const [stageRows] = await pool.execute(
-        `
-          SELECT stage, COUNT(*) AS total
-          FROM leads
-          WHERE deletedAt IS NULL
-          GROUP BY stage
-          ORDER BY total DESC
-          LIMIT 10
-        `
-      ) as any;
-
-      const [negotiationRows] = await pool.execute(
-        `
-          SELECT COUNT(*) AS stuckCount
-          FROM leads l
-          LEFT JOIN (
-            SELECT leadId, MAX(activityTime) AS lastActivityTime
-            FROM activities
-            GROUP BY leadId
-          ) a ON a.leadId = l.id
-          WHERE l.deletedAt IS NULL
-            AND l.stage = 'Negotiation'
-            AND (
-              a.lastActivityTime IS NULL OR
-              a.lastActivityTime < DATE_SUB(NOW(), INTERVAL 7 DAY)
-            )
-        `
-      ) as any;
-
-      parts.push("ملخص تنفيذي للإدارة العليا:");
-      parts.push(`- إجمالي الصفقات المكسوبة: ${formatMetric(salesRows[0]?.wonDeals)}`);
-      parts.push(`- إجمالي المبيعات المحققة: ${formatMetric(salesRows[0]?.totalSales, 2)}`);
-      parts.push(`- إجمالي الإنفاق الإعلاني خلال آخر 30 يومًا: ${formatMetric(adSpendRows[0]?.totalAdSpend, 2)}`);
-      parts.push(`- عدد الليدز العالقة في مرحلة التفاوض لأكثر من 7 أيام: ${formatMetric(negotiationRows[0]?.stuckCount)}`);
-      parts.push("أبرز الاختناقات حسب المرحلة:");
-      for (const row of stageRows as any[]) {
-        parts.push(`- ${row.stage}: ${formatMetric(row.total)} ليد`);
+      parts.push(`📊 إحصائيات اليوم (${today}):`);
+      parts.push(`- ليدز اليوم: ${leadsToday[0].cnt}`);
+      parts.push(`- إجمالي الليدز: ${leadsTotal[0].cnt}`);
+      parts.push(`- SLA Breached: ${slaBreached[0].cnt}`);
+      parts.push(`- صفقات مكسوبة: ${dealsWon[0].cnt} (${dealsWon[0].total ?? 0} SAR)`);
+      parts.push(`\n👥 أداء الـ Sales Agents:`);
+      for (const a of agentPerf) {
+        parts.push(`- ${a.name}: ${a.leads} ليد، ${a.won} صفقة`);
       }
-    } else if (role === "MediaBuyer") {
-      const [campaignRows] = await pool.execute(
-        `
-          SELECT
-            platform,
-            campaignName,
-            ROUND(SUM(spend), 2) AS totalSpend,
-            SUM(conversions) AS totalConversions,
-            ROUND(AVG(NULLIF(cpa, 0)), 2) AS avgCpa
-          FROM (
-            SELECT 'Meta' AS platform, campaignName, CAST(COALESCE(dailyBudget, 0) AS DECIMAL(12,2)) AS spend, 0 AS conversions, 0 AS cpa
-            FROM meta_campaign_snapshots
-            WHERE syncedAt >= DATE_SUB(NOW(), INTERVAL 14 DAY)
-
-            UNION ALL
-
-            SELECT 'TikTok' AS platform, campaign_name AS campaignName, CAST(COALESCE(spend, 0) AS DECIMAL(12,2)) AS spend, CAST(COALESCE(conversions, 0) AS UNSIGNED) AS conversions, CAST(COALESCE(cpa, 0) AS DECIMAL(12,2)) AS cpa
-            FROM tiktok_campaign_snapshots
-            WHERE synced_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)
-          ) t
-          WHERE campaignName IS NOT NULL AND campaignName <> ''
-          GROUP BY platform, campaignName
-          ORDER BY totalSpend DESC
-          LIMIT 12
-        `
-      ) as any;
-
-      const [leadQualityRows] = await pool.execute(
-        `
-          SELECT
-            COALESCE(campaignName, 'Direct / Unknown') AS campaignName,
-            SUM(CASE WHEN leadQuality = 'Hot' THEN 1 ELSE 0 END) AS hotLeads,
-            SUM(CASE WHEN leadQuality = 'Warm' THEN 1 ELSE 0 END) AS warmLeads,
-            SUM(CASE WHEN leadQuality = 'Cold' THEN 1 ELSE 0 END) AS coldLeads,
-            SUM(CASE WHEN leadQuality = 'Bad' THEN 1 ELSE 0 END) AS badLeads,
-            COUNT(*) AS totalLeads
-          FROM leads
-          WHERE deletedAt IS NULL
-          GROUP BY COALESCE(campaignName, 'Direct / Unknown')
-          ORDER BY totalLeads DESC
-          LIMIT 12
-        `
-      ) as any;
-
-      parts.push("ملخص تحليلي لإدارة الميديا بايينج:");
-      parts.push("أداء الحملات خلال آخر 14 يومًا:");
-      for (const row of campaignRows as any[]) {
-        parts.push(`- ${row.platform} | ${row.campaignName}: إنفاق ${formatMetric(row.totalSpend, 2)} | تحويلات ${formatMetric(row.totalConversions)} | متوسط CPA/CPL = ${formatMetric(row.avgCpa, 2)}`);
+      parts.push(`\n📢 الحملات الأخيرة:`);
+      for (const c of campaigns) {
+        parts.push(`- ${c.name} (${c.platform}) - ${c.isActive ? "نشطة" : "متوقفة"}`);
       }
-      parts.push("توزيع جودة الليدز حسب الحملة:");
-      for (const row of leadQualityRows as any[]) {
-        parts.push(`- ${row.campaignName}: Hot ${formatMetric(row.hotLeads)} | Warm ${formatMetric(row.warmLeads)} | Cold ${formatMetric(row.coldLeads)} | Bad ${formatMetric(row.badLeads)} | الإجمالي ${formatMetric(row.totalLeads)}`);
-      }
-    } else if (role === "SalesManager") {
-      const [agentRows] = await pool.execute(
-        `
-          SELECT
-            u.id,
-            COALESCE(u.name, CONCAT('User #', u.id)) AS agentName,
-            COUNT(DISTINCT l.id) AS totalLeads,
-            COUNT(DISTINCT CASE WHEN d.status = 'Won' THEN d.id END) AS wonDeals,
-            ROUND(
-              100 * COUNT(DISTINCT CASE WHEN d.status = 'Won' THEN d.id END)
-              / NULLIF(COUNT(DISTINCT l.id), 0),
-              1
-            ) AS winRate,
-            SUM(
-              CASE WHEN l.stage = 'New' AND l.createdAt <= DATE_SUB(NOW(), INTERVAL 30 MINUTE)
-              THEN 1 ELSE 0 END
-            ) AS slaRiskLeads
-          FROM users u
-          LEFT JOIN leads l
-            ON l.ownerId = u.id
-           AND l.deletedAt IS NULL
-          LEFT JOIN deals d
-            ON d.leadId = l.id
-           AND d.deletedAt IS NULL
-          WHERE u.role = 'SalesAgent'
-            AND u.deletedAt IS NULL
-            AND u.isActive = 1
-          GROUP BY u.id, u.name
-          ORDER BY totalLeads DESC
-          LIMIT 15
-        `
-      ) as any;
 
-      const [slaRows] = await pool.execute(
-        `
-          SELECT
-            COALESCE(u.name, 'غير محدد') AS agentName,
-            COUNT(*) AS breaches
-          FROM leads l
-          LEFT JOIN users u ON u.id = l.ownerId
-          WHERE l.deletedAt IS NULL
-            AND l.stage = 'New'
-            AND l.createdAt <= DATE_SUB(NOW(), INTERVAL 30 MINUTE)
-          GROUP BY u.id, u.name
-          ORDER BY breaches DESC
-          LIMIT 10
-        `
-      ) as any;
+      // If question mentions a specific agent or client
+      const nameMatch = question.match(/[\u0600-\u06FF\w]{3,}/g);
+      if (nameMatch && nameMatch.length > 0) {
+        for (const term of nameMatch.slice(0, 3)) {
+          const [matchedLeads] = await pool.execute(
+            `SELECT l.name, l.phone, l.stage, l.leadQuality, l.slaBreached,
+                    u.name as ownerName, l.createdAt,
+                    a.type as lastActivity, a.outcome as lastOutcome, a.activityTime as lastActivityTime
+             FROM leads l
+             LEFT JOIN users u ON u.id = l.ownerId
+             LEFT JOIN activities a ON a.id = (SELECT id FROM activities WHERE leadId = l.id ORDER BY activityTime DESC LIMIT 1)
+             WHERE (l.name LIKE ? OR u.name LIKE ?) AND l.deletedAt IS NULL
+             LIMIT 5`,
+            [`%${term}%`, `%${term}%`]
+          ) as any;
+          if (matchedLeads.length > 0) {
+            parts.push(`\n🔍 نتائج البحث عن "${term}":`);
+            for (const lead of matchedLeads) {
+              parts.push(`- ${lead.name} | ${lead.phone} | المرحلة: ${lead.stage} | الجودة: ${lead.leadQuality} | المسؤول: ${lead.ownerName ?? "غير محدد"}`);
+              if (lead.lastActivity) {
+                parts.push(`  آخر نشاط: ${lead.lastActivity} - ${lead.lastOutcome} (${lead.lastActivityTime})`);
+              }
+            }
+          }
+        }
+      }
 
-      const [stageRows] = await pool.execute(
-        `
-          SELECT stage, COUNT(*) AS total
-          FROM leads
-          WHERE deletedAt IS NULL
-          GROUP BY stage
-          ORDER BY total DESC
-          LIMIT 8
-        `
-      ) as any;
-
-      parts.push("لوحة مدير المبيعات:");
-      parts.push("أداء الفريق:");
-      for (const row of agentRows as any[]) {
-        parts.push(`- ${row.agentName}: ليدز ${formatMetric(row.totalLeads)} | صفقات مكسوبة ${formatMetric(row.wonDeals)} | معدل الفوز ${formatMetric(row.winRate, 1)}% | ليدز في خطر SLA ${formatMetric(row.slaRiskLeads)}`);
-      }
-      parts.push("خروقات SLA أو حالات التأخر الحالية:");
-      for (const row of slaRows as any[]) {
-        parts.push(`- ${row.agentName}: ${formatMetric(row.breaches)} حالة`);
-      }
-      parts.push("المراحل الأكثر ازدحامًا:");
-      for (const row of stageRows as any[]) {
-        parts.push(`- ${row.stage}: ${formatMetric(row.total)} ليد`);
-      }
     } else if (role === "SalesAgent") {
-      const [myStageRows] = await pool.execute(
-        `
-          SELECT stage, COUNT(*) AS total
-          FROM leads
-          WHERE ownerId = ?
-            AND deletedAt IS NULL
-          GROUP BY stage
-          ORDER BY total DESC
-        `,
+      // Only own leads
+      const [myLeads] = await pool.execute(
+        "SELECT COUNT(*) as cnt FROM leads WHERE ownerId = ? AND deletedAt IS NULL",
+        [userId]
+      ) as any;
+      const [myLeadsToday] = await pool.execute(
+        "SELECT COUNT(*) as cnt FROM leads WHERE ownerId = ? AND DATE(createdAt) = ? AND deletedAt IS NULL",
+        [userId, today]
+      ) as any;
+      const [mySla] = await pool.execute(
+        "SELECT COUNT(*) as cnt FROM leads WHERE ownerId = ? AND slaBreached = 1 AND deletedAt IS NULL",
+        [userId]
+      ) as any;
+      const [myDeals] = await pool.execute(
+        "SELECT COUNT(*) as cnt, SUM(d.valueSar) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.ownerId = ? AND d.status = 'Won' AND d.deletedAt IS NULL",
+        [userId]
+      ) as any;
+      const [recentLeads] = await pool.execute(
+        `SELECT l.name, l.phone, l.stage, l.leadQuality, l.slaBreached,
+                a.type as lastActivity, a.outcome as lastOutcome, a.activityTime
+         FROM leads l
+         LEFT JOIN activities a ON a.id = (SELECT id FROM activities WHERE leadId = l.id ORDER BY activityTime DESC LIMIT 1)
+         WHERE l.ownerId = ? AND l.deletedAt IS NULL
+         ORDER BY l.updatedAt DESC LIMIT 10`,
         [userId]
       ) as any;
 
-      const [myDealsRows] = await pool.execute(
-        `
-          SELECT
-            COUNT(DISTINCT CASE WHEN d.status = 'Won' THEN d.id END) AS wonDeals,
-            COALESCE(SUM(CASE WHEN d.status = 'Won' THEN d.valueSar ELSE 0 END), 0) AS wonValue
-          FROM deals d
-          INNER JOIN leads l ON l.id = d.leadId
-          WHERE l.ownerId = ?
-            AND l.deletedAt IS NULL
-            AND d.deletedAt IS NULL
-        `,
-        [userId]
-      ) as any;
-
-      const [myUnattendedRows] = await pool.execute(
-        `
-          SELECT
-            l.id,
-            COALESCE(l.name, CONCAT('Lead #', l.id)) AS leadName,
-            l.stage,
-            l.leadQuality,
-            MAX(a.activityTime) AS lastActivityTime
-          FROM leads l
-          LEFT JOIN activities a ON a.leadId = l.id
-          WHERE l.ownerId = ?
-            AND l.deletedAt IS NULL
-          GROUP BY l.id, l.name, l.stage, l.leadQuality
-          HAVING lastActivityTime IS NULL
-              OR lastActivityTime < DATE_SUB(NOW(), INTERVAL 24 HOUR)
-          ORDER BY lastActivityTime ASC
-          LIMIT 10
-        `,
-        [userId]
-      ) as any;
-
-      parts.push("لوحة المستشار البيعي:");
-      parts.push("توزيع الليدز حسب المرحلة:");
-      for (const row of myStageRows as any[]) {
-        parts.push(`- ${row.stage}: ${formatMetric(row.total)} ليد`);
+      parts.push(`📊 إحصائياتك (${today}):`);
+      parts.push(`- ليدزك الكلي: ${myLeads[0].cnt}`);
+      parts.push(`- ليدز اليوم: ${myLeadsToday[0].cnt}`);
+      parts.push(`- SLA Breached: ${mySla[0].cnt}`);
+      parts.push(`- صفقاتك المكسوبة: ${myDeals[0].cnt} (${myDeals[0].total ?? 0} SAR)`);
+      parts.push(`\n📋 آخر 10 ليدز:`);
+      for (const l of recentLeads) {
+        parts.push(`- ${l.name ?? "بدون اسم"} | ${l.phone} | ${l.stage} | ${l.leadQuality}${l.slaBreached ? " ⚠️ SLA" : ""}`);
+        if (l.lastActivity) parts.push(`  آخر نشاط: ${l.lastActivity} - ${l.lastOutcome}`);
       }
-      parts.push(`- صفقاتك المكسوبة: ${formatMetric(myDealsRows[0]?.wonDeals)} بقيمة ${formatMetric(myDealsRows[0]?.wonValue, 2)}`);
-      parts.push("أولويات المتابعة اليوم:");
-      for (const row of myUnattendedRows as any[]) {
-        parts.push(`- ${row.leadName} | المرحلة: ${row.stage} | الجودة: ${row.leadQuality} | آخر نشاط: ${row.lastActivityTime ?? 'لا يوجد'}`);
+
+      // Search by name/phone
+      const nameMatch = question.match(/[\u0600-\u06FF\w]{3,}/g);
+      if (nameMatch) {
+        for (const term of nameMatch.slice(0, 2)) {
+          const [found] = await pool.execute(
+            `SELECT l.name, l.phone, l.stage, l.leadQuality, l.slaBreached, l.notes,
+                    a.type as lastActivity, a.outcome, a.notes as actNotes, a.activityTime
+             FROM leads l
+             LEFT JOIN activities a ON a.id = (SELECT id FROM activities WHERE leadId = l.id ORDER BY activityTime DESC LIMIT 1)
+             WHERE l.ownerId = ? AND (l.name LIKE ? OR l.phone LIKE ?) AND l.deletedAt IS NULL
+             LIMIT 3`,
+            [userId, `%${term}%`, `%${term}%`]
+          ) as any;
+          if (found.length > 0) {
+            parts.push(`\n🔍 نتائج "${term}":`);
+            for (const f of found) {
+              parts.push(`- ${f.name} | ${f.phone} | المرحلة: ${f.stage} | الجودة: ${f.leadQuality}`);
+              if (f.notes) parts.push(`  ملاحظات: ${f.notes}`);
+              if (f.lastActivity) parts.push(`  آخر نشاط: ${f.lastActivity} - ${f.outcome} - ${f.actNotes ?? ""} (${f.activityTime})`);
+            }
+          }
+        }
       }
+
     } else if (role === "AccountManager" || role === "AccountManagerLead") {
-      const [clientSummaryRows] = await pool.execute(
-        `
-          SELECT
-            COUNT(*) AS totalClients,
-            SUM(CASE WHEN COALESCE(healthScore, 0) < 50 THEN 1 ELSE 0 END) AS riskyClients
-          FROM clients
-          WHERE accountManagerId = ?
-            AND deletedAt IS NULL
-        `,
+      // Own clients
+      const [myClients] = await pool.execute(
+        "SELECT COUNT(*) as cnt FROM clients WHERE accountManagerId = ? AND deletedAt IS NULL",
+        [userId]
+      ) as any;
+      const [renewalsDue] = await pool.execute(
+        `SELECT c.leadName, c.contactPhone, ct.endDate, ct.contractRenewalStatus
+         FROM clients c JOIN contracts ct ON ct.clientId = c.id
+         WHERE c.accountManagerId = ? AND ct.endDate >= NOW() AND ct.endDate <= DATE_ADD(NOW(), INTERVAL 30 DAY)
+         AND ct.deletedAt IS NULL AND c.deletedAt IS NULL
+         ORDER BY ct.endDate ASC LIMIT 10`,
+        [userId]
+      ) as any;
+      const [followUpsDue] = await pool.execute(
+        `SELECT c.leadName, f.type, f.followUpDate, f.notes
+         FROM follow_ups f JOIN clients c ON c.id = f.clientId
+         WHERE f.userId = ? AND f.status = 'Pending' AND f.followUpDate <= DATE_ADD(NOW(), INTERVAL 7 DAY)
+         ORDER BY f.followUpDate ASC LIMIT 10`,
         [userId]
       ) as any;
 
-      const [renewalRows] = await pool.execute(
-        `
-          SELECT
-            c.id AS clientId,
-            COALESCE(c.leadName, CONCAT('Client #', c.id)) AS clientName,
-            ct.endDate,
-            ct.contractRenewalStatus
-          FROM clients c
-          INNER JOIN contracts ct ON ct.clientId = c.id
-          WHERE c.accountManagerId = ?
-            AND c.deletedAt IS NULL
-            AND ct.deletedAt IS NULL
-            AND ct.endDate IS NOT NULL
-            AND ct.endDate <= DATE_ADD(NOW(), INTERVAL 30 DAY)
-          ORDER BY ct.endDate ASC
-          LIMIT 12
-        `,
-        [userId]
-      ) as any;
-
-      const [followUpGapRows] = await pool.execute(
-        `
-          SELECT
-            c.id AS clientId,
-            COALESCE(c.leadName, CONCAT('Client #', c.id)) AS clientName,
-            c.healthScore,
-            MAX(f.followUpDate) AS lastFollowUpDate
-          FROM clients c
-          LEFT JOIN follow_ups f ON f.clientId = c.id
-          WHERE c.accountManagerId = ?
-            AND c.deletedAt IS NULL
-          GROUP BY c.id, c.leadName, c.healthScore
-          HAVING lastFollowUpDate IS NULL
-              OR lastFollowUpDate < DATE_SUB(NOW(), INTERVAL 14 DAY)
-          ORDER BY lastFollowUpDate ASC
-          LIMIT 12
-        `,
-        [userId]
-      ) as any;
-
-      parts.push("لوحة إدارة الحسابات:");
-      parts.push(`- إجمالي العملاء: ${formatMetric(clientSummaryRows[0]?.totalClients)}`);
-      parts.push(`- العملاء المعرضون للخطر: ${formatMetric(clientSummaryRows[0]?.riskyClients)}`);
-      parts.push("العقود القريبة من الانتهاء:");
-      for (const row of renewalRows as any[]) {
-        parts.push(`- ${row.clientName}: نهاية العقد ${row.endDate} | حالة التجديد ${row.contractRenewalStatus}`);
+      parts.push(`📊 إحصائياتك:`);
+      parts.push(`- عملاؤك: ${myClients[0].cnt}`);
+      parts.push(`\n⚠️ عقود تنتهي خلال 30 يوم:`);
+      for (const r of renewalsDue) {
+        parts.push(`- ${r.leadName} | تنتهي: ${r.endDate} | حالة التجديد: ${r.contractRenewalStatus}`);
       }
-      parts.push("العملاء الذين يحتاجون متابعة استباقية:");
-      for (const row of followUpGapRows as any[]) {
-        parts.push(`- ${row.clientName}: Health Score = ${formatMetric(row.healthScore)} | آخر متابعة = ${row.lastFollowUpDate ?? 'لا توجد'}`);
+      parts.push(`\n📅 متابعات مطلوبة (7 أيام):`);
+      for (const f of followUpsDue) {
+        parts.push(`- ${f.leadName} | ${f.type} | ${f.followUpDate} | ${f.notes ?? ""}`);
+      }
+
+      // Search client
+      const nameMatch = question.match(/[\u0600-\u06FF\w]{3,}/g);
+      if (nameMatch) {
+        for (const term of nameMatch.slice(0, 2)) {
+          const [found] = await pool.execute(
+            `SELECT c.leadName, c.contactPhone, c.planStatus, c.healthScore, c.notes,
+                    ct.endDate, ct.contractRenewalStatus, ct.charges
+             FROM clients c LEFT JOIN contracts ct ON ct.clientId = c.id AND ct.deletedAt IS NULL
+             WHERE c.accountManagerId = ? AND c.leadName LIKE ? AND c.deletedAt IS NULL
+             LIMIT 3`,
+            [userId, `%${term}%`]
+          ) as any;
+          if (found.length > 0) {
+            parts.push(`\n🔍 نتائج "${term}":`);
+            for (const f of found) {
+              parts.push(`- ${f.leadName} | ${f.contactPhone} | الحالة: ${f.planStatus} | Health: ${f.healthScore}`);
+              if (f.endDate) parts.push(`  العقد ينتهي: ${f.endDate} | التجديد: ${f.contractRenewalStatus} | القيمة: ${f.charges} SAR`);
+              if (f.notes) parts.push(`  ملاحظات: ${f.notes}`);
+            }
+          }
+        }
+      }
+
+    } else if (role === "MediaBuyer") {
+      // Campaigns data
+      const [campaigns] = await pool.execute(
+        `SELECT name, platform, isActive, createdAt FROM campaigns WHERE deletedAt IS NULL ORDER BY createdAt DESC LIMIT 15`
+      ) as any;
+      const [leadsPerCampaign] = await pool.execute(
+        `SELECT campaignName, COUNT(*) as cnt FROM leads WHERE deletedAt IS NULL AND campaignName IS NOT NULL
+         GROUP BY campaignName ORDER BY cnt DESC LIMIT 10`
+      ) as any;
+
+      parts.push(`📢 الحملات (${campaigns.length} حملة):`);
+      for (const c of campaigns) {
+        parts.push(`- ${c.name} | ${c.platform} | ${c.isActive ? "نشطة" : "متوقفة"}`);
+      }
+      parts.push(`\n📊 ليدز لكل حملة:`);
+      for (const l of leadsPerCampaign) {
+        parts.push(`- ${l.campaignName}: ${l.cnt} ليد`);
       }
     }
 
-    parts.push("ضوابط تشغيل راكان:");
-    parts.push("- دورك استشاري فقط.");
-    parts.push("- ممنوع تنفيذ أي تحديث أو إرسال أو تعديل مباشر داخل النظام.");
-    parts.push("- مهمتك تحليل البيانات، كشف المخاطر، وترتيب الأولويات مع اقتراح أفضل خطوة تالية فقط.");
-  } catch (error: any) {
-    console.error("[Rakan] buildDbContext error:", error?.message || error);
-    parts.push("تعذر تحميل بعض المؤشرات من قاعدة البيانات. استخدم فقط ما هو متاح واذكر حدود البيانات بوضوح.");
+  } catch (err: any) {
+    console.error("[Rakan] DB context error:", err.message);
   }
 
   return parts.join("\n");
@@ -622,7 +421,9 @@ function generateStaticFallbackReply(
   const asksHelp = /(مساعد|help|تقدر|ايه|شو|ماذا|what can)/i.test(msg);
   const asksWho = /(مين|من هو|who|انت مين)/i.test(msg);
 
+  // ─── Respond based on intent ───
   if (isGreeting && !asksLeads && !asksDeals && !asksSla && !asksPerformance && !asksCampaign) {
+    // Pure greeting - respond naturally
     const greetings = [
       `أهلاً ${userName}! 😊 إزيك النهارده؟ أنا ${rakanName} جاهز أساعدك في أي حاجة تخص النظام.`,
       `يا هلا ${userName}! 👋 تمام الحمد لله! إيه اللي أقدر أساعدك فيه؟`,
@@ -636,12 +437,10 @@ function generateStaticFallbackReply(
     parts.push(`• 📢 الحملات التسويقية`);
     parts.push(`• ⚠️ تنبيهات SLA`);
     parts.push(`• 🔍 البحث عن عميل بالاسم`);
-    parts.push(`• 📥 تقارير Excel (قولي "عايز تقرير أداء السيلز" أو "هات شيت بالتجديدات")`);
 
   } else if (asksWho) {
     parts.push(`أنا ${rakanName}! 🤖 مساعدك الذكي في نظام تميز CRM.`);
     parts.push(`بقدر أساعدك تتابع الليدز، الصفقات، أداء الفريق، الحملات، وأي حاجة تخص شغلك في النظام.`);
-    parts.push(`وكمان بقدر أطلعلك تقارير Excel جاهزة! 📥`);
 
   } else if (asksHelp && !asksLeads && !asksDeals) {
     parts.push(`أهلاً ${userName}! أنا ${rakanName} وبقدر أساعدك في:`);
@@ -652,13 +451,13 @@ function generateStaticFallbackReply(
     parts.push(`• 📢 "إيه الحملات النشطة؟" - الحملات التسويقية`);
     parts.push(`• ⚠️ "كم ليد متأخر SLA؟" - تنبيهات SLA`);
     parts.push(`• 🔍 "ابحث عن أحمد" - البحث عن عميل`);
-    parts.push(`• 📥 "عايز تقرير أداء السيلز" - تقارير Excel`);
-    parts.push(`• 📥 "هات شيت بالتجديدات" - تقارير العقود`);
 
   } else if (dbContext && dbContext.trim().length > 0) {
+    // Has DB context - show relevant sections based on intent
     const dbLines = dbContext.split("\n");
 
     if (asksLeads || asksCount) {
+      // Filter to show only lead-related stats
       parts.push(`أهلاً ${userName}! هنا بيانات الليدز:`);
       parts.push(``);
       const leadLines = dbLines.filter(l =>
@@ -667,7 +466,7 @@ function generateStaticFallbackReply(
       if (leadLines.length > 0) {
         parts.push(...leadLines);
       } else {
-        parts.push(dbContext.split("\n\n")[0]);
+        parts.push(dbContext.split("\n\n")[0]); // First section
       }
 
     } else if (asksDeals) {
@@ -730,6 +529,7 @@ function generateStaticFallbackReply(
       }
 
     } else if (dbContext.includes("🔍")) {
+      // Search results found
       parts.push(`أهلاً ${userName}! هنا نتائج البحث:`);
       parts.push(``);
       const searchLines: string[] = [];
@@ -745,18 +545,18 @@ function generateStaticFallbackReply(
       }
 
     } else {
+      // General question - show a summary, not everything
       parts.push(`أهلاً ${userName}! 👋`);
       parts.push(``);
+      // Show just the first stats section
       const firstSection = dbContext.split("\n\n")[0];
       parts.push(firstSection);
       parts.push(``);
       parts.push(`💡 لو عايز تفاصيل أكتر، اسألني عن حاجة محددة زي "كم ليد النهارده" أو "مين أفضل سيلز".`);
-      parts.push(`📥 أو لو عايز تقرير Excel، قولي "عايز تقرير أداء السيلز" أو "هات شيت بالتجديدات".`);
     }
   } else {
     parts.push(`أهلاً ${userName}! 👋 أنا ${rakanName}.`);
     parts.push(`معنديش بيانات كافية عن سؤالك ده. ممكن تسألني عن الليدز، الصفقات، أداء الفريق، أو الحملات.`);
-    parts.push(`📥 أو لو عايز تقرير Excel، قولي "عايز تقرير" وحدد النوع.`);
   }
 
   return parts.join("\n");
@@ -772,8 +572,10 @@ export async function callGemini(
   const model = "gemini-2.0-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+  // Build contents array for Gemini
   const contents: any[] = [];
 
+  // Add history (last 10 messages)
   const recentHistory = history.slice(-10);
   for (const msg of recentHistory) {
     contents.push({
@@ -782,6 +584,7 @@ export async function callGemini(
     });
   }
 
+  // Add current user message
   contents.push({
     role: "user",
     parts: [{ text: userMessage }],
@@ -843,6 +646,7 @@ export async function textToSpeech(
     const data = await response.json() as any;
     if (!data.audioContent) return null;
 
+    // Return as base64 data URL
     return `data:audio/mp3;base64,${data.audioContent}`;
   } catch {
     return null;
@@ -855,272 +659,117 @@ export function detectLanguageCode(text: string): string {
   return arabicPattern.test(text) ? "ar" : "en";
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Report Intent Analysis (from drop-in)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function stripCodeFence(input: string): string {
-  return input
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/```$/i, "")
-    .trim();
+// ─── Main Rakan Chat Handler ───────────────────────────────────────────────────
+export interface RakanChatReportAttachment {
+  reportType: RakanExecutiveReportType;
+  overview: string;
+  files?: RakanExportBundle;
 }
 
-function safeJsonParse<T>(text: string): T | null {
-  try {
-    return JSON.parse(stripCodeFence(text)) as T;
-  } catch {
-    return null;
-  }
+export interface RakanChatResponse {
+  reply: string;
+  audioBase64: string | null;
+  mode: "smart" | "normal";
+  report?: RakanChatReportAttachment;
 }
 
-function lower(s?: string | null): string {
-  return (s ?? "").trim().toLowerCase();
+function getRouteSpecificGuidance(currentRoute = "/"): string {
+  const route = currentRoute.toLowerCase();
+  if (route.includes("/leads")) {
+    return "أنت داخل صفحة الليدز. ركّز على ترتيب الأولويات، الليدز المتوقفة، سوء استخدام Cold، والبيانات الناقصة.";
+  }
+  if (route.includes("/clients")) {
+    return "أنت داخل صفحة العملاء. ركّز على صحة العميل، المتابعات المتأخرة، والتجديدات القريبة.";
+  }
+  if (route.includes("/campaign")) {
+    return "أنت داخل صفحة الحملات. ركّز على جودة الليدز، الهدر المحتمل، ومقارنة النتائج بالإنفاق المتاح.";
+  }
+  if (route.includes("/dashboard")) {
+    return "أنت داخل لوحة المتابعة التنفيذية. ابدأ دائمًا بالاختناقات ثم اعرض أهم 3 أولويات.";
+  }
+  return "قدّم تحليلًا تنفيذيًا واضحًا يربط بين نقص البيانات، ضعف المتابعة، والنتيجة التجارية.";
 }
 
-function normalizeDate(value?: string | null): string | null {
-  if (!value) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+function detectExecutiveReportIntent(userMessage: string): {
+  reportType?: RakanExecutiveReportType;
+  wantsExcel: boolean;
+  wantsDocument: boolean;
+} {
+  const msg = userMessage.toLowerCase();
+  const asksReport = /(تقرير|report|ملف|اكسيل|excel|sheet|document|word|doc|ملخص|summary|طلع|هات|اعمل)/i.test(userMessage);
+  const wantsExcel = /(excel|xlsx|sheet|شيت|اكسيل)/i.test(userMessage);
+  const wantsDocument = /(document|word|doc|مستند|document)/i.test(userMessage);
 
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
+  if (!asksReport) {
+    return { wantsExcel, wantsDocument };
+  }
 
-  const y = parsed.getFullYear();
-  const m = `${parsed.getMonth() + 1}`.padStart(2, "0");
-  const d = `${parsed.getDate()}`.padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  if (/(جودة البيانات|بيانات ناقصة|نقص البيانات|data quality|incomplete data|missing data|عك)/i.test(userMessage)) {
+    return { reportType: "data_quality", wantsExcel, wantsDocument };
+  }
+  if (/(cold|كولد|cold misuse|lead cold|ليدز cold)/i.test(userMessage)) {
+    return { reportType: "cold_misuse", wantsExcel, wantsDocument };
+  }
+  if (/(متابعة|follow|compliance|نشاط|activity|مهمل|واقف)/i.test(userMessage)) {
+    return { reportType: "follow_up_compliance", wantsExcel, wantsDocument };
+  }
+  if (/(account manager|account managers|مدير الحساب|مديري الحسابات|am|عملاء)/i.test(msg)) {
+    return { reportType: "account_management", wantsExcel, wantsDocument };
+  }
+  if (/(تجديد|تجديدات|renew|contract|contracts|عقد|عقود)/i.test(userMessage)) {
+    return { reportType: "renewals_risk", wantsExcel, wantsDocument };
+  }
+  if (/(campaign|campaigns|حملات|حملة|media buyer|ads|اعلانات|إعلانات)/i.test(userMessage)) {
+    return { reportType: "campaign_efficiency", wantsExcel, wantsDocument };
+  }
+  if (/(sales|مبيعات|صفقات|team|agents|سيلز|funnel)/i.test(userMessage)) {
+    return { reportType: "sales_management", wantsExcel, wantsDocument };
+  }
+  if (/(ceo|executive|executive summary|شامل|ملخص تنفيذي|إدارة|الادارة|المدير التنفيذي)/i.test(userMessage)) {
+    return { reportType: "ceo_master", wantsExcel, wantsDocument };
+  }
+
+  return { reportType: "ceo_master", wantsExcel, wantsDocument };
 }
 
-function inferReportTypeHeuristically(message: string): RakanReportType | null {
-  const text = lower(message);
+async function maybeBuildDeterministicReport(params: {
+  userId: number;
+  role: UserRole;
+  userMessage: string;
+}): Promise<RakanChatReportAttachment | null> {
+  const intent = detectExecutiveReportIntent(params.userMessage);
+  if (!intent.reportType) return null;
 
-  if (
-    text.includes("أداء السيلز") ||
-    text.includes("اداء السيلز") ||
-    text.includes("sales performance") ||
-    text.includes("conversion")
-  ) {
-    return "sales_performance";
-  }
+  const report = await buildRakanExecutiveReport({
+    reportType: intent.reportType,
+    role: params.role,
+    userId: params.userId,
+  });
 
-  if (
-    text.includes("sla") ||
-    text.includes("خروقات") ||
-    text.includes("مهملة") ||
-    text.includes("neglected leads")
-  ) {
-    return "sla_breaches";
-  }
+  const shouldExport = intent.wantsExcel || intent.wantsDocument;
+  const format = intent.wantsExcel && intent.wantsDocument
+    ? "both"
+    : intent.wantsDocument
+      ? "document"
+      : intent.wantsExcel
+        ? "excel"
+        : null;
 
-  if (
-    text.includes("الأنشطة") ||
-    text.includes("المتابعات") ||
-    text.includes("activities") ||
-    text.includes("follow-up")
-  ) {
-    return "activities_followups";
-  }
-
-  if (
-    text.includes("التجديدات") ||
-    text.includes("العقود") ||
-    text.includes("renewals") ||
-    text.includes("contracts")
-  ) {
-    return "contracts_renewals";
-  }
-
-  if (
-    text.includes("متأخرة") ||
-    text.includes("متابعة متأخرة") ||
-    text.includes("delayed follow")
-  ) {
-    return "am_delayed_followups";
-  }
-
-  if (
-    text.includes("إيرادات") ||
-    text.includes("ايرادات") ||
-    text.includes("upsell") ||
-    text.includes("revenue")
-  ) {
-    return "am_revenue";
-  }
-
-  return null;
-}
-
-function looksLikeExcelRequest(message: string): boolean {
-  const text = lower(message);
-  return [
-    "excel",
-    "xlsx",
-    "شيت",
-    "sheet",
-    "تقرير",
-    "report",
-    "تحميل",
-    "download",
-    "export",
-    "اكسل",
-  ].some((token) => text.includes(token));
-}
-
-function applyDefaultDates(
-  intent: Partial<AnalyzeIntentResult>,
-  userMessage: string,
-): AnalyzeIntentResult {
-  const reportType = intent.reportType ?? inferReportTypeHeuristically(userMessage);
-
-  if (!reportType) {
-    return {
-      isReportRequest: false,
-      reportType: null,
-      dateFrom: null,
-      dateTo: null,
-      confidence: intent.confidence ?? 0.3,
-      reason: intent.reason ?? "No supported report type detected",
-    };
-  }
-
-  const fallbackRange = defaultDateRangeForReport(reportType, userMessage);
-
+  const files = format ? await exportRakanReportBundle(report, format) : undefined;
   return {
-    isReportRequest: Boolean(intent.isReportRequest ?? looksLikeExcelRequest(userMessage)),
-    reportType,
-    dateFrom: normalizeDate(intent.dateFrom) ?? fallbackRange.dateFrom,
-    dateTo: normalizeDate(intent.dateTo) ?? fallbackRange.dateTo,
-    confidence: intent.confidence ?? 0.75,
-    reason: intent.reason,
+    reportType: intent.reportType,
+    overview: buildReportOverview(report),
+    files,
   };
 }
 
-async function callGeminiForIntent(
-  apiKey: string,
-  userMessage: string,
-  history: ChatHistoryItem[],
-): Promise<string | null> {
-  if (!apiKey) return null;
-
-  const GEMINI_MODEL = "gemini-2.0-flash";
-
-  const historyPreview = history
-    .slice(-6)
-    .map((item) => `${item.role}: ${item.content}`)
-    .join("\n");
-
-  const prompt = `
-You are an intent analyzer for a CRM assistant named Rakan.
-Return JSON only. No markdown. No explanation.
-
-Task:
-1) detect whether the user is asking for an Excel report.
-2) map the request to one of these exact report types only:
-   - sales_performance
-   - sla_breaches
-   - activities_followups
-   - contracts_renewals
-   - am_delayed_followups
-   - am_revenue
-3) extract dateFrom and dateTo in YYYY-MM-DD if possible.
-4) if dates are not explicit, return null for them.
-5) confidence is a number between 0 and 1.
-
-Required JSON shape:
-{
-  "isReportRequest": boolean,
-  "reportType": "sales_performance" | "sla_breaches" | "activities_followups" | "contracts_renewals" | "am_delayed_followups" | "am_revenue" | null,
-  "dateFrom": string | null,
-  "dateTo": string | null,
-  "confidence": number,
-  "reason": string
-}
-
-Examples:
-- "عايز تقرير أداء السيلز من أول الشهر" => sales_performance
-- "طلعلي شيت بالتجديدات اللي هتنتهي الشهر الجاي" => contracts_renewals
-- "هات تقرير الأنشطة والمتابعات آخر 7 أيام" => activities_followups
-- "مين عنده ليدز مهملة؟" => sla_breaches
-- "وريني إيرادات مديري الحسابات هذا الشهر" => am_revenue
-
-Conversation history:
-${historyPreview || "(empty)"}
-
-Last user message:
-${userMessage}
-  `.trim();
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0,
-          topP: 0.1,
-          responseMimeType: "application/json",
-        },
-      }),
-    },
-  );
-
-  if (!response.ok) return null;
-
-  const data = (await response.json()) as any;
-  return (
-    data?.candidates?.[0]?.content?.parts
-      ?.map((part: any) => part?.text ?? "")
-      .join("") ?? null
-  );
-}
-
-async function analyzeIntent(
-  geminiApiKey: string,
-  userMessage: string,
-  history: ChatHistoryItem[],
-): Promise<AnalyzeIntentResult> {
-  const raw = await callGeminiForIntent(geminiApiKey, userMessage, history).catch(() => null);
-  const parsed = raw ? safeJsonParse<AnalyzeIntentResult>(raw) : null;
-
-  if (parsed) {
-    return applyDefaultDates(parsed, userMessage);
-  }
-
-  return applyDefaultDates(
-    {
-      isReportRequest: looksLikeExcelRequest(userMessage),
-      reportType: inferReportTypeHeuristically(userMessage),
-      confidence: 0.55,
-      reason: "Heuristic fallback",
-    },
-    userMessage,
-  );
-}
-
-async function storeGeneratedReport(buffer: Buffer, fileName: string): Promise<string> {
-  const downloadsDir = path.join(process.cwd(), "public", "downloads", "rakan");
-  await mkdir(downloadsDir, { recursive: true });
-
-  const uniqueName = `${Date.now()}-${crypto.randomUUID()}-${fileName}`;
-  const absolutePath = path.join(downloadsDir, uniqueName);
-
-  await writeFile(absolutePath, buffer);
-  return `/downloads/rakan/${uniqueName}`;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Main Rakan Chat Handler (merged: text-only + report generation)
-// ═══════════════════════════════════════════════════════════════════════════════
 export async function rakanChat(
   userId: number,
   role: UserRole,
   userName: string,
   userMessage: string,
   ttsVoicePreference?: string,
-  currentRoute = "/"
+  currentRoute = "/",
 ): Promise<RakanChatResponse> {
   const geminiKey = await getRakanSetting("gemini_api_key");
   const ttsKey = await getRakanSetting("google_tts_api_key");
@@ -1128,96 +777,86 @@ export async function rakanChat(
   const rakanName = (await getRakanSetting("rakan_name")) || "راكان";
 
   const fallbackApiKey = await getRakanSetting("fallback_llm_api_key");
-  const fallbackBaseUrl =
-    (await getRakanSetting("fallback_llm_base_url")) || "https://api.openai.com/v1";
-  const fallbackModel =
-    (await getRakanSetting("fallback_llm_model")) || "gpt-4.1-nano";
+  const fallbackBaseUrl = (await getRakanSetting("fallback_llm_base_url")) || "https://api.openai.com/v1";
+  const fallbackModel = (await getRakanSetting("fallback_llm_model")) || "gpt-4.1-nano";
 
-  const history = await getChatHistory(userId, 10);
-  const historyForLLM = history.map((h) => ({ role: h.role, content: h.content }));
-
-  try {
-    const intent = await analyzeIntent(geminiKey, userMessage, historyForLLM);
-
-    if (intent.isReportRequest && intent.reportType) {
-      const generated = await generateRakanReport({
-        reportType: intent.reportType,
-        dateFrom: intent.dateFrom!,
-        dateTo: intent.dateTo!,
-        requestedBy: { id: userId, name: userName, role },
-        delivery: "both",
-      });
-
-      let url: string | undefined;
-      if (generated.buffer) {
-        url = await storeGeneratedReport(generated.buffer, generated.fileName);
-      }
-
-      const labelMap: Record<RakanReportType, string> = {
-        sales_performance: "تقرير أداء المبيعات والتحويل",
-        sla_breaches: "تقرير خروقات SLA والليدز المهملة",
-        activities_followups: "تقرير الأنشطة والمتابعات",
-        contracts_renewals: "تقرير العقود والتجديدات",
-        am_delayed_followups: "تقرير المتابعات المتأخرة لمديري الحسابات",
-        am_revenue: "تقرير إيرادات مديري الحسابات",
-      };
-
-      const answer =
-        `تم تجهيز ${labelMap[intent.reportType]} للفترة من ${intent.dateFrom} إلى ${intent.dateTo}. ` +
-        `هذا التقرير مخصص للتحليل والدعم الإداري فقط ولا يتضمن أي تنفيذ مباشر داخل النظام.`;
-
-      await saveChatMessage(userId, "user", userMessage);
-      await saveChatMessage(userId, "assistant", answer);
-
-      return {
-        kind: "report",
-        answer,
-        report: {
-          fileName: generated.fileName,
-          mimeType: generated.mimeType,
-          url,
-          base64: generated.base64,
-        },
-        reply: answer,
-        audioBase64: null,
-        mode: "smart",
-      };
+  const deterministicReport = await maybeBuildDeterministicReport({ userId, role, userMessage });
+  if (deterministicReport) {
+    const downloadLines: string[] = [];
+    if (deterministicReport.files?.excel) {
+      downloadLines.push(`رابط ملف Excel: ${deterministicReport.files.excel.fileUrl}`);
     }
-  } catch (err: any) {
-    console.error("[Rakan] Report intent analysis error:", err?.message);
+    if (deterministicReport.files?.document) {
+      downloadLines.push(`رابط الـ Document: ${deterministicReport.files.document.fileUrl}`);
+    }
+
+    const reply = [
+      deterministicReport.overview,
+      downloadLines.length ? "" : "",
+      ...downloadLines,
+      downloadLines.length
+        ? "هذا التقرير مبني مباشرة على قاعدة بيانات الـ CRM الحالية، ومخصص للمتابعة والتحليل فقط دون تنفيذ أي إجراء تلقائي."
+        : "لو تريد، أقدر في نفس اللحظة أجهزه لك كـ Excel أو Document بمجرد أن تطلب الصيغة المطلوبة.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    await saveChatMessage(userId, "user", userMessage);
+    await saveChatMessage(userId, "assistant", reply);
+
+    let audioBase64: string | null = null;
+    const voicePref = ttsVoicePreference || "ar_formal";
+    if (voicePref !== "none" && ttsKey) {
+      const lang = detectLanguageCode(reply);
+      let voiceName: string;
+      let langCode: string;
+      if (lang === "ar") {
+        const voiceMap: Record<string, string> = {
+          ar_formal: await getRakanSetting("tts_voice_ar_formal") || "ar-XA-Wavenet-B",
+          ar_egyptian: await getRakanSetting("tts_voice_ar_egyptian") || "ar-XA-Wavenet-A",
+          ar_gulf: await getRakanSetting("tts_voice_ar_gulf") || "ar-XA-Wavenet-D",
+        };
+        voiceName = voiceMap[voicePref] || voiceMap["ar_formal"];
+        langCode = "ar-XA";
+      } else {
+        voiceName = (await getRakanSetting("tts_voice_en")) || "en-US-Neural2-D";
+        langCode = "en-US";
+      }
+      const ttsText = reply.length > 500 ? `${reply.substring(0, 500)}...` : reply;
+      audioBase64 = await textToSpeech(ttsKey, ttsText, voiceName, langCode);
+    }
+
+    return {
+      reply,
+      audioBase64,
+      mode: "normal",
+      report: deterministicReport,
+    };
   }
 
-  const dbContext = await buildDbContext(userId, role, userMessage, currentRoute);
+  const dbContext = await buildDbContext(userId, role, userMessage);
   const routeGuidance = getRouteSpecificGuidance(currentRoute);
 
-  const systemPrompt = `${instructions || "أنت راكان، مدير ذكاء اصطناعي استشاري داخل نظام CRM."}
+  const systemPrompt = `${instructions || "أنت راكان، مساعد تنفيذي استشاري داخل نظام CRM."}
 
 اسمك: ${rakanName}
-المستخدم الحالي: ${userName}
-الدور الحالي: ${role}
-الوقت الحالي: ${new Date().toLocaleString("ar-EG")}
-المسار الحالي داخل النظام: ${currentRoute}
+المستخدم الحالي: ${userName} (الدور: ${role})
+التاريخ والوقت الحالي: ${new Date().toLocaleString("ar-EG")}
+المسار الحالي: ${currentRoute}
 
-سياق العمل:
+سياق قاعدة البيانات:
 ${dbContext}
 
 تعليمات تشغيل إلزامية:
-- أنت مساعد استشاري فقط، ولست منفذًا لأي إجراءات.
-- ممنوع منعًا باتًا أن تدّعي أنك عدّلت بيانات، أو أرسلت رسالة، أو حدّثت سجلًا، أو غيّرت حالة، أو أنشأت مهمة.
-- عندما يطلب منك المستخدم تنفيذ إجراء مباشر، وضّح باحتراف أنك لا تنفذ الإجراءات، ثم قدّم له توصية عملية وخطوات مقترحة فقط.
-- مهمتك الأساسية: التحليل، اكتشاف الاختناقات، تحديد المخاطر، ترتيب الأولويات، وتقديم توصيات تنفيذية للإدارة والفرق.
-- استخدم فقط الأرقام والسياق المتاحين لك. إذا كانت البيانات غير كافية فقل ذلك بوضوح.
-- لا تخترع مؤشرات أو نتائج غير موجودة.
-- اجعل الردود مهنية، مختصرة، وذات قيمة تنفيذية.
-- عند عرض التوصيات، رتّبها بحسب الأولوية: عاجل، مهم، تحسين.
-- عند الحديث عن المبيعات أو خدمة العملاء أو الميديا بايينج، اربط دائمًا بين المؤشر والسبب المحتمل والتوصية التالية.
-- ${routeGuidance}
-- إذا كان السؤال عامًا من الإدارة العليا، أعطِ ملخصًا تنفيذيًا أولًا ثم 3 توصيات واضحة.
-- إذا كان السؤال من مدير مبيعات، اذكر الأداء، المخاطر، ومواطن ضعف الالتزام.
-- إذا كان السؤال من مدير حسابات، اذكر مخاطر churn، العملاء المتعثرين، وفرص الاحتفاظ والتجديد.
-- إذا كان السؤال من Media Buyer، ركّز على الإنفاق، CPA/CPL، جودة الليدز، وفرضيات التحسين.
-- اللغة الأساسية: العربية المهنية الواضحة.
-- لا تستخدم عبارات توحي بالتنفيذ مثل: "تم", "نفذت", "أرسلت", "حدّثت". استخدم بدلًا منها: "أوصي", "أقترح", "يُفضّل", "يحتاج إلى مراجعة".`;
+- أنت مستشار وتحليلي فقط، ولا تقوم بأي تعديل مباشر أو إرسال أو تحديث للسجلات.
+- ممنوع منعًا باتًا أن تدّعي أنك غيّرت حالة ليد أو أرسلت رسالة أو نفذت إجراء.
+- ركّز على نقص البيانات، سوء المتابعة، الاختناقات، وحالات Cold المشكوك فيها.
+- إذا طلب المستخدم تقريرًا أو ملفًا، اقترح الأنسب أو استخدم البيانات المتاحة فعليًا فقط.
+- استخدم لهجة عربية مهنية وواضحة، وابدأ دائمًا بالأولوية الأعلى.
+- ${routeGuidance}`;
+
+  const history = await getChatHistory(userId, 10);
+  const historyForLLM = history.map((h) => ({ role: h.role, content: h.content }));
 
   let reply: string;
   let mode: "smart" | "normal" = "smart";
@@ -1226,9 +865,9 @@ ${dbContext}
     try {
       reply = await callGemini(geminiKey, systemPrompt, historyForLLM, userMessage);
       mode = "smart";
+      console.log("[Rakan] ✅ Tier 1: Gemini response successful");
     } catch (err: any) {
-      console.warn("[Rakan] Gemini failed:", err.message);
-
+      console.warn("[Rakan] ❌ Tier 1: Gemini failed:", err.message);
       if (fallbackApiKey) {
         try {
           reply = await callOpenAICompatible(
@@ -1237,28 +876,17 @@ ${dbContext}
             fallbackModel,
             systemPrompt,
             historyForLLM,
-            userMessage
+            userMessage,
           );
           mode = "smart";
+          console.log("[Rakan] ✅ Tier 2: Fallback LLM response successful");
         } catch (err2: any) {
-          console.warn("[Rakan] Fallback LLM failed:", err2.message);
-          reply = generateStaticFallbackReply(
-            rakanName,
-            userName,
-            role,
-            userMessage,
-            dbContext
-          );
+          console.warn("[Rakan] ❌ Tier 2: Fallback LLM failed:", err2.message);
+          reply = generateStaticFallbackReply(rakanName, userName, role, userMessage, dbContext);
           mode = "normal";
         }
       } else {
-        reply = generateStaticFallbackReply(
-          rakanName,
-          userName,
-          role,
-          userMessage,
-          dbContext
-        );
+        reply = generateStaticFallbackReply(rakanName, userName, role, userMessage, dbContext);
         mode = "normal";
       }
     }
@@ -1270,28 +898,16 @@ ${dbContext}
         fallbackModel,
         systemPrompt,
         historyForLLM,
-        userMessage
+        userMessage,
       );
       mode = "smart";
     } catch (err: any) {
-      console.warn("[Rakan] Direct fallback LLM failed:", err.message);
-      reply = generateStaticFallbackReply(
-        rakanName,
-        userName,
-        role,
-        userMessage,
-        dbContext
-      );
+      console.warn("[Rakan] ❌ Tier 2 (direct): Fallback LLM failed:", err.message);
+      reply = generateStaticFallbackReply(rakanName, userName, role, userMessage, dbContext);
       mode = "normal";
     }
   } else {
-    reply = generateStaticFallbackReply(
-      rakanName,
-      userName,
-      role,
-      userMessage,
-      dbContext
-    );
+    reply = generateStaticFallbackReply(rakanName, userName, role, userMessage, dbContext);
     mode = "normal";
   }
 
@@ -1308,26 +924,20 @@ ${dbContext}
 
     if (lang === "ar") {
       const voiceMap: Record<string, string> = {
-        ar_formal: (await getRakanSetting("tts_voice_ar_formal")) || "ar-XA-Wavenet-B",
-        ar_egyptian: (await getRakanSetting("tts_voice_ar_egyptian")) || "ar-XA-Wavenet-A",
-        ar_gulf: (await getRakanSetting("tts_voice_ar_gulf")) || "ar-XA-Wavenet-D",
+        ar_formal: await getRakanSetting("tts_voice_ar_formal") || "ar-XA-Wavenet-B",
+        ar_egyptian: await getRakanSetting("tts_voice_ar_egyptian") || "ar-XA-Wavenet-A",
+        ar_gulf: await getRakanSetting("tts_voice_ar_gulf") || "ar-XA-Wavenet-D",
       };
       voiceName = voiceMap[voicePref] || voiceMap["ar_formal"];
       langCode = "ar-XA";
     } else {
-      voiceName = (await getRakanSetting("tts_voice_en")) || "en-US-Neural2-D";
+      voiceName = await getRakanSetting("tts_voice_en") || "en-US-Neural2-D";
       langCode = "en-US";
     }
 
-    const ttsText = reply.length > 500 ? `${reply.substring(0, 500)}...` : reply;
+    const ttsText = reply.length > 500 ? reply.substring(0, 500) + "..." : reply;
     audioBase64 = await textToSpeech(ttsKey, ttsText, voiceName, langCode);
   }
 
-  return {
-    kind: "text",
-    answer: reply,
-    reply,
-    audioBase64,
-    mode,
-  };
+  return { reply, audioBase64, mode };
 }

@@ -23,7 +23,7 @@ import { restoreService } from "../services/RestoreService";
 import { promises as fs } from "fs";
 import { handleTamaraWebhook, verifyTamaraWebhookRequest } from "../services/tamaraService";
 import { handlePaymobWebhook } from "../services/paymobService";
-import { startRakanAdvisoryEngine } from "../services/rakanAdvisoryEngine";
+import { initRakanAdvisoryEngine } from "../services/rakanAdvisoryEngine";
 import { developerHubRouter } from "../routes/developerHub";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -553,10 +553,6 @@ async function startServer() {
     }
   });
 
-  const downloadsDir = path.join(process.cwd(), "downloads");
-  await fs.mkdir(path.join(downloadsDir, "rakan"), { recursive: true });
-  app.use("/downloads", express.static(downloadsDir));
-
   // tRPC API
   app.use(
     "/api/trpc",
@@ -600,7 +596,7 @@ startServer().then(() => {
   // Start notification engine
   startNotificationEngine();
   // Start Rakan advisory engine
-  startRakanAdvisoryEngine();
+  initRakanAdvisoryEngine();
   // Start exchange rate auto-sync scheduler
   startExchangeRateScheduler();
 }).catch(console.error);

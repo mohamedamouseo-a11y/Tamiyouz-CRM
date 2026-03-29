@@ -8,7 +8,6 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { rakanRouter } from "./rakanRouter";
-import { rakanExecutiveRouter } from "./rakanExecutiveRouter";
 import { tamaraRouter } from "./tamaraRouter";
 import { paymobRouter } from "./paymobRouter";
 import { innocallRouter } from "./innocallRouter";
@@ -3846,7 +3845,6 @@ byLeadStageChanges: protectedProcedure
     }),
   }),
   rakan: rakanRouter,
-  rakanExecutive: rakanExecutiveRouter,
   tamara: tamaraRouter,
   paymob: paymobRouter,
   innocall: innocallRouter,
