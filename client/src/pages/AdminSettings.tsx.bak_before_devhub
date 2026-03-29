@@ -12,7 +12,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useThemeTokens } from "@/contexts/ThemeTokenContext";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Bell, Clock, Copy, Edit, Eye, EyeOff, FileSpreadsheet, GripVertical, Key, Mail, Palette, Plus, RefreshCw, Save, Send, Settings, Shield, Sliders, Trash2, Users, Check, Archive, SlidersHorizontal, Megaphone, Sparkles, Webhook , DollarSign, BarChart3, Package, Undo2, Terminal} from "lucide-react";
+import { Bell, Clock, Copy, Edit, Eye, EyeOff, FileSpreadsheet, GripVertical, Key, Mail, Palette, Plus, RefreshCw, Save, Send, Settings, Shield, Sliders, Trash2, Users, Check, Archive, SlidersHorizontal, Megaphone, Sparkles, Webhook , DollarSign, BarChart3, Package, Undo2} from "lucide-react";
 import NotificationSettingsContent from "@/components/NotificationSettingsContent";
 import NotificationsTab from "@/components/NotificationsTab";
 import MeetingNotificationSettings from "@/components/MeetingNotificationSettings";
@@ -27,7 +27,6 @@ import TamaraSettingsTab from "@/components/TamaraSettingsTab";
 import PaymobSettingsTab from "@/components/PaymobSettingsTab";
 import InnoCallSettingsTab from "@/components/InnoCallSettingsTab";
 import DemoSyncTab from "@/components/DemoSyncTab";
-import DeveloperHubTab from "@/components/DeveloperHubTab";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -433,10 +432,6 @@ export default function AdminSettings() {
             {isSuperAdmin && <TabsTrigger value="demoSync" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               <RefreshCw size={13} />
               <span>{isRTL ? "مزامنة الديمو" : "Demo Sync"}</span>
-            </TabsTrigger>}
-            {isSuperAdmin && <TabsTrigger value="developerHub" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
-              <Terminal size={13} />
-              <span>{isRTL ? "لوحة المطورين" : "Developer Hub"}</span>
             </TabsTrigger>}
             {isAdmin && <TabsTrigger value="packages" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               <Package size={13} />
@@ -898,10 +893,6 @@ export default function AdminSettings() {
           {/* ── Demo Sync Tab (Super Admin only) ── */}
           {isSuperAdmin && <TabsContent value="demoSync" className="mt-4">
             <DemoSyncTab />
-          </TabsContent>}
-          {/* ── Developer Hub Tab (Super Admin only) ── */}
-          {isSuperAdmin && <TabsContent value="developerHub" className="mt-4">
-            <DeveloperHubTab />
           </TabsContent>}
           {isAdmin && <TabsContent value="packages" className="mt-4">
             <PackagesTab isRTL={isRTL} />
