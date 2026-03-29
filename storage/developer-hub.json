@@ -2,9 +2,9 @@
   "webhookSecret": "7cebc74f41c31a6afc8da79e4b8c40ada69cb3f1109628563c34f2f4fb047c17",
   "aiAccessToken": "dc3891421275163274ef00b78d6932c0ee253a28a2de23ff",
   "mcpEnabled": false,
-  "githubToken": "",
-  "githubRepo": "",
+  "githubToken": "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",
+  "githubRepo": "https://ghu_D7rqwZgi9MLJwKDFRIWGJpZcVR0LjD1UD7Va@github.com/mohamedamouseo-a11y/Tamiyouz-CRM.git",
   "latestContextFile": "tamiyouz-crm-context-latest.txt",
   "latestContextGeneratedAt": "2026-03-29T20:01:18.615Z",
-  "updatedAt": "2026-03-29T20:01:18.617Z"
+  "updatedAt": "2026-03-29T21:12:38.562Z"
 }
