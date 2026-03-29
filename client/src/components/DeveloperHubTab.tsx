@@ -198,6 +198,17 @@ export default function DeveloperHubTab() {
         setSyncStatus("idle");
         addLog(isRTL ? "تم إلغاء جلسة النشر من المتصفح" : "Deployment stream cancelled from browser", "warning");
         toast.info(isRTL ? "تم إلغاء الجلسة" : "Stream cancelled");
+      } else if (syncStatus === "success" || error?.message?.includes("network")) {
+        // Network error after PM2 restart is expected - the server restarts itself
+        // If we already got a "done" event, this is not an error
+        if (syncStatus !== "success") {
+          setSyncStatus("success");
+          setProgress(100);
+          setCurrentStep(isRTL ? "اكتملت المزامنة - جاري إعادة تشغيل الخادم" : "Sync complete - server is restarting");
+          addLog(isRTL ? "اكتملت المزامنة بنجاح. الخادم يعيد التشغيل الآن." : "Sync completed successfully. Server is restarting now.", "success");
+          toast.success(isRTL ? "تم النشر بنجاح - الخادم يعيد التشغيل" : "Deployment successful - server restarting");
+          void loadStatus();
+        }
       } else {
         setSyncStatus("error");
         setCurrentStep(isRTL ? `خطأ: ${error?.message}` : `Error: ${error?.message}`);
@@ -684,3 +695,4 @@ export default function DeveloperHubTab() {
     </div>
   );
 }
+

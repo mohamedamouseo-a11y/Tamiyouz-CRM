@@ -152,6 +152,10 @@ async function getGitSnapshot() {
   }
 }
 
+function addLog(res: Response, level: SseLevel, message: string, messageAr: string) {
+  sendSseEvent(res, { type: "log", level, message, messageAr });
+}
+
 async function streamCommand(opts: {
   command: string;
   args: string[];
@@ -395,14 +399,7 @@ developerHubRouter.post("/deploy-sync", async (req, res) => {
       stepAr: "بناء التطبيق",
       percent: 72,
     },
-    {
-      command: "pm2",
-      args: ["restart", PM2_APP_NAME],
-      cwd: REPO_DIR,
-      step: "Restart PM2 service",
-      stepAr: "إعادة تشغيل خدمة PM2",
-      percent: 95,
-    },
+
   ];
 
   try {
@@ -425,6 +422,15 @@ developerHubRouter.post("/deploy-sync", async (req, res) => {
     }
 
     if (!clientClosed) {
+      // Send progress for PM2 restart step
+      sendSseEvent(res, {
+        type: "progress",
+        step: "Restart PM2 service",
+        stepAr: "إعادة تشغيل خدمة PM2",
+        percent: 95,
+      });
+      addLog(res, "info", "Preparing to restart PM2 service...", "جاري تجهيز إعادة تشغيل PM2...");
+
       const nextGit = await getGitSnapshot();
       sendSseEvent(res, {
         type: "done",
@@ -432,6 +438,18 @@ developerHubRouter.post("/deploy-sync", async (req, res) => {
         shortSha: nextGit.shortSha,
       });
       res.end();
+
+      // Trigger PM2 restart AFTER the response is fully sent (detached)
+      // This avoids killing the SSE connection mid-stream
+      setTimeout(() => {
+        const pmChild = spawn("pm2", ["restart", PM2_APP_NAME], {
+          cwd: REPO_DIR,
+          env: process.env,
+          detached: true,
+          stdio: "ignore",
+        });
+        pmChild.unref();
+      }, 500);
     }
   } catch (error: any) {
     if (!clientClosed) {
