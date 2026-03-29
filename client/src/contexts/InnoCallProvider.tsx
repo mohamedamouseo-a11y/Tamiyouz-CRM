@@ -6,10 +6,9 @@ import { trpc } from "@/lib/trpc";
  * InnoCallProvider - Web Call Script Integration
  *
  * This provider dynamically loads the InnoCall Web Call script from the URL
- * stored in the database settings. The Web Call script handles everything
- * (dialpad UI, calling, etc.) automatically once loaded.
- *
- * No complex WebRTC setup needed - the script does it all.
+ * stored in the database settings. The script is ONLY loaded on lead/client
+ * profile pages (/leads/:id and /clients/:id) to avoid covering the
+ * Rakan AI assistant widget on other pages.
  */
 
 interface InnoCallContextType {
@@ -36,9 +35,17 @@ const InnoCallContext = createContext<InnoCallContextType>({
   hideDialpad: () => {},
 });
 
+/** Check if the current URL is a lead or client profile page */
+function isProfilePage(): boolean {
+  const path = window.location.pathname;
+  // Match /leads/:id or /clients/:id (where :id is a number)
+  return /^\/(leads|clients)\/\d+/.test(path);
+}
+
 export function InnoCallProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const scriptLoadedRef = useRef(false);
   const scriptElementRef = useRef<HTMLScriptElement | null>(null);
 
@@ -48,18 +55,61 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
     staleTime: 60_000,
   });
 
+  // Listen for route changes
   useEffect(() => {
-    // Don't load if config not loaded or not enabled or no script URL
+    const checkPath = () => {
+      const newPath = window.location.pathname;
+      if (newPath !== currentPath) {
+        setCurrentPath(newPath);
+      }
+    };
+
+    // Check on popstate (back/forward navigation)
+    window.addEventListener("popstate", checkPath);
+
+    // Also poll for route changes (wouter doesn't always fire popstate)
+    const interval = setInterval(checkPath, 500);
+
+    return () => {
+      window.removeEventListener("popstate", checkPath);
+      clearInterval(interval);
+    };
+  }, [currentPath]);
+
+  // Helper to remove the script and any widget elements
+  const removeScript = useCallback(() => {
+    if (scriptElementRef.current) {
+      scriptElementRef.current.remove();
+      scriptElementRef.current = null;
+      scriptLoadedRef.current = false;
+      console.log("[InnoCall] Script removed");
+    }
+    // Also remove any InnoCall widget elements that the script created
+    const widgets = document.querySelectorAll(
+      '.innocalls-web-call, .innocalls-webrtc, [class*="innocall"], [id*="innocall"]'
+    );
+    widgets.forEach((el) => el.remove());
+    setIsReady(false);
+  }, []);
+
+  useEffect(() => {
+    const onProfilePage = isProfilePage();
+
+    // If not on a profile page, remove the script if loaded
+    if (!onProfilePage) {
+      if (scriptLoadedRef.current) {
+        removeScript();
+      }
+      setIsEnabled(configData?.enabled ?? false);
+      return;
+    }
+
+    // On a profile page - check if we should load the script
     if (!configData || !configData.enabled || !configData.scriptUrl) {
       setIsEnabled(false);
       setIsReady(false);
-
-      // Remove existing script if it was loaded before and now disabled
-      if (scriptElementRef.current) {
-        scriptElementRef.current.remove();
-        scriptElementRef.current = null;
-        scriptLoadedRef.current = false;
-        console.log("[InnoCall] Script removed (disabled or no URL)");
+      if (scriptLoadedRef.current) {
+        removeScript();
       }
       return;
     }
@@ -73,9 +123,7 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
         return;
       }
       // URL changed - remove old script
-      scriptElementRef.current.remove();
-      scriptElementRef.current = null;
-      scriptLoadedRef.current = false;
+      removeScript();
     }
 
     // Dynamically load the Web Call script
@@ -85,34 +133,31 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
     script.async = true;
 
     script.onload = () => {
-      console.log("[InnoCall] Web Call script loaded successfully from:", configData.scriptUrl);
+      console.log("[InnoCall] Web Call script loaded on profile page:", currentPath);
       setIsReady(true);
       scriptLoadedRef.current = true;
     };
 
     script.onerror = (err) => {
       console.error("[InnoCall] Failed to load Web Call script:", err);
-      toast.error("Failed to load InnoCall calling widget. Please check the Script URL in settings.");
+      toast.error("Failed to load InnoCall calling widget.");
       setIsReady(false);
     };
 
     document.body.appendChild(script);
     scriptElementRef.current = script;
 
-    console.log("[InnoCall] Loading Web Call script from:", configData.scriptUrl);
+    console.log("[InnoCall] Loading Web Call script for profile page:", currentPath);
+  }, [configData, currentPath, removeScript]);
 
-    // Cleanup on unmount
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      if (scriptElementRef.current) {
-        scriptElementRef.current.remove();
-        scriptElementRef.current = null;
-        scriptLoadedRef.current = false;
-      }
+      removeScript();
     };
-  }, [configData]);
+  }, [removeScript]);
 
-  // Backward-compatible startCall - the Web Call script provides its own UI
-  // but we can try to interact with it if the widget exposes an API
+  // Backward-compatible startCall
   const startCall = useCallback(
     (number: string) => {
       if (!isReady) {
@@ -126,27 +171,21 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
       }
       console.log("[InnoCall] Call requested to:", cleaned);
 
-      // Try to find the Web Call widget input and fill the number
-      // The Web Call script creates its own UI elements
       try {
-        // Look for the InnoCall widget's phone input
         const widget = document.querySelector('.innocalls-web-call, .innocalls-webrtc, [class*="innocall"]') as HTMLElement;
         if (widget) {
-          // Try to find and click the widget to open it
-          widget.style.display = 'block';
+          widget.style.display = "block";
           const input = widget.querySelector('input[type="tel"], input[type="text"], input') as HTMLInputElement;
           if (input) {
             input.value = cleaned;
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
           }
-          // Try to find and click the call button
           const callBtn = widget.querySelector('button[class*="call"], .call-button, button') as HTMLButtonElement;
           if (callBtn) {
             setTimeout(() => callBtn.click(), 300);
           }
         } else {
-          // Widget not found - just copy number to clipboard for easy pasting
           navigator.clipboard.writeText(cleaned).then(() => {
             toast.info(`Phone number ${cleaned} copied. Use the InnoCall widget to make the call.`);
           }).catch(() => {
@@ -161,21 +200,10 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
     [isReady]
   );
 
-  const hangup = useCallback(() => {
-    console.log("[InnoCall] Hangup requested");
-  }, []);
-
-  const toggleDialpad = useCallback(() => {
-    console.log("[InnoCall] Toggle dialpad");
-  }, []);
-
-  const showDialpad = useCallback(() => {
-    console.log("[InnoCall] Show dialpad");
-  }, []);
-
-  const hideDialpad = useCallback(() => {
-    console.log("[InnoCall] Hide dialpad");
-  }, []);
+  const hangup = useCallback(() => {}, []);
+  const toggleDialpad = useCallback(() => {}, []);
+  const showDialpad = useCallback(() => {}, []);
+  const hideDialpad = useCallback(() => {}, []);
 
   return (
     <InnoCallContext.Provider
