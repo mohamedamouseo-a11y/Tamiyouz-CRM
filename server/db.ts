@@ -3351,6 +3351,17 @@ export async function createObjective(data: { clientId: number; title: string; s
   return objective;
 }
 
+
+export async function updateObjective(id: number, data: { title?: string; status?: string }) {
+  const db = await getDb();
+  if (!db) return null;
+  const patch: any = {};
+  if (data.title !== undefined) patch.title = data.title;
+  if (data.status !== undefined) patch.status = data.status;
+  await db.update(clientObjectives).set(patch).where(eq(clientObjectives.id, id));
+  const [row] = await db.select().from(clientObjectives).where(eq(clientObjectives.id, id)).limit(1);
+  return row;
+}
 export async function createKeyResult(data: { objectiveId: number; title: string; targetValue?: number | null }) {
   const db = await getDb();
   if (!db) return null;
@@ -3546,6 +3557,19 @@ export async function createClientCommunication(data: { clientId: number; channe
   return row;
 }
 
+
+export async function updateClientCommunication(id: number, data: { channelName?: string; channelType?: string; link?: string | null; notes?: string | null }) {
+  const db = await getDb();
+  if (!db) return null;
+  const patch: any = {};
+  if (data.channelName !== undefined) patch.channelName = data.channelName;
+  if (data.channelType !== undefined) patch.channelType = data.channelType;
+  if (data.link !== undefined) patch.link = data.link;
+  if (data.notes !== undefined) patch.notes = data.notes;
+  await db.update(clientCommunications).set(patch).where(eq(clientCommunications.id, id));
+  const [row] = await db.select().from(clientCommunications).where(eq(clientCommunications.id, id)).limit(1);
+  return row;
+}
 // ─── Phase 5: CSAT Surveys ─────────────────────────────────────────────────
 
 export async function submitCSAT(data: { clientId: number; contractId?: number | null; score: number; feedback?: string | null }) {

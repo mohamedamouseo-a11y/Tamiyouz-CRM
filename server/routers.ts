@@ -143,7 +143,7 @@ import {
   getObjectives,
   createObjective,
   createKeyResult,
-  updateKeyResult,
+  updateKeyResult, updateObjective,
   getDeliverables,
   createDeliverable,
   updateDeliverable,
@@ -151,7 +151,7 @@ import {
   createUpsellOpportunity,
   updateUpsellOpportunity,
   getClientCommunications,
-  createClientCommunication,
+  createClientCommunication, updateClientCommunication,
   submitCSAT,
   getCSATScores,
   getLeadAssignments,
@@ -2778,6 +2778,16 @@ byLeadStageChanges: protectedProcedure
       .mutation(async ({ input }) => {
         return updateKeyResult(input.id, input.currentValue);
       }),
+    updateObjective: accountManagerProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().optional(),
+        status: z.enum(["OnTrack", "AtRisk", "OffTrack"]).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return updateObjective(input.id, { title: input.title, status: input.status });
+      }),
+
   }),
 
   // ─── Phase 5: Deliverables ────────────────────────────────────────────
@@ -2892,6 +2902,20 @@ byLeadStageChanges: protectedProcedure
           notes: input.notes ?? null,
         });
       }),
+    update: accountManagerProcedure
+      .input(z.object({
+        id: z.number(),
+        data: z.object({
+          channelName: z.string().optional(),
+          channelType: z.enum(["EmailThread", "WhatsAppGroup", "SlackChannel", "Other"]).optional(),
+          link: z.string().nullable().optional(),
+          notes: z.string().nullable().optional(),
+        }),
+      }))
+      .mutation(async ({ input }) => {
+        return updateClientCommunication(input.id, input.data);
+      }),
+
   }),
 
   // ─── Phase 5: CSAT Surveys ────────────────────────────────────────────
