@@ -553,9 +553,9 @@ async function startServer() {
     }
   });
 
-  const downloadsDir = path.join(process.cwd(), "downloads");
-  await fs.mkdir(path.join(downloadsDir, "rakan"), { recursive: true });
-  app.use("/downloads", express.static(downloadsDir));
+  const rakanDownloadsDir = path.join(process.cwd(), "downloads");
+  await fs.mkdir(path.join(rakanDownloadsDir, "rakan"), { recursive: true });
+  app.use("/downloads", express.static(rakanDownloadsDir));
 
   // tRPC API
   app.use(
