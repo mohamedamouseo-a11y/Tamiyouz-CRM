@@ -306,6 +306,169 @@ export default function ClientProfile({ params }: RouteProps) {
   const updateUpsellM = trpc.upsell.update.useMutation({ onSuccess: async () => { await upsellQ.refetch(); } });
   const createCommunicationM = trpc.communications.create.useMutation({ onSuccess: async () => { setCommunicationDialogOpen(false); setCommunicationForm({ channelName: "", channelType: "EmailThread", link: "", notes: "" }); await communicationsQ.refetch(); } });
 
+  // ─── Edit Task State ──────────────────────────────────────────────────────
+  const [editTaskDialogOpen, setEditTaskDialogOpen] = React.useState(false);
+  const [editTaskId, setEditTaskId] = React.useState<number | null>(null);
+  const [editTaskForm, setEditTaskForm] = React.useState({ title: "", assignedTo: "", dueDate: "", priority: "Medium", notes: "" });
+
+  function openEditTask(task: any) {
+    setEditTaskId(task.id);
+    setEditTaskForm({
+      title: task.title ?? "",
+      assignedTo: task.assignedTo ? String(task.assignedTo) : "",
+      dueDate: toDateInput(task.dueDate),
+      priority: task.priority ?? "Medium",
+      notes: task.notes ?? "",
+    });
+    setEditTaskDialogOpen(true);
+  }
+
+  async function submitEditTask() {
+    if (!editTaskId) return;
+    await updateTaskM.mutateAsync({
+      id: editTaskId,
+      data: {
+        title: editTaskForm.title.trim() || undefined,
+        assignedTo: editTaskForm.assignedTo ? Number(editTaskForm.assignedTo) : null,
+        dueDate: editTaskForm.dueDate ? `${editTaskForm.dueDate}T00:00:00` : null,
+        priority: editTaskForm.priority as any,
+        notes: editTaskForm.notes.trim() || null,
+      },
+    });
+    setEditTaskDialogOpen(false);
+    setEditTaskId(null);
+    toast.success("Task updated successfully");
+  }
+
+  // ─── Edit Objective State ──────────────────────────────────────────────────
+  const [editObjDialogOpen, setEditObjDialogOpen] = React.useState(false);
+  const [editObjId, setEditObjId] = React.useState<number | null>(null);
+  const [editObjForm, setEditObjForm] = React.useState({ title: "", status: "OnTrack" });
+
+  const updateObjectiveM = trpc.objectives.updateObjective.useMutation({
+    onSuccess: async () => {
+      setEditObjDialogOpen(false);
+      setEditObjId(null);
+      await objectivesQ.refetch();
+      toast.success("Objective updated successfully");
+    },
+  });
+
+  function openEditObjective(obj: any) {
+    setEditObjId(obj.id);
+    setEditObjForm({ title: obj.title ?? "", status: obj.status ?? "OnTrack" });
+    setEditObjDialogOpen(true);
+  }
+
+  async function submitEditObjective() {
+    if (!editObjId) return;
+    await updateObjectiveM.mutateAsync({
+      id: editObjId,
+      title: editObjForm.title.trim() || undefined,
+      status: editObjForm.status as any,
+    });
+  }
+
+  // ─── Edit Deliverable State ────────────────────────────────────────────────
+  const [editDeliverableDialogOpen, setEditDeliverableDialogOpen] = React.useState(false);
+  const [editDeliverableId, setEditDeliverableId] = React.useState<number | null>(null);
+  const [editDeliverableForm, setEditDeliverableForm] = React.useState({ name: "", description: "", dueDate: "", assignedTo: "" });
+
+  function openEditDeliverable(item: any) {
+    setEditDeliverableId(item.id);
+    setEditDeliverableForm({
+      name: item.name ?? "",
+      description: item.description ?? "",
+      dueDate: toDateInput(item.dueDate),
+      assignedTo: item.assignedTo ? String(item.assignedTo) : "",
+    });
+    setEditDeliverableDialogOpen(true);
+  }
+
+  async function submitEditDeliverable() {
+    if (!editDeliverableId) return;
+    await updateDeliverableM.mutateAsync({
+      id: editDeliverableId,
+      data: {
+        name: editDeliverableForm.name.trim() || undefined,
+        description: editDeliverableForm.description.trim() || null,
+        dueDate: editDeliverableForm.dueDate || null,
+        assignedTo: editDeliverableForm.assignedTo ? Number(editDeliverableForm.assignedTo) : null,
+      },
+    });
+    setEditDeliverableDialogOpen(false);
+    setEditDeliverableId(null);
+    toast.success("Deliverable updated successfully");
+  }
+
+  // ─── Edit Upsell State ─────────────────────────────────────────────────────
+  const [editUpsellDialogOpen, setEditUpsellDialogOpen] = React.useState(false);
+  const [editUpsellId, setEditUpsellId] = React.useState<number | null>(null);
+  const [editUpsellForm, setEditUpsellForm] = React.useState({ title: "", potentialValue: "", notes: "" });
+
+  function openEditUpsell(item: any) {
+    setEditUpsellId(item.id);
+    setEditUpsellForm({
+      title: item.title ?? "",
+      potentialValue: item.potentialValue ? String(item.potentialValue) : "",
+      notes: item.notes ?? "",
+    });
+    setEditUpsellDialogOpen(true);
+  }
+
+  async function submitEditUpsell() {
+    if (!editUpsellId) return;
+    await updateUpsellM.mutateAsync({
+      id: editUpsellId,
+      data: {
+        title: editUpsellForm.title.trim() || undefined,
+        potentialValue: editUpsellForm.potentialValue || null,
+        notes: editUpsellForm.notes.trim() || null,
+      },
+    });
+    setEditUpsellDialogOpen(false);
+    setEditUpsellId(null);
+    toast.success("Upsell updated successfully");
+  }
+
+  // ─── Edit Communication State ──────────────────────────────────────────────
+  const [editCommDialogOpen, setEditCommDialogOpen] = React.useState(false);
+  const [editCommId, setEditCommId] = React.useState<number | null>(null);
+  const [editCommForm, setEditCommForm] = React.useState({ channelName: "", channelType: "EmailThread" as string, link: "", notes: "" });
+
+  const updateCommunicationM = trpc.communications.update.useMutation({
+    onSuccess: async () => {
+      setEditCommDialogOpen(false);
+      setEditCommId(null);
+      await communicationsQ.refetch();
+      toast.success("Channel updated successfully");
+    },
+  });
+
+  function openEditCommunication(ch: any) {
+    setEditCommId(ch.id);
+    setEditCommForm({
+      channelName: ch.channelName ?? "",
+      channelType: ch.channelType ?? "EmailThread",
+      link: ch.link ?? "",
+      notes: ch.notes ?? "",
+    });
+    setEditCommDialogOpen(true);
+  }
+
+  async function submitEditCommunication() {
+    if (!editCommId) return;
+    await updateCommunicationM.mutateAsync({
+      id: editCommId,
+      data: {
+        channelName: editCommForm.channelName.trim() || undefined,
+        channelType: editCommForm.channelType as any,
+        link: editCommForm.link.trim() || null,
+        notes: editCommForm.notes.trim() || null,
+      },
+    });
+  }
+
   // ─── Derived Data ───────────────────────────────────────────────────────────
   const data = clientQ.data;
   const client = data?.client;
@@ -1038,25 +1201,23 @@ export default function ClientProfile({ params }: RouteProps) {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditFollowUp(fu)}
+                                  title="Edit"
+                                >
+                                  <Pencil size={14} />
+                                </Button>
                                 {fu.status !== "Completed" && (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => openEditFollowUp(fu)}
-                                      title="Edit"
-                                    >
-                                      <Pencil size={14} />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => completeFollowUpM.mutate({ id: fu.id })}
-                                      disabled={completeFollowUpM.isPending}
-                                    >
-                                      Mark Done
-                                    </Button>
-                                  </>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => completeFollowUpM.mutate({ id: fu.id })}
+                                    disabled={completeFollowUpM.isPending}
+                                  >
+                                    Mark Done
+                                  </Button>
                                 )}
                               </div>
                             </TableCell>
@@ -1198,6 +1359,9 @@ export default function ClientProfile({ params }: RouteProps) {
                               <div className="text-xs text-muted-foreground mt-1 truncate">{task.notes}</div>
                             )}
                             <div className="flex gap-1 mt-2">
+                              <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => openEditTask(task)}>
+                                <Pencil size={12} className="mr-1" /> Edit
+                              </Button>
                               {status !== "ToDo" && (
                                 <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => moveTask(task.id, status === "InProgress" ? "ToDo" : "InProgress")}>
                                   {status === "InProgress" ? "← To Do" : "← In Progress"}
@@ -1215,6 +1379,58 @@ export default function ClientProfile({ params }: RouteProps) {
                     </div>
                   ))}
                 </div>
+                {/* ── Edit Task Dialog ── */}
+                <Dialog open={editTaskDialogOpen} onOpenChange={setEditTaskDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Task</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4">
+                      <div className="space-y-2">
+                        <Label>Title</Label>
+                        <Input value={editTaskForm.title} onChange={(e) => setEditTaskForm((s) => ({ ...s, title: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Assign To</Label>
+                        <Select
+                          value={editTaskForm.assignedTo || "none"}
+                          onValueChange={(v) => setEditTaskForm((s) => ({ ...s, assignedTo: v === "none" ? "" : v }))}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Select user" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">—</SelectItem>
+                            {(usersListQ.data ?? []).map((u: any) => (
+                              <SelectItem key={u.id} value={String(u.id)}>{u.name} ({u.role})</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Due Date</Label>
+                        <Input type="date" value={editTaskForm.dueDate} onChange={(e) => setEditTaskForm((s) => ({ ...s, dueDate: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Priority</Label>
+                        <Select value={editTaskForm.priority} onValueChange={(v) => setEditTaskForm((s) => ({ ...s, priority: v }))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Low">Low</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="High">High</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Notes</Label>
+                        <Textarea value={editTaskForm.notes} onChange={(e) => setEditTaskForm((s) => ({ ...s, notes: e.target.value }))} rows={3} />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setEditTaskDialogOpen(false)}>Cancel</Button>
+                      <Button onClick={submitEditTask} disabled={!editTaskForm.title.trim()}>Save Changes</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </TabsContent>
 
@@ -1239,6 +1455,9 @@ export default function ClientProfile({ params }: RouteProps) {
                     <div className="flex items-center gap-2 mb-2">
                       <span className="font-semibold">{obj.title}</span>
                       <Badge variant="outline" className={obj.status === "OnTrack" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : obj.status === "AtRisk" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-rose-200 bg-rose-50 text-rose-700"}>{obj.status}</Badge>
+                      <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => openEditObjective(obj)}>
+                        <Pencil size={12} className="mr-1" /> Edit
+                      </Button>
                     </div>
                     {(obj.keyResults ?? []).map((kr: any) => {
                       const target = Number(kr.targetValue ?? 0);
@@ -1266,6 +1485,37 @@ export default function ClientProfile({ params }: RouteProps) {
                   </div>
                 ))}
               </div>
+              {/* ── Edit Objective Dialog ── */}
+              <Dialog open={editObjDialogOpen} onOpenChange={setEditObjDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Objective</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4">
+                      <div className="space-y-2">
+                        <Label>Title</Label>
+                        <Input value={editObjForm.title} onChange={(e) => setEditObjForm((s) => ({ ...s, title: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select value={editObjForm.status} onValueChange={(v) => setEditObjForm((s) => ({ ...s, status: v }))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="OnTrack">OnTrack</SelectItem>
+                            <SelectItem value="AtRisk">AtRisk</SelectItem>
+                            <SelectItem value="OffTrack">OffTrack</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setEditObjDialogOpen(false)} disabled={updateObjectiveM.isPending}>Cancel</Button>
+                      <Button onClick={submitEditObjective} disabled={updateObjectiveM.isPending || !editObjForm.title.trim()}>
+                        {updateObjectiveM.isPending ? "Saving..." : "Save Changes"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+              </Dialog>
             </TabsContent>
 
             {/* ── Deliverables Tab (Phase 5) ── */}
@@ -1276,7 +1526,7 @@ export default function ClientProfile({ params }: RouteProps) {
                   <Button onClick={() => setDeliverableDialogOpen(true)}>Add Deliverable</Button>
                 </div>
                 <Table>
-                  <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Status</TableHead><TableHead>Due Date</TableHead><TableHead>Delivered</TableHead><TableHead>Assigned To</TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Status</TableHead><TableHead>Due Date</TableHead><TableHead>Delivered</TableHead><TableHead>Assigned To</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {(deliverablesQ.data ?? []).map((item: any) => (
                       <TableRow key={item.id}>
@@ -1296,6 +1546,11 @@ export default function ClientProfile({ params }: RouteProps) {
                         <TableCell>{item.dueDate ? fmtDate(item.dueDate) : "—"}</TableCell>
                         <TableCell>{item.deliveredAt ? fmtDate(item.deliveredAt) : "—"}</TableCell>
                         <TableCell>{item.assignedToName ?? (item.assignedTo ? `User #${item.assignedTo}` : "—")}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" onClick={() => openEditDeliverable(item)}>
+                            <Pencil size={14} />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1315,6 +1570,30 @@ export default function ClientProfile({ params }: RouteProps) {
                   <DialogFooter><Button onClick={() => { if (deliverableForm.name.trim()) createDeliverableM.mutate({ clientId: id, name: deliverableForm.name.trim(), description: deliverableForm.description.trim() || null, dueDate: deliverableForm.dueDate || null, assignedTo: deliverableForm.assignedTo ? Number(deliverableForm.assignedTo) : null }); }}>Save</Button></DialogFooter>
                 </DialogContent>
               </Dialog>
+              {/* ── Edit Deliverable Dialog ── */}
+              <Dialog open={editDeliverableDialogOpen} onOpenChange={setEditDeliverableDialogOpen}>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Edit Deliverable</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Name</Label>
+                      <Input value={editDeliverableForm.name} onChange={(e) => setEditDeliverableForm(s => ({ ...s, name: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Description</Label>
+                      <Textarea value={editDeliverableForm.description} onChange={(e) => setEditDeliverableForm(s => ({ ...s, description: e.target.value }))} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><Label>Due Date</Label><Input type="date" value={editDeliverableForm.dueDate} onChange={(e) => setEditDeliverableForm(s => ({ ...s, dueDate: e.target.value }))} /></div>
+                      <div><Label>Assigned To (User ID)</Label><Input type="number" min="1" value={editDeliverableForm.assignedTo} onChange={(e) => setEditDeliverableForm(s => ({ ...s, assignedTo: e.target.value }))} /></div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setEditDeliverableDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={submitEditDeliverable} disabled={!editDeliverableForm.name.trim()}>Save Changes</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </TabsContent>
 
             {/* ── Upsell Tab (Phase 5) ── */}
@@ -1328,7 +1607,7 @@ export default function ClientProfile({ params }: RouteProps) {
                   <Button onClick={() => setUpsellDialogOpen(true)}>Add Upsell</Button>
                 </div>
                 <Table>
-                  <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>Value</TableHead><TableHead>Status</TableHead><TableHead>Notes</TableHead><TableHead>Created By</TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>Value</TableHead><TableHead>Status</TableHead><TableHead>Notes</TableHead><TableHead>Created By</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {(upsellQ.data ?? []).map((item: any) => (
                       <TableRow key={item.id}>
@@ -1348,6 +1627,11 @@ export default function ClientProfile({ params }: RouteProps) {
                         </TableCell>
                         <TableCell className="text-sm">{item.notes ?? "—"}</TableCell>
                         <TableCell>{item.createdByName ?? `User #${item.createdBy}`}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" onClick={() => openEditUpsell(item)}>
+                            <Pencil size={14} />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1364,6 +1648,29 @@ export default function ClientProfile({ params }: RouteProps) {
                     <Textarea placeholder="Notes" value={upsellForm.notes} onChange={(e) => setUpsellForm(s => ({ ...s, notes: e.target.value }))} />
                   </div>
                   <DialogFooter><Button onClick={() => { if (upsellForm.title.trim()) createUpsellM.mutate({ clientId: id, title: upsellForm.title.trim(), potentialValue: upsellForm.potentialValue || null, notes: upsellForm.notes.trim() || null }); }}>Save</Button></DialogFooter>
+                </DialogContent>
+              </Dialog>
+              {/* ── Edit Upsell Dialog ── */}
+              <Dialog open={editUpsellDialogOpen} onOpenChange={setEditUpsellDialogOpen}>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Edit Upsell Opportunity</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Title</Label>
+                      <Input value={editUpsellForm.title} onChange={(e) => setEditUpsellForm(s => ({ ...s, title: e.target.value }))} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><Label>Potential Value</Label><Input type="number" min="0" step="0.01" value={editUpsellForm.potentialValue} onChange={(e) => setEditUpsellForm(s => ({ ...s, potentialValue: e.target.value }))} /></div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Notes</Label>
+                      <Textarea value={editUpsellForm.notes} onChange={(e) => setEditUpsellForm(s => ({ ...s, notes: e.target.value }))} />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setEditUpsellDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={submitEditUpsell} disabled={!editUpsellForm.title.trim()}>Save Changes</Button>
+                  </DialogFooter>
                 </DialogContent>
               </Dialog>
             </TabsContent>
@@ -1389,7 +1696,12 @@ export default function ClientProfile({ params }: RouteProps) {
                         </div>
                         {ch.notes && <p className="text-sm text-muted-foreground mt-1">{ch.notes}</p>}
                       </div>
-                      {ch.link ? <a href={ch.link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">Open Link</a> : <span className="text-xs text-muted-foreground">No link</span>}
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => openEditCommunication(ch)}>
+                          <Pencil size={14} />
+                        </Button>
+                        {ch.link ? <a href={ch.link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">Open Link</a> : <span className="text-xs text-muted-foreground">No link</span>}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1412,6 +1724,44 @@ export default function ClientProfile({ params }: RouteProps) {
                     <Textarea placeholder="Notes" value={communicationForm.notes} onChange={(e) => setCommunicationForm(s => ({ ...s, notes: e.target.value }))} />
                   </div>
                   <DialogFooter><Button onClick={() => { if (communicationForm.channelName.trim()) createCommunicationM.mutate({ clientId: id, channelName: communicationForm.channelName.trim(), channelType: communicationForm.channelType as any, link: communicationForm.link.trim() || null, notes: communicationForm.notes.trim() || null }); }}>Save</Button></DialogFooter>
+                </DialogContent>
+              </Dialog>
+              {/* ── Edit Communication Dialog ── */}
+              <Dialog open={editCommDialogOpen} onOpenChange={setEditCommDialogOpen}>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Edit Channel</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Channel Name</Label>
+                      <Input value={editCommForm.channelName} onChange={(e) => setEditCommForm(s => ({ ...s, channelName: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Channel Type</Label>
+                      <Select value={editCommForm.channelType} onValueChange={(v: any) => setEditCommForm(s => ({ ...s, channelType: v }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="EmailThread">Email Thread</SelectItem>
+                          <SelectItem value="WhatsAppGroup">WhatsApp Group</SelectItem>
+                          <SelectItem value="SlackChannel">Slack Channel</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Link</Label>
+                      <Input value={editCommForm.link} onChange={(e) => setEditCommForm(s => ({ ...s, link: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Notes</Label>
+                      <Textarea value={editCommForm.notes} onChange={(e) => setEditCommForm(s => ({ ...s, notes: e.target.value }))} />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setEditCommDialogOpen(false)} disabled={updateCommunicationM.isPending}>Cancel</Button>
+                    <Button onClick={submitEditCommunication} disabled={updateCommunicationM.isPending || !editCommForm.channelName.trim()}>
+                      {updateCommunicationM.isPending ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </DialogFooter>
                 </DialogContent>
               </Dialog>
             </TabsContent>
