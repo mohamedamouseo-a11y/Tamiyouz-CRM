@@ -12,6 +12,9 @@ import { useAuth } from "@/_core/hooks/useAuth";
  * When navigating away, the widget is cleaned up automatically.
  * The widget is made DRAGGABLE so the user can move it anywhere on the page.
  *
+ * FEATURE: Hide/Show toggle - clicking the call button again toggles
+ * the widget visibility. The widget can be hidden and brought back.
+ *
  * FIX: The getConfig query is now only enabled when the user is authenticated,
  * preventing UNAUTHORIZED errors on the login page that caused infinite reloads.
  */
@@ -20,6 +23,7 @@ interface InnoCallContextType {
   isReady: boolean;
   isEnabled: boolean;
   isLoading: boolean;
+  isWidgetVisible: boolean;
   callStatus: string;
   currentCallId: string | null;
   startCall: (number: string) => void;
@@ -28,12 +32,14 @@ interface InnoCallContextType {
   showDialpad: () => void;
   hideDialpad: () => void;
   dismissWidget: () => void;
+  toggleWidget: () => void;
 }
 
 const InnoCallContext = createContext<InnoCallContextType>({
   isReady: false,
   isEnabled: false,
   isLoading: false,
+  isWidgetVisible: false,
   callStatus: "idle",
   currentCallId: null,
   startCall: () => {},
@@ -42,7 +48,10 @@ const InnoCallContext = createContext<InnoCallContextType>({
   showDialpad: () => {},
   hideDialpad: () => {},
   dismissWidget: () => {},
+  toggleWidget: () => {},
 });
+
+const WIDGET_SELECTORS = '.innocalls-web-call, .innocalls-webrtc, [class*="innocall"], [id*="innocall"], [class*="InnoCall"], [id*="InnoCall"]';
 
 /**
  * Makes an InnoCall widget element draggable via mouse/touch.
@@ -180,18 +189,32 @@ function observeAndMakeDraggable(): MutationObserver {
   return observer;
 }
 
+/** Hide all InnoCall widget elements */
+function hideWidgetElements() {
+  document.querySelectorAll<HTMLElement>(WIDGET_SELECTORS).forEach((el) => {
+    el.style.display = "none";
+  });
+  console.log("[InnoCall] Widget hidden");
+}
+
+/** Show all InnoCall widget elements */
+function showWidgetElements() {
+  document.querySelectorAll<HTMLElement>(WIDGET_SELECTORS).forEach((el) => {
+    el.style.display = "";
+  });
+  console.log("[InnoCall] Widget shown");
+}
+
 export function InnoCallProvider({ children }: { children: ReactNode }) {
-  // FIX: Get auth state so we only query config when authenticated
   const { isAuthenticated } = useAuth();
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isWidgetVisible, setIsWidgetVisible] = useState(false);
   const scriptLoadedRef = useRef(false);
   const scriptElementRef = useRef<HTMLScriptElement | null>(null);
   const pendingNumberRef = useRef<string | null>(null);
   const observerRef = useRef<MutationObserver | null>(null);
 
-  // FIX: Only fetch config when the user is authenticated.
-  // This prevents UNAUTHORIZED errors on the login page that caused infinite reloads.
   const { data: configData } = trpc.innocall.getConfig.useQuery(undefined, {
     retry: 2,
     staleTime: 60_000,
@@ -200,10 +223,20 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
 
   const isEnabled = configData?.enabled ?? false;
 
+  /** Toggle widget visibility (hide/show) */
+  const toggleWidget = useCallback(() => {
+    if (isWidgetVisible) {
+      hideWidgetElements();
+      setIsWidgetVisible(false);
+    } else {
+      showWidgetElements();
+      setIsWidgetVisible(true);
+    }
+  }, [isWidgetVisible]);
+
+  /** Completely remove the widget and script */
   const removeWidget = useCallback(() => {
-    const widgets = document.querySelectorAll(
-      '.innocalls-web-call, .innocalls-webrtc, [class*="innocall"], [id*="innocall"]'
-    );
+    const widgets = document.querySelectorAll(WIDGET_SELECTORS);
     widgets.forEach((el) => {
       if ((el as any).__dragCleanup) {
         (el as any).__dragCleanup();
@@ -224,6 +257,7 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
 
     setIsReady(false);
     setIsLoading(false);
+    setIsWidgetVisible(false);
     pendingNumberRef.current = null;
     console.log("[InnoCall] Widget dismissed and script removed");
   }, []);
@@ -245,6 +279,9 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
 
       if (scriptLoadedRef.current) {
         setIsReady(true);
+        // Widget already loaded - show it
+        showWidgetElements();
+        setIsWidgetVisible(true);
         return;
       }
 
@@ -260,6 +297,7 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
         console.log("[InnoCall] Web Call script loaded on demand");
         setIsReady(true);
         setIsLoading(false);
+        setIsWidgetVisible(true);
         scriptLoadedRef.current = true;
 
         if (!observerRef.current) {
@@ -274,6 +312,7 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
         toast.error("Failed to load InnoCall calling widget.");
         setIsReady(false);
         setIsLoading(false);
+        setIsWidgetVisible(false);
         pendingNumberRef.current = null;
       };
 
@@ -283,6 +322,12 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
     [configData]
   );
 
+  /**
+   * startCall: 
+   * - First click: loads the script and shows the widget
+   * - Subsequent clicks: toggles widget visibility (hide/show)
+   * - Always copies the phone number to clipboard
+   */
   const startCall = useCallback(
     (number: string) => {
       if (!isEnabled) {
@@ -296,19 +341,29 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // Always copy number to clipboard
       navigator.clipboard.writeText(cleaned).catch(() => {});
 
       if (!scriptLoadedRef.current) {
+        // First time - load the script
         toast.info(`Loading InnoCall... Number ${cleaned} copied to clipboard.`);
         loadScript(cleaned);
-      } else {
-        toast.info(`Number ${cleaned} copied to clipboard. Use the InnoCall widget to call.`);
+      } else if (!isWidgetVisible) {
+        // Widget is hidden - show it
+        showWidgetElements();
+        setIsWidgetVisible(true);
+        toast.info(`Number ${cleaned} copied to clipboard. Widget is now visible.`);
         if (!observerRef.current) {
           observerRef.current = observeAndMakeDraggable();
         }
+      } else {
+        // Widget is visible - hide it
+        hideWidgetElements();
+        setIsWidgetVisible(false);
+        toast.info(`Widget hidden. Number ${cleaned} copied to clipboard. Click call again to show.`);
       }
     },
-    [isEnabled, loadScript]
+    [isEnabled, isWidgetVisible, loadScript]
   );
 
   const hangup = useCallback(() => {}, []);
@@ -322,6 +377,7 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
         isReady,
         isEnabled,
         isLoading,
+        isWidgetVisible,
         callStatus: "idle",
         currentCallId: null,
         startCall,
@@ -330,6 +386,7 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
         showDialpad,
         hideDialpad,
         dismissWidget: removeWidget,
+        toggleWidget,
       }}
     >
       {children}
