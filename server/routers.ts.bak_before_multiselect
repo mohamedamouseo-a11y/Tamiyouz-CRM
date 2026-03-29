@@ -2386,7 +2386,6 @@ byLeadStageChanges: protectedProcedure
       .input(z.object({
         clientId: z.number(),
         packageId: z.number().optional().nullable(),
-        packageIds: z.array(z.number()).optional().nullable(),
         contractName: z.string().optional(),
         contractFile: z.string().optional(),
         startDate: z.string().optional(),
@@ -2409,13 +2408,6 @@ byLeadStageChanges: protectedProcedure
         // Fix: remove null/empty packageId and renewalAssignedTo to avoid DB insert errors
         if (contractData.packageId === null || contractData.packageId === undefined) delete contractData.packageId;
         if (contractData.renewalAssignedTo === null || contractData.renewalAssignedTo === undefined) delete contractData.renewalAssignedTo;
-        // Handle packageIds: store as JSON array, also set packageId to first item for backward compat
-        if (input.packageIds && input.packageIds.length > 0) {
-          contractData.packageIds = input.packageIds;
-          contractData.packageId = input.packageIds[0];
-        } else {
-          contractData.packageIds = null;
-        }
         const id = await createContract(contractData);
         return { id };
       }),
@@ -2423,7 +2415,6 @@ byLeadStageChanges: protectedProcedure
     updateContract: accountManagerProcedure
       .input(z.object({
         id: z.number(),
-        packageIds: z.array(z.number()).optional().nullable(),
         contractName: z.string().optional(),
         contractFile: z.string().optional(),
         startDate: z.string().optional(),
@@ -2447,11 +2438,6 @@ byLeadStageChanges: protectedProcedure
         // Fix: remove undefined packageId and renewalAssignedTo to avoid DB update errors
         if (contractData.packageId === undefined) delete contractData.packageId;
         if (contractData.renewalAssignedTo === undefined) delete contractData.renewalAssignedTo;
-        // Handle packageIds: store as JSON array, also set packageId to first item for backward compat
-        if (data.packageIds !== undefined) {
-          contractData.packageIds = data.packageIds && data.packageIds.length > 0 ? data.packageIds : null;
-          contractData.packageId = data.packageIds && data.packageIds.length > 0 ? data.packageIds[0] : null;
-        }
         await updateContract(id, contractData);
         return { success: true };
       }),

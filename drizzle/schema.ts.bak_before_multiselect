@@ -135,7 +135,6 @@ export const contracts = mysqlTable("contracts", {
 	id: int().autoincrement().notNull(),
 	clientId: int().notNull(),
 	packageId: int(),
-	packageIds: json().$type<number[]>(),
 	contractName: varchar({ length: 255 }),
 	contractFile: text(),
 	startDate: timestamp({ mode: 'string' }),

@@ -2548,7 +2548,6 @@ export async function getClientProfileById(id: number) {
       id: contracts.id,
       clientId: contracts.clientId,
       packageId: contracts.packageId,
-      packageIds: contracts.packageIds,
       packageName: servicePackages.name,
       contractName: contracts.contractName,
       startDate: contracts.startDate,
