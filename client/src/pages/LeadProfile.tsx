@@ -338,7 +338,7 @@ export default function LeadProfile() {
   const { data: allUsers } = trpc.users.list.useQuery(undefined, { enabled: true });
 
   const [, navigate] = useLocation();
-  const { startCall: innocallStartCall, isReady: innocallReady } = useInnoCall();
+  const { startCall: innocallStartCall, isReady: innocallReady, isEnabled: innocallEnabled, isLoading: innocallLoading } = useInnoCall();
 
   const updateLead = trpc.leads.update.useMutation({
     onSuccess: () => {
@@ -860,7 +860,7 @@ export default function LeadProfile() {
                     size="icon"
                     className="h-9 w-9"
                     onClick={() => lead.phone && innocallStartCall(lead.phone)}
-                    disabled={!lead.phone || !innocallReady}
+                    disabled={!lead.phone || !innocallEnabled}
                     title={t("Call" as any)}
                   >
                     <Phone size={16} />
