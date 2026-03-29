@@ -2725,6 +2725,27 @@ export async function completeFollowUp(id: number) {
   await recalcClientFollowUpDates(db, meta.clientId);
 }
 
+
+export async function updateFollowUp(id: number, data: { type?: string; followUpDate?: Date; notes?: string | null }) {
+  const db = await getDb();
+  if (!db) return;
+  const row = await db
+    .select({ id: followUps.id, clientId: followUps.clientId })
+    .from(followUps)
+    .where(eq(followUps.id, id))
+    .limit(1);
+  const meta = row[0];
+  if (!meta) throw new Error("Follow-up not found");
+  const setObj: any = {};
+  if (data.type !== undefined) setObj.type = data.type;
+  if (data.followUpDate !== undefined) setObj.followUpDate = data.followUpDate;
+  if (data.notes !== undefined) setObj.notes = data.notes;
+  await db
+    .update(followUps)
+    .set(setObj)
+    .where(eq(followUps.id, id));
+  await recalcClientFollowUpDates(db, meta.clientId);
+}
 // ─── Phase 3: Client Tasks ──────────────────────────────────────────────────
 
 export async function getClientTasks(clientId: number) {

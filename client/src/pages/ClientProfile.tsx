@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Phone, Mail, MessageCircle, Users, CheckCircle, Clock, GripVertical, Loader2, ExternalLink } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MessageCircle, Users, CheckCircle, Clock, GripVertical, Loader2, ExternalLink, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 
@@ -228,6 +228,42 @@ export default function ClientProfile({ params }: RouteProps) {
       await clientQ.refetch();
     },
   });
+
+  // ─── Edit Follow-up State ──────────────────────────────────────────────────
+  const [editFuDialogOpen, setEditFuDialogOpen] = React.useState(false);
+  const [editFuId, setEditFuId] = React.useState<number | null>(null);
+  const [editFuForm, setEditFuForm] = React.useState({ type: "Call", followUpDate: "", notes: "" });
+
+  const updateFollowUpM = trpc.followUps.update.useMutation({
+    onSuccess: async () => {
+      setEditFuDialogOpen(false);
+      setEditFuId(null);
+      setEditFuForm({ type: "Call", followUpDate: "", notes: "" });
+      await followUpsQ.refetch();
+      await clientQ.refetch();
+      toast.success("Follow-up updated successfully");
+    },
+  });
+
+  function openEditFollowUp(fu: any) {
+    setEditFuId(fu.id);
+    setEditFuForm({
+      type: fu.type ?? "Call",
+      followUpDate: toDateInput(fu.followUpDate),
+      notes: fu.notes ?? "",
+    });
+    setEditFuDialogOpen(true);
+  }
+
+  async function submitEditFollowUp() {
+    if (!editFuId) return;
+    await updateFollowUpM.mutateAsync({
+      id: editFuId,
+      type: editFuForm.type as any,
+      followUpDate: editFuForm.followUpDate ? `${editFuForm.followUpDate}T00:00:00` : undefined,
+      notes: editFuForm.notes.trim() || null,
+    });
+  }
 
   // ─── Task State ─────────────────────────────────────────────────────────────
   const [taskDialogOpen, setTaskDialogOpen] = React.useState(false);
@@ -1001,16 +1037,28 @@ export default function ClientProfile({ params }: RouteProps) {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {fu.status !== "Completed" && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => completeFollowUpM.mutate({ id: fu.id })}
-                                  disabled={completeFollowUpM.isPending}
-                                >
-                                  Mark Done
-                                </Button>
-                              )}
+                              <div className="flex items-center gap-1">
+                                {fu.status !== "Completed" && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => openEditFollowUp(fu)}
+                                      title="Edit"
+                                    >
+                                      <Pencil size={14} />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => completeFollowUpM.mutate({ id: fu.id })}
+                                      disabled={completeFollowUpM.isPending}
+                                    >
+                                      Mark Done
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1018,6 +1066,43 @@ export default function ClientProfile({ params }: RouteProps) {
                     </Table>
                   </div>
                 )}
+
+                {/* ── Edit Follow-up Dialog ── */}
+                <Dialog open={editFuDialogOpen} onOpenChange={setEditFuDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Follow-up</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4">
+                      <div className="space-y-2">
+                        <Label>Type</Label>
+                        <Select value={editFuForm.type} onValueChange={(v) => setEditFuForm((s) => ({ ...s, type: v }))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Call">Call</SelectItem>
+                            <SelectItem value="Meeting">Meeting</SelectItem>
+                            <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                            <SelectItem value="Email">Email</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Date</Label>
+                        <Input type="date" value={editFuForm.followUpDate} onChange={(e) => setEditFuForm((s) => ({ ...s, followUpDate: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Notes</Label>
+                        <Textarea value={editFuForm.notes} onChange={(e) => setEditFuForm((s) => ({ ...s, notes: e.target.value }))} rows={3} />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setEditFuDialogOpen(false)} disabled={updateFollowUpM.isPending}>Cancel</Button>
+                      <Button onClick={submitEditFollowUp} disabled={updateFollowUpM.isPending || !editFuForm.followUpDate}>
+                        {updateFollowUpM.isPending ? "Saving..." : "Save Changes"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </TabsContent>
 

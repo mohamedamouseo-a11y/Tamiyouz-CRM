@@ -126,7 +126,7 @@ import {
   getFollowUps,
   createFollowUp,
   getFollowUpMeta,
-  completeFollowUp,
+  completeFollowUp, updateFollowUp,
   getClientTasks,
   createClientTask,
   updateClientTask,
@@ -2553,6 +2553,28 @@ byLeadStageChanges: protectedProcedure
           }
         }
         await completeFollowUp(input.id);
+        return { success: true };
+      }),
+    update: accountManagerProcedure
+      .input(z.object({
+        id: z.number(),
+        type: z.enum(["Call", "Meeting", "WhatsApp", "Email"]).optional(),
+        followUpDate: z.string().optional(),
+        notes: z.string().optional().nullable(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const meta = await getFollowUpMeta(input.id);
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(meta.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        await updateFollowUp(input.id, {
+          type: input.type,
+          followUpDate: input.followUpDate ? new Date(input.followUpDate) : undefined,
+          notes: input.notes,
+        });
         return { success: true };
       }),
   }),
