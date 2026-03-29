@@ -1,43 +1,95 @@
 import CRMLayout from "@/components/CRMLayout";
 import LeadQualityBadge from "@/components/LeadQualityBadge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useThemeTokens } from "@/contexts/ThemeTokenContext";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { AlertTriangle, Copy, Download, Filter, Loader2, Phone, Plus, Search, Trash2, X, MessageSquare } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
-import { Link, useLocation } from "wouter";
-import { format, startOfDay, endOfDay } from "date-fns";
+import {
+  AlertTriangle,
+  Copy,
+  Download,
+  Loader2,
+  MessageSquare,
+  Phone,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
+import { endOfDay, format, startOfDay } from "date-fns";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { DateRange } from "react-day-picker";
 import { toast } from "sonner";
-import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { PhoneInput } from "@/components/PhoneInput";
 import { CountrySelect } from "@/components/CountrySelect";
-import { countries, getCountryByName } from "@/lib/countries-data";
+import { countries } from "@/lib/countries-data";
 
 const LEAD_QUALITIES = ["Hot", "Warm", "Cold", "Bad", "Unknown"];
 
-// ── Lead Classification: Lead → Prospect → Opportunity ──
+type VisibleColumnKey =
+  | "name"
+  | "phone"
+  | "quality"
+  | "fitStatus"
+  | "classification"
+  | "stage"
+  | "campaign"
+  | "owner"
+  | "contactDate"
+  | "createdAt"
+  | "actions";
+
 type ClassificationType = "Lead" | "Prospect" | "Opportunity";
-const classificationConfig: Record<ClassificationType, { label: string; labelAr: string; color: string; bg: string; border: string; icon: string }> = {
-  Lead: { label: "Lead", labelAr: "عميل محتمل", color: "#3b82f6", bg: "bg-blue-50", border: "border-blue-300", icon: "🔵" },
-  Prospect: { label: "Prospect", labelAr: "عميل مهتم", color: "#f59e0b", bg: "bg-amber-50", border: "border-amber-300", icon: "🟡" },
-  Opportunity: { label: "Opportunity", labelAr: "فرصة بيع", color: "#22c55e", bg: "bg-green-50", border: "border-green-300", icon: "🟢" },
+const classificationConfig: Record<
+  ClassificationType,
+  { label: string; labelAr: string; color: string; bg: string; border: string; icon: string }
+> = {
+  Lead: {
+    label: "Lead",
+    labelAr: "عميل محتمل",
+    color: "#3b82f6",
+    bg: "bg-blue-50",
+    border: "border-blue-300",
+    icon: "🔵",
+  },
+  Prospect: {
+    label: "Prospect",
+    labelAr: "عميل مهتم",
+    color: "#f59e0b",
+    bg: "bg-amber-50",
+    border: "border-amber-300",
+    icon: "🟡",
+  },
+  Opportunity: {
+    label: "Opportunity",
+    labelAr: "فرصة بيع",
+    color: "#22c55e",
+    bg: "bg-green-50",
+    border: "border-green-300",
+    icon: "🟢",
+  },
 };
-function getLeadClassificationSimple(stage: string, quality: string | null | undefined, fitStatus: string | null | undefined): ClassificationType {
+
+function getLeadClassificationSimple(
+  stage: string,
+  quality: string | null | undefined,
+  fitStatus: string | null | undefined
+): ClassificationType {
   const q = quality ?? "Unknown";
   const fs = fitStatus ?? "Pending";
-  // Simplified version for list view (no activity/deal data available)
   if (["Proposal Delivered", "Won"].includes(stage)) return "Opportunity";
   if (["Proposal Delivered"].includes(stage) && q === "Hot") return "Opportunity";
   if (["Meeting Scheduled"].includes(stage) && ["Hot", "Warm"].includes(q)) return "Prospect";
@@ -49,35 +101,241 @@ function getLeadClassificationSimple(stage: string, quality: string | null | und
 
 const STAGES = ["New", "Contacted", "Meeting", "Offer Sent", "Won", "Lost", "Follow Up"];
 
+const ALL_COLUMNS: VisibleColumnKey[] = [
+  "name",
+  "phone",
+  "quality",
+  "fitStatus",
+  "classification",
+  "stage",
+  "campaign",
+  "owner",
+  "contactDate",
+  "createdAt",
+  "actions",
+];
+
+const NON_HIDEABLE_COLUMNS: VisibleColumnKey[] = ["name", "actions"];
+
+function getInitialParams() {
+  return new URLSearchParams(window.location.search);
+}
+
+function getInitialPage() {
+  const raw = Number(getInitialParams().get("page") ?? "0");
+  return Number.isFinite(raw) && raw >= 0 ? raw : 0;
+}
+
+function getInitialDateRange(): DateRange | undefined {
+  const params = getInitialParams();
+  const dateFrom = params.get("dateFrom");
+  const dateTo = params.get("dateTo");
+
+  if (!dateFrom && !dateTo) return undefined;
+
+  return {
+    from: dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined,
+    to: dateTo ? new Date(`${dateTo}T00:00:00`) : undefined,
+  };
+}
+
+function getInitialVisibleColumns(): VisibleColumnKey[] {
+  const raw = getInitialParams().get("columns");
+  if (!raw) return ALL_COLUMNS;
+
+  const parsed = raw
+    .split(",")
+    .map((key) => key.trim())
+    .filter((key): key is VisibleColumnKey => ALL_COLUMNS.includes(key as VisibleColumnKey));
+
+  if (!parsed.length) return ALL_COLUMNS;
+
+  const merged = Array.from(new Set<VisibleColumnKey>([...NON_HIDEABLE_COLUMNS, ...parsed]));
+  return ALL_COLUMNS.filter((key) => merged.includes(key));
+}
+
 export default function LeadsList() {
   const { t, isRTL } = useLanguage();
   const { tokens } = useThemeTokens();
   const { user } = useAuth();
-  const [location] = useLocation();
-  const urlParams = new URLSearchParams(window.location.search);
 
-  const [search, setSearch] = useState(() => sessionStorage.getItem("leads_search") || "");
-  const [stage, setStage] = useState<string>(() => sessionStorage.getItem("leads_stage") || "all");
-  const [quality, setQuality] = useState<string>(() => sessionStorage.getItem("leads_quality") || "all");
-  const [fitStatusFilter, setFitStatusFilter] = useState<string>(() => sessionStorage.getItem("leads_fitStatus") || "all");
-  const [campaign, setCampaign] = useState<string>(() => urlParams.get("campaign") ?? sessionStorage.getItem("leads_campaign") ?? "");
-  const [slaBreached, setSlaBreached] = useState(urlParams.get("slaBreached") === "true");
-  const [page, setPage] = useState(0);
+  const initialParams = useMemo(() => getInitialParams(), []);
+
+  const [search, setSearch] = useState(() => initialParams.get("search") ?? "");
+  const [stage, setStage] = useState<string>(() => initialParams.get("stage") ?? "all");
+  const [quality, setQuality] = useState<string>(() => initialParams.get("quality") ?? "all");
+  const [fitStatusFilter, setFitStatusFilter] = useState<string>(() => initialParams.get("fitStatus") ?? "all");
+  const [campaign, setCampaign] = useState<string>(() => initialParams.get("campaign") ?? "");
+  const [slaBreached, setSlaBreached] = useState(() => initialParams.get("slaBreached") === "true");
+  const [page, setPage] = useState(getInitialPage);
   const [showNewLead, setShowNewLead] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [exportLimit, setExportLimit] = useState(100);
   const [exporting, setExporting] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
-  const [ownerId, setOwnerId] = useState<string>(() => sessionStorage.getItem("leads_ownerId") || "all");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange);
+  const [ownerId, setOwnerId] = useState<string>(() => initialParams.get("ownerId") ?? "all");
+  const [visibleColumns, setVisibleColumns] = useState<VisibleColumnKey[]>(getInitialVisibleColumns);
 
-  // ── Persist filters to sessionStorage ──
-  useEffect(() => { sessionStorage.setItem("leads_search", search); }, [search]);
-  useEffect(() => { sessionStorage.setItem("leads_stage", stage); }, [stage]);
-  useEffect(() => { sessionStorage.setItem("leads_quality", quality); }, [quality]);
-  useEffect(() => { sessionStorage.setItem("leads_fitStatus", fitStatusFilter); }, [fitStatusFilter]);
-  useEffect(() => { sessionStorage.setItem("leads_ownerId", ownerId); }, [ownerId]);
-  useEffect(() => { sessionStorage.setItem("leads_campaign", campaign); }, [campaign]);
+  const limit = 20;
+
+  const isAdminOrManager = ["Admin", "SalesManager", "admin"].includes(user?.role ?? "");
+
+  const columnMeta = useMemo(
+    () =>
+      ({
+        name: {
+          labelAr: "اسم العميل",
+          labelEn: "Lead Name",
+          canHide: false,
+          minWidth: "min-w-[260px]",
+        },
+        phone: {
+          labelAr: "رقم الهاتف",
+          labelEn: "Phone",
+          canHide: true,
+          minWidth: "min-w-[150px]",
+        },
+        quality: {
+          labelAr: "جودة العميل",
+          labelEn: "Lead Quality",
+          canHide: true,
+          minWidth: "min-w-[140px]",
+        },
+        fitStatus: {
+          labelAr: "حالة الملاءمة",
+          labelEn: "Fit Status",
+          canHide: true,
+          minWidth: "min-w-[150px]",
+        },
+        classification: {
+          labelAr: "التصنيف",
+          labelEn: "Classification",
+          canHide: true,
+          minWidth: "min-w-[140px]",
+        },
+        stage: {
+          labelAr: "المرحلة",
+          labelEn: "Stage",
+          canHide: true,
+          minWidth: "min-w-[130px]",
+        },
+        campaign: {
+          labelAr: "الحملة",
+          labelEn: "Campaign",
+          canHide: true,
+          minWidth: "min-w-[150px]",
+        },
+        owner: {
+          labelAr: "المسؤول",
+          labelEn: "Sales Agent",
+          canHide: true,
+          minWidth: "min-w-[150px]",
+        },
+        contactDate: {
+          labelAr: "تاريخ التواصل",
+          labelEn: "Contact Date",
+          canHide: true,
+          minWidth: "min-w-[155px]",
+        },
+        createdAt: {
+          labelAr: "تاريخ الإنشاء",
+          labelEn: "Created At",
+          canHide: true,
+          minWidth: "min-w-[125px]",
+        },
+        actions: {
+          labelAr: "إجراءات",
+          labelEn: "Actions",
+          canHide: false,
+          minWidth: "min-w-[130px]",
+        },
+      }) satisfies Record<VisibleColumnKey, { labelAr: string; labelEn: string; canHide: boolean; minWidth: string }>,
+    []
+  );
+
+  const orderedVisibleColumns = useMemo(() => {
+    const middleColumns = ALL_COLUMNS.filter(
+      (key) => key !== "name" && key !== "actions" && visibleColumns.includes(key)
+    );
+    return ["name", ...middleColumns, "actions"] as VisibleColumnKey[];
+  }, [visibleColumns]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (search.trim()) params.set("search", search.trim());
+    else params.delete("search");
+
+    if (stage !== "all") params.set("stage", stage);
+    else params.delete("stage");
+
+    if (quality !== "all") params.set("quality", quality);
+    else params.delete("quality");
+
+    if (fitStatusFilter !== "all") params.set("fitStatus", fitStatusFilter);
+    else params.delete("fitStatus");
+
+    if (campaign) params.set("campaign", campaign);
+    else params.delete("campaign");
+
+    if (ownerId !== "all") params.set("ownerId", ownerId);
+    else params.delete("ownerId");
+
+    if (slaBreached) params.set("slaBreached", "true");
+    else params.delete("slaBreached");
+
+    if (dateRange?.from) params.set("dateFrom", format(dateRange.from, "yyyy-MM-dd"));
+    else params.delete("dateFrom");
+
+    if (dateRange?.to) params.set("dateTo", format(dateRange.to, "yyyy-MM-dd"));
+    else params.delete("dateTo");
+
+    params.set("page", String(page));
+    params.set("columns", visibleColumns.join(","));
+
+    const nextUrl = `${window.location.pathname}?${params.toString()}${window.location.hash || ""}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, [
+    campaign,
+    dateRange?.from,
+    dateRange?.to,
+    fitStatusFilter,
+    ownerId,
+    page,
+    quality,
+    search,
+    slaBreached,
+    stage,
+    visibleColumns,
+  ]);
+
+  useEffect(() => {
+    let didReset = false;
+
+    if (!visibleColumns.includes("stage") && stage !== "all") {
+      setStage("all");
+      didReset = true;
+    }
+    if (!visibleColumns.includes("quality") && quality !== "all") {
+      setQuality("all");
+      didReset = true;
+    }
+    if (!visibleColumns.includes("fitStatus") && fitStatusFilter !== "all") {
+      setFitStatusFilter("all");
+      didReset = true;
+    }
+    if (!visibleColumns.includes("campaign") && campaign) {
+      setCampaign("");
+      didReset = true;
+    }
+    if (!visibleColumns.includes("owner") && ownerId !== "all") {
+      setOwnerId("all");
+      didReset = true;
+    }
+
+    if (didReset) setPage(0);
+  }, [visibleColumns, stage, quality, fitStatusFilter, campaign, ownerId]);
+
   async function handleExport() {
     setExporting(true);
     try {
@@ -90,6 +348,9 @@ export default function LeadsList() {
       if (slaBreached) params.set("slaBreached", "true");
       if (search) params.set("search", search);
       if (ownerId !== "all") params.set("ownerId", ownerId);
+      if (dateRange?.from) params.set("dateFrom", format(startOfDay(dateRange.from), "yyyy-MM-dd'T'HH:mm:ss"));
+      if (dateRange?.to) params.set("dateTo", format(endOfDay(dateRange.to), "yyyy-MM-dd'T'HH:mm:ss"));
+
       const res = await fetch(`/api/export/leads?${params.toString()}`, { credentials: "include" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Export failed" }));
@@ -113,8 +374,6 @@ export default function LeadsList() {
     }
   }
 
-  const limit = 20;
-
   const { data, isLoading, refetch } = trpc.leads.list.useQuery({
     search: search || undefined,
     stage: stage !== "all" ? stage : undefined,
@@ -132,11 +391,10 @@ export default function LeadsList() {
   const { data: campaigns } = trpc.campaigns.list.useQuery();
   const { data: stages } = trpc.pipeline.list.useQuery();
   const { data: users } = trpc.users.list.useQuery(undefined, {
-    enabled: ["Admin", "SalesManager", "admin"].includes(user?.role ?? ""),
+    enabled: isAdminOrManager,
   });
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
-  // Quick Add Activity state
   const [quickActivityLeadId, setQuickActivityLeadId] = useState<number | null>(null);
   const [quickActivityType, setQuickActivityType] = useState("Call");
   const [quickActivityOutcome, setQuickActivityOutcome] = useState("Interested");
@@ -190,27 +448,31 @@ export default function LeadsList() {
   const [phoneValid, setPhoneValid] = useState(false);
   const [phoneError, setPhoneError] = useState(false);
   const [campaignError, setCampaignError] = useState(false);
-  const onSubmit = (data: any) => {
+
+  const onSubmit = (formData: any) => {
     if (!phoneValid) {
       setPhoneError(true);
       return;
     }
     setPhoneError(false);
-    if (!data.campaignName) {
+
+    if (!formData.campaignName) {
       setCampaignError(true);
       return;
     }
     setCampaignError(false);
-    if (!data.contactTime) {
+
+    if (!formData.contactTime) {
       setContactDateError(true);
       return;
     }
     setContactDateError(false);
-    // Auto-assign the current user as owner if they are a SalesAgent
-    if (!data.ownerId && user?.role === "SalesAgent" && user?.id) {
-      data.ownerId = user.id;
+
+    if (!formData.ownerId && user?.role === "SalesAgent" && user?.id) {
+      formData.ownerId = user.id;
     }
-    createLead.mutate(data);
+
+    createLead.mutate(formData);
   };
 
   const stageColor: Record<string, string> = {
@@ -223,10 +485,243 @@ export default function LeadsList() {
     "Follow Up": "#06b6d4",
   };
 
+  const stickyNameClass = isRTL
+    ? "sticky right-0 z-20 bg-background shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.25)]"
+    : "sticky left-0 z-20 bg-background shadow-[8px_0_12px_-12px_rgba(15,23,42,0.25)]";
+  const stickyNameHeaderClass = isRTL
+    ? "sticky right-0 z-30 bg-muted/95 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.25)]"
+    : "sticky left-0 z-30 bg-muted/95 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.25)]";
+  const stickyActionsClass = isRTL
+    ? "sticky left-0 z-20 bg-background shadow-[8px_0_12px_-12px_rgba(15,23,42,0.25)]"
+    : "sticky right-0 z-20 bg-background shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.25)]";
+  const stickyActionsHeaderClass = isRTL
+    ? "sticky left-0 z-30 bg-muted/95 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.25)]"
+    : "sticky right-0 z-30 bg-muted/95 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.25)]";
+
+  const hasActiveFilters =
+    !!search ||
+    stage !== "all" ||
+    quality !== "all" ||
+    fitStatusFilter !== "all" ||
+    !!campaign ||
+    slaBreached ||
+    !!dateRange?.from ||
+    !!dateRange?.to ||
+    ownerId !== "all";
+
+  const resetFilters = () => {
+    setSearch("");
+    setStage("all");
+    setQuality("all");
+    setFitStatusFilter("all");
+    setCampaign("");
+    setSlaBreached(false);
+    setDateRange(undefined);
+    setOwnerId("all");
+    setPage(0);
+  };
+
+  const toggleColumn = (columnKey: VisibleColumnKey) => {
+    if (NON_HIDEABLE_COLUMNS.includes(columnKey)) return;
+
+    setVisibleColumns((prev) => {
+      if (prev.includes(columnKey)) {
+        return ALL_COLUMNS.filter((key) => key !== columnKey && prev.includes(key));
+      }
+      const merged = Array.from(new Set<VisibleColumnKey>([...prev, columnKey]));
+      return ALL_COLUMNS.filter((key) => merged.includes(key));
+    });
+  };
+
+  const renderColumnHeader = (columnKey: VisibleColumnKey) => {
+    const baseClass = `text-start px-4 py-3 font-medium text-muted-foreground whitespace-nowrap ${columnMeta[columnKey].minWidth}`;
+
+    if (columnKey === "name") {
+      return (
+        <th className={`${baseClass} ${stickyNameHeaderClass}`}>
+          {isRTL ? columnMeta.name.labelAr : columnMeta.name.labelEn}
+        </th>
+      );
+    }
+
+    if (columnKey === "actions") {
+      return (
+        <th className={`${baseClass} ${stickyActionsHeaderClass}`}>
+          {isRTL ? columnMeta.actions.labelAr : columnMeta.actions.labelEn}
+        </th>
+      );
+    }
+
+    return <th className={baseClass}>{isRTL ? columnMeta[columnKey].labelAr : columnMeta[columnKey].labelEn}</th>;
+  };
+
+  const renderColumnCell = (lead: any, columnKey: VisibleColumnKey) => {
+    const ownerName = lead.ownerId
+      ? (users ?? []).find((u: any) => u.id === lead.ownerId)?.name ?? "—"
+      : "—";
+
+    if (columnKey === "name") {
+      return (
+        <td className={`px-4 py-3 ${columnMeta.name.minWidth} ${stickyNameClass}`}>
+          <div className="flex items-center gap-2">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
+              style={{ background: tokens.primaryColor }}
+            >
+              {(lead.name ?? lead.phone)?.[0]?.toUpperCase() ?? "?"}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-foreground whitespace-nowrap">{lead.name ?? "—"}</span>
+                {lead.slaBreached && <AlertTriangle size={12} className="text-destructive shrink-0" />}
+                {lead.isDuplicate && <Copy size={11} className="text-muted-foreground shrink-0" />}
+              </div>
+              {lead.businessProfile && (
+                <span className="text-xs text-muted-foreground truncate max-w-40 block">{lead.businessProfile}</span>
+              )}
+            </div>
+          </div>
+        </td>
+      );
+    }
+
+    if (columnKey === "phone") {
+      return (
+        <td className={`px-4 py-3 ${columnMeta.phone.minWidth}`}>
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <Phone size={12} className="text-muted-foreground" />
+            <span className="font-mono text-xs">{lead.phone}</span>
+          </div>
+        </td>
+      );
+    }
+
+    if (columnKey === "quality") {
+      return (
+        <td className={`px-4 py-3 ${columnMeta.quality.minWidth}`}>
+          <LeadQualityBadge quality={lead.leadQuality} size="sm" />
+        </td>
+      );
+    }
+
+    if (columnKey === "fitStatus") {
+      return (
+        <td className={`px-4 py-3 ${columnMeta.fitStatus.minWidth}`}>
+          <span
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${
+              (lead as any).fitStatus === "Fit"
+                ? "bg-green-50 border-green-200 text-green-700"
+                : (lead as any).fitStatus === "Not Fit"
+                  ? "bg-red-50 border-red-200 text-red-700"
+                  : "bg-yellow-50 border-yellow-200 text-yellow-700"
+            }`}
+          >
+            {(lead as any).fitStatus === "Fit" ? "✅" : (lead as any).fitStatus === "Not Fit" ? "❌" : "⏳"}{" "}
+            {(lead as any).fitStatus ?? "Pending"}
+          </span>
+        </td>
+      );
+    }
+
+    if (columnKey === "classification") {
+      const cls = getLeadClassificationSimple(lead.stage, lead.leadQuality, (lead as any).fitStatus);
+      const cfg = classificationConfig[cls];
+      return (
+        <td className={`px-4 py-3 ${columnMeta.classification.minWidth}`}>
+          <span className="text-xs font-bold whitespace-nowrap" style={{ color: cfg.color }}>
+            {isRTL ? cfg.labelAr : cfg.label}
+          </span>
+        </td>
+      );
+    }
+
+    if (columnKey === "stage") {
+      return (
+        <td className={`px-4 py-3 ${columnMeta.stage.minWidth}`}>
+          <span
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap"
+            style={{ background: stageColor[lead.stage] ?? "#6366f1" }}
+          >
+            {t(lead.stage as any)}
+          </span>
+        </td>
+      );
+    }
+
+    if (columnKey === "campaign") {
+      return (
+        <td className={`px-4 py-3 ${columnMeta.campaign.minWidth}`}>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">{lead.campaignName ?? "—"}</span>
+        </td>
+      );
+    }
+
+    if (columnKey === "owner") {
+      return (
+        <td className={`px-4 py-3 ${columnMeta.owner.minWidth}`}>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">{ownerName}</span>
+        </td>
+      );
+    }
+
+    if (columnKey === "contactDate") {
+      return (
+        <td className={`px-4 py-3 ${columnMeta.contactDate.minWidth}`}>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            {lead.contactTime ? format(new Date(lead.contactTime), "dd/MM/yyyy HH:mm") : "—"}
+          </span>
+        </td>
+      );
+    }
+
+    if (columnKey === "createdAt") {
+      return (
+        <td className={`px-4 py-3 ${columnMeta.createdAt.minWidth}`}>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            {format(new Date(lead.createdAt), "dd/MM/yyyy")}
+          </span>
+        </td>
+      );
+    }
+
+    return (
+      <td className={`px-4 py-3 ${columnMeta.actions.minWidth} ${stickyActionsClass}`}>
+        <div className="flex items-center gap-1 whitespace-nowrap">
+          <Link href={`/leads/${lead.id}`}>
+            <Button variant="ghost" size="sm" className="text-xs h-7">
+              {t("view")}
+            </Button>
+          </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-primary"
+            title={isRTL ? "إضافة نشاط" : "Add Activity"}
+            onClick={(e) => {
+              e.stopPropagation();
+              setQuickActivityLeadId(lead.id);
+            }}
+          >
+            <MessageSquare size={14} />
+          </Button>
+          {(user?.role === "Admin" || user?.role === "admin") && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+              onClick={() => setDeleteConfirmId(lead.id)}
+            >
+              <Trash2 size={14} />
+            </Button>
+          )}
+        </div>
+      </td>
+    );
+  };
+
   return (
     <CRMLayout>
       <div className="p-6 space-y-4 fade-in" dir={isRTL ? "rtl" : "ltr"}>
-        {/* Header */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-foreground">{t("leads")}</h1>
@@ -236,11 +731,7 @@ export default function LeadsList() {
           </div>
           <div className="flex items-center gap-2">
             {(user?.role === "Admin" || user?.role === "admin" || user?.role === "SalesManager") && (
-              <Button
-                variant="outline"
-                onClick={() => setShowExport(true)}
-                className="gap-2"
-              >
+              <Button variant="outline" onClick={() => setShowExport(true)} className="gap-2">
                 <Download size={16} />
                 {isRTL ? "تصدير Excel" : "Export Excel"}
               </Button>
@@ -258,121 +749,236 @@ export default function LeadsList() {
           </div>
         </div>
 
-        {/* Search & Filters */}
         <Card>
           <CardContent className="p-4">
-            <div className="flex flex-wrap gap-3">
-              <div className="relative flex-1 min-w-48">
-                <Search
-                  size={14}
-                  className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground ${
-                    isRTL ? "right-3" : "left-3"
-                  }`}
-                />
-                <Input
-                  placeholder={t("search")}
-                  value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-                  className={isRTL ? "pr-9" : "pl-9"}
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-2 flex-1 min-w-[240px]">
+                <Label>{t("search")}</Label>
+                <div className="relative">
+                  <Search
+                    size={14}
+                    className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground ${
+                      isRTL ? "right-3" : "left-3"
+                    }`}
+                  />
+                  <Input
+                    placeholder={t("search")}
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPage(0);
+                    }}
+                    className={isRTL ? "pr-9" : "pl-9"}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 min-w-[250px]">
+                <Label>{isRTL ? "النطاق الزمني" : "Date Range"}</Label>
+                <DateRangePicker
+                  date={dateRange}
+                  setDate={(d) => {
+                    setDateRange(d);
+                    setPage(0);
+                  }}
                 />
               </div>
-              <DateRangePicker 
-                date={dateRange} 
-                setDate={(d) => { setDateRange(d); setPage(0); }} 
-              />
 
-              <Select value={stage} onValueChange={(v) => { setStage(v); setPage(0); }}>
-                <SelectTrigger className="w-36">
-                  <SelectValue placeholder={t("stage")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("all")}</SelectItem>
-                  {(stages ?? STAGES.map((s) => ({ name: s, nameAr: s }))).map((s: any) => (
-                    <SelectItem key={s.name} value={s.name}>
-                      {isRTL && s.nameAr ? s.nameAr : s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {visibleColumns.includes("stage") && (
+                <div className="space-y-2 min-w-[150px]">
+                  <Label>{isRTL ? "المرحلة" : "Stage"}</Label>
+                  <Select
+                    value={stage}
+                    onValueChange={(v) => {
+                      setStage(v);
+                      setPage(0);
+                    }}
+                  >
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder={t("stage")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("all")}</SelectItem>
+                      {(stages ?? STAGES.map((s) => ({ name: s, nameAr: s }))).map((s: any) => (
+                        <SelectItem key={s.name} value={s.name}>
+                          {isRTL && s.nameAr ? s.nameAr : s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-              <Select value={quality} onValueChange={(v) => { setQuality(v); setPage(0); }}>
-                <SelectTrigger className="w-36">
-                  <SelectValue placeholder={t("leadQuality")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("all")}</SelectItem>
-                  {LEAD_QUALITIES.map((q) => (
-                    <SelectItem key={q} value={q}>{t(q as any)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {visibleColumns.includes("quality") && (
+                <div className="space-y-2 min-w-[150px]">
+                  <Label>{isRTL ? "جودة العميل" : "Lead Quality"}</Label>
+                  <Select
+                    value={quality}
+                    onValueChange={(v) => {
+                      setQuality(v);
+                      setPage(0);
+                    }}
+                  >
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder={t("leadQuality")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("all")}</SelectItem>
+                      {LEAD_QUALITIES.map((q) => (
+                        <SelectItem key={q} value={q}>
+                          {t(q as any)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-              <Select value={fitStatusFilter} onValueChange={(v) => { setFitStatusFilter(v); setPage(0); }}>
-                <SelectTrigger className="w-36">
-                  <SelectValue placeholder={isRTL ? "حالة الملاءمة" : "Fit Status"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("all")}</SelectItem>
-                  <SelectItem value="Fit">✅ Fit</SelectItem>
-                  <SelectItem value="Not Fit">❌ Not Fit</SelectItem>
-                  <SelectItem value="Pending">⏳ Pending</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={campaign || "all"} onValueChange={(v) => { setCampaign(v === "all" ? "" : v); setPage(0); }}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder={t("campaign")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("all")}</SelectItem>
-                  {campaigns?.map((c) => (
-                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {visibleColumns.includes("fitStatus") && (
+                <div className="space-y-2 min-w-[150px]">
+                  <Label>{isRTL ? "حالة الملاءمة" : "Fit Status"}</Label>
+                  <Select
+                    value={fitStatusFilter}
+                    onValueChange={(v) => {
+                      setFitStatusFilter(v);
+                      setPage(0);
+                    }}
+                  >
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder={isRTL ? "حالة الملاءمة" : "Fit Status"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("all")}</SelectItem>
+                      <SelectItem value="Fit">✅ Fit</SelectItem>
+                      <SelectItem value="Not Fit">❌ Not Fit</SelectItem>
+                      <SelectItem value="Pending">⏳ Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-              {["Admin", "SalesManager", "admin"].includes(user?.role ?? "") && (
-                <Select value={ownerId} onValueChange={(v) => { setOwnerId(v); setPage(0); }}>
-                  <SelectTrigger className="w-44">
-                    <SelectValue placeholder={isRTL ? "المسؤول" : "Sales Agent"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t("all")}</SelectItem>
-                    {users?.filter((u: any) => u.role === "SalesAgent").map((u: any) => (
-                      <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {visibleColumns.includes("campaign") && (
+                <div className="space-y-2 min-w-[170px]">
+                  <Label>{isRTL ? "الحملة" : "Campaign"}</Label>
+                  <Select
+                    value={campaign || "all"}
+                    onValueChange={(v) => {
+                      setCampaign(v === "all" ? "" : v);
+                      setPage(0);
+                    }}
+                  >
+                    <SelectTrigger className="w-[170px]">
+                      <SelectValue placeholder={t("campaign")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("all")}</SelectItem>
+                      {campaigns?.map((c) => (
+                        <SelectItem key={c.id} value={c.name}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {isAdminOrManager && visibleColumns.includes("owner") && (
+                <div className="space-y-2 min-w-[180px]">
+                  <Label>{isRTL ? "المسؤول" : "Sales Agent"}</Label>
+                  <Select
+                    value={ownerId}
+                    onValueChange={(v) => {
+                      setOwnerId(v);
+                      setPage(0);
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder={isRTL ? "المسؤول" : "Sales Agent"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("all")}</SelectItem>
+                      {users
+                        ?.filter((u: any) => u.role === "SalesAgent")
+                        .map((u: any) => (
+                          <SelectItem key={u.id} value={String(u.id)}>
+                            {u.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
 
               <Button
                 variant={slaBreached ? "destructive" : "outline"}
                 size="sm"
                 className="gap-1.5"
-                onClick={() => { setSlaBreached(!slaBreached); setPage(0); }}
+                onClick={() => {
+                  setSlaBreached(!slaBreached);
+                  setPage(0);
+                }}
               >
                 <AlertTriangle size={14} />
                 {t("slaAlerts")}
               </Button>
 
-              {(search || stage !== "all" || quality !== "all" || fitStatusFilter !== "all" || campaign || slaBreached || dateRange || ownerId !== "all") && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1.5 text-muted-foreground"
-                  onClick={() => {
-                    setSearch(""); setStage("all"); setQuality("all");
-                    setCampaign(""); setSlaBreached(false); setPage(0);
-                    setDateRange(undefined); setOwnerId("all"); setFitStatusFilter("all");
-                  }}
-                >
-                  <X size={14} /> {t("clear")}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <SlidersHorizontal size={14} />
+                    {isRTL ? "الأعمدة" : "Columns"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-3" align={isRTL ? "start" : "end"} dir={isRTL ? "rtl" : "ltr"}>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="font-medium text-sm">{isRTL ? "إظهار/إخفاء الأعمدة" : "Show / hide columns"}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {isRTL ? "يمكنك تخصيص الأعمدة الظاهرة في الجدول." : "Customize which columns are visible in the table."}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      {ALL_COLUMNS.map((columnKey) => {
+                        const meta = columnMeta[columnKey];
+                        const checked = visibleColumns.includes(columnKey);
+                        return (
+                          <label
+                            key={columnKey}
+                            className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm ${
+                              meta.canHide ? "cursor-pointer hover:bg-muted/40" : "bg-muted/40"
+                            }`}
+                          >
+                            <div className="space-y-0.5">
+                              <div className="font-medium">{isRTL ? meta.labelAr : meta.labelEn}</div>
+                              {!meta.canHide && (
+                                <div className="text-[11px] text-muted-foreground">
+                                  {isRTL ? "عمود ثابت" : "Always visible"}
+                                </div>
+                              )}
+                            </div>
+                            <Checkbox
+                              checked={checked}
+                              disabled={!meta.canHide}
+                              onCheckedChange={() => toggleColumn(columnKey)}
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={resetFilters}>
+                  <X size={14} />
+                  {t("clear")}
                 </Button>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Leads Table */}
         <Card>
           <CardContent className="p-0">
             {isLoading ? (
@@ -386,20 +992,12 @@ export default function LeadsList() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[980px] text-sm" dir={isRTL ? "rtl" : "ltr"}>
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
-                      <th className="text-start px-4 py-3 font-medium text-muted-foreground">{t("leadName")}</th>
-                      <th className="text-start px-4 py-3 font-medium text-muted-foreground">{t("phone")}</th>
-                      <th className="text-start px-4 py-3 font-medium text-muted-foreground">{t("leadQuality")}</th>
-                      <th className="text-start px-4 py-3 font-medium text-muted-foreground">{isRTL ? "حالة الملاءمة" : "Fit Status"}</th>
-                      <th className="text-start px-4 py-3 font-medium text-muted-foreground">{isRTL ? "التصنيف" : "Classification"}</th>
-                      <th className="text-start px-4 py-3 font-medium text-muted-foreground">{t("stage")}</th>
-                      <th className="text-start px-4 py-3 font-medium text-muted-foreground">{t("campaign")}</th>
-                      <th className="text-start px-4 py-3 font-medium text-muted-foreground">{isRTL ? "المسؤول" : "Sales Agent"}</th>
-                      <th className="text-start px-4 py-3 font-medium text-muted-foreground">{isRTL ? "تاريخ التواصل" : "Contact Date"}</th>
-                      <th className="text-start px-4 py-3 font-medium text-muted-foreground">{t("createdAt")}</th>
-                      <th className="text-start px-4 py-3 font-medium text-muted-foreground">{t("actions")}</th>
+                      {orderedVisibleColumns.map((columnKey) => (
+                        <Fragment key={columnKey}>{renderColumnHeader(columnKey)}</Fragment>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -410,121 +1008,9 @@ export default function LeadsList() {
                           lead.slaBreached ? "sla-breached-row" : ""
                         }`}
                       >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
-                              style={{ background: tokens.primaryColor }}
-                            >
-                              {(lead.name ?? lead.phone)?.[0]?.toUpperCase() ?? "?"}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-medium text-foreground">
-                                  {lead.name ?? "—"}
-                                </span>
-                                {lead.slaBreached && (
-                                  <AlertTriangle size={12} className="text-destructive" />
-                                )}
-                                {lead.isDuplicate && (
-                                  <Copy size={11} className="text-muted-foreground" />
-                                )}
-                              </div>
-                              {lead.businessProfile && (
-                                <span className="text-xs text-muted-foreground truncate max-w-32 block">
-                                  {lead.businessProfile}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <Phone size={12} className="text-muted-foreground" />
-                            <span className="font-mono text-xs">{lead.phone}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <LeadQualityBadge quality={lead.leadQuality} size="sm" />
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-                        (lead as any).fitStatus === "Fit" ? "bg-green-50 border-green-200 text-green-700" :
-                        (lead as any).fitStatus === "Not Fit" ? "bg-red-50 border-red-200 text-red-700" :
-                        "bg-yellow-50 border-yellow-200 text-yellow-700"
-                      }`}>
-                        {(lead as any).fitStatus === "Fit" ? "✅" : (lead as any).fitStatus === "Not Fit" ? "❌" : "⏳"} {(lead as any).fitStatus ?? "Pending"}
-                      </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {(() => {
-                            const cls = getLeadClassificationSimple(lead.stage, lead.leadQuality, (lead as any).fitStatus);
-                            const cfg = classificationConfig[cls];
-                            return (
-                              <span className="text-xs font-bold" style={{ color: cfg.color }}>
-                                {isRTL ? cfg.labelAr : cfg.label}
-                              </span>
-                            );
-                          })()}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                            style={{ background: stageColor[lead.stage] ?? "#6366f1" }}
-                          >
-                            {t(lead.stage as any)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-muted-foreground">
-                            {lead.campaignName ?? "—"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-muted-foreground">
-                            {lead.ownerId
-                              ? (users ?? []).find((u: any) => u.id === lead.ownerId)?.name ?? "—"
-                              : "—"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-muted-foreground">
-                            {lead.contactTime ? format(new Date(lead.contactTime), "dd/MM/yyyy HH:mm") : "—"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-muted-foreground">
-                            {format(new Date(lead.createdAt), "dd/MM/yyyy")}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <Link href={`/leads/${lead.id}`}>
-                              <Button variant="ghost" size="sm" className="text-xs h-7">
-                                {t("view")}
-                              </Button>
-                            </Link>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-primary"
-                              title={isRTL ? "إضافة نشاط" : "Add Activity"}
-                              onClick={(e) => { e.stopPropagation(); setQuickActivityLeadId(lead.id); }}
-                            >
-                              <MessageSquare size={14} />
-                            </Button>
-                            {(user?.role === "Admin" || user?.role === "admin") && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                onClick={() => setDeleteConfirmId(lead.id)}
-                              >
-                                <Trash2 size={14} />
-                              </Button>
-                            )}
-                          </div>
-                        </td>
+                        {orderedVisibleColumns.map((columnKey) => (
+                          <Fragment key={columnKey}>{renderColumnCell(lead, columnKey)}</Fragment>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
@@ -532,7 +1018,6 @@ export default function LeadsList() {
               </div>
             )}
 
-            {/* Pagination */}
             {(data?.total ?? 0) > limit && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-border">
                 <span className="text-xs text-muted-foreground">
@@ -543,7 +1028,7 @@ export default function LeadsList() {
                     variant="outline"
                     size="sm"
                     disabled={page === 0}
-                    onClick={() => setPage(page - 1)}
+                    onClick={() => setPage((prev) => Math.max(0, prev - 1))}
                   >
                     {t("previous")}
                   </Button>
@@ -551,7 +1036,7 @@ export default function LeadsList() {
                     variant="outline"
                     size="sm"
                     disabled={(page + 1) * limit >= (data?.total ?? 0)}
-                    onClick={() => setPage(page + 1)}
+                    onClick={() => setPage((prev) => prev + 1)}
                   >
                     {t("next")}
                   </Button>
@@ -562,7 +1047,6 @@ export default function LeadsList() {
         </Card>
       </div>
 
-      {/* New Lead Dialog */}
       <Dialog open={showNewLead} onOpenChange={setShowNewLead}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader className="pb-2 border-b border-border">
@@ -575,8 +1059,6 @@ export default function LeadsList() {
             </p>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pt-2">
-
-            {/* ── Section: Contact Info ── */}
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                 {isRTL ? "معلومات التواصل" : "Contact Information"}
@@ -587,13 +1069,28 @@ export default function LeadsList() {
                   <Input {...register("name")} placeholder={isRTL ? "اسم العميل" : "Lead name"} className="h-10" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("contactDate")} <span className="text-red-500">*</span></Label>
-                  <Input type="datetime-local" className={`h-10 ${contactDateError ? "border-red-500 ring-1 ring-red-500" : ""}`} onChange={(e) => { setValue("contactTime", new Date(e.target.value)); setContactDateError(false); }} />
-                  {contactDateError && <p className="text-red-500 text-xs">{isRTL ? "وقت التواصل مطلوب" : "Contact date is required"}</p>}
+                  <Label className="text-sm font-medium">
+                    {t("contactDate")} <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    type="datetime-local"
+                    className={`h-10 ${contactDateError ? "border-red-500 ring-1 ring-red-500" : ""}`}
+                    onChange={(e) => {
+                      setValue("contactTime", new Date(e.target.value));
+                      setContactDateError(false);
+                    }}
+                  />
+                  {contactDateError && (
+                    <p className="text-red-500 text-xs">
+                      {isRTL ? "وقت التواصل مطلوب" : "Contact date is required"}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-medium">{t("phone")} <span className="text-red-500">*</span></Label>
+                <Label className="text-sm font-medium">
+                  {t("phone")} <span className="text-red-500">*</span>
+                </Label>
                 <PhoneInput
                   value={watch("phone")}
                   onChange={(fullPhone, valid) => {
@@ -612,27 +1109,28 @@ export default function LeadsList() {
                   isRTL={isRTL}
                   error={phoneError}
                 />
-                {phoneError && <p className="text-red-500 text-xs">{isRTL ? "رقم الهاتف غير صحيح" : "Invalid phone number"}</p>}
+                {phoneError && (
+                  <p className="text-red-500 text-xs">{isRTL ? "رقم الهاتف غير صحيح" : "Invalid phone number"}</p>
+                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">{t("country")}</Label>
-                  <CountrySelect
-                    value={watch("country")}
-                    onChange={(name) => setValue("country", name)}
-                    isRTL={isRTL}
-                  />
+                  <CountrySelect value={watch("country")} onChange={(name) => setValue("country", name)} isRTL={isRTL} />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">{t("businessProfile")}</Label>
-                  <Input {...register("businessProfile")} placeholder={isRTL ? "نشاط العميل" : "Business profile"} className="h-10" />
+                  <Input
+                    {...register("businessProfile")}
+                    placeholder={isRTL ? "نشاط العميل" : "Business profile"}
+                    className="h-10"
+                  />
                 </div>
               </div>
             </div>
 
             <div className="border-t border-border" />
 
-            {/* ── Section: Lead Details ── */}
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                 {isRTL ? "تفاصيل العميل" : "Lead Details"}
@@ -641,10 +1139,14 @@ export default function LeadsList() {
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">{t("leadQuality")}</Label>
                   <Select onValueChange={(v) => setValue("leadQuality", v as any)} defaultValue="Unknown">
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {LEAD_QUALITIES.map((q) => (
-                        <SelectItem key={q} value={q}>{t(q as any)}</SelectItem>
+                        <SelectItem key={q} value={q}>
+                          {t(q as any)}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -652,7 +1154,9 @@ export default function LeadsList() {
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">{isRTL ? "حالة الملاءمة" : "Fit Status"}</Label>
                   <Select onValueChange={(v) => setValue("fitStatus", v as any)} defaultValue="Pending">
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Fit">{isRTL ? "✅ مناسب" : "✅ Fit"}</SelectItem>
                       <SelectItem value="Not Fit">{isRTL ? "❌ غير مناسب" : "❌ Not Fit"}</SelectItem>
@@ -663,25 +1167,42 @@ export default function LeadsList() {
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">{t("stage")}</Label>
                   <Select onValueChange={(v) => setValue("stage", v)} defaultValue="New">
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {STAGES.map((s) => (
-                        <SelectItem key={s} value={s}>{t(s as any)}</SelectItem>
+                        <SelectItem key={s} value={s}>
+                          {t(s as any)}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">{t("campaign")} <span className="text-red-500">*</span></Label>
-                  <Select onValueChange={(v) => { setValue("campaignName", v === "none" ? "" : v); if (v && v !== "none") setCampaignError(false); }}>
-                    <SelectTrigger className={`h-10 ${campaignError ? "border-red-500 ring-1 ring-red-500" : ""}`}><SelectValue placeholder={t("selectOption")} /></SelectTrigger>
+                  <Label className="text-sm font-medium">
+                    {t("campaign")} <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    onValueChange={(v) => {
+                      setValue("campaignName", v === "none" ? "" : v);
+                      if (v && v !== "none") setCampaignError(false);
+                    }}
+                  >
+                    <SelectTrigger className={`h-10 ${campaignError ? "border-red-500 ring-1 ring-red-500" : ""}`}>
+                      <SelectValue placeholder={t("selectOption")} />
+                    </SelectTrigger>
                     <SelectContent>
                       {campaigns?.map((c) => (
-                        <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                        <SelectItem key={c.id} value={c.name}>
+                          {c.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {campaignError && <p className="text-red-500 text-xs">{isRTL ? "الحملة مطلوبة" : "Campaign is required"}</p>}
+                  {campaignError && (
+                    <p className="text-red-500 text-xs">{isRTL ? "الحملة مطلوبة" : "Campaign is required"}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">{t("adCreative") || "الإعلان"}</Label>
@@ -690,8 +1211,7 @@ export default function LeadsList() {
               </div>
             </div>
 
-            {/* ── Section: Assignment (Admin/Manager only) ── */}
-            {["Admin", "SalesManager", "admin"].includes(user?.role ?? "") && (
+            {isAdminOrManager && (
               <>
                 <div className="border-t border-border" />
                 <div className="space-y-4">
@@ -701,12 +1221,18 @@ export default function LeadsList() {
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">{t("owner")}</Label>
                     <Select onValueChange={(v) => setValue("ownerId", v === "none" ? undefined : Number(v))}>
-                      <SelectTrigger className="h-10"><SelectValue placeholder={t("selectOption")} /></SelectTrigger>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder={t("selectOption")} />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">—</SelectItem>
-                        {users?.filter((u) => u.role === "SalesAgent").map((u) => (
-                          <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
-                        ))}
+                        {users
+                          ?.filter((u) => u.role === "SalesAgent")
+                          .map((u) => (
+                            <SelectItem key={u.id} value={String(u.id)}>
+                              {u.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -716,17 +1242,19 @@ export default function LeadsList() {
 
             <div className="border-t border-border" />
 
-            {/* ── Section: Notes ── */}
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                 {isRTL ? "ملاحظات" : "Notes"}
               </h3>
               <div className="space-y-2">
-                <Textarea {...register("notes")} className="min-h-[80px] resize-y" placeholder={isRTL ? "اكتب ملاحظاتك هنا..." : "Write your notes here..."} />
+                <Textarea
+                  {...register("notes")}
+                  className="min-h-[80px] resize-y"
+                  placeholder={isRTL ? "اكتب ملاحظاتك هنا..." : "Write your notes here..."}
+                />
               </div>
             </div>
 
-            {/* ── Actions ── */}
             <div className="flex gap-3 justify-end pt-2 border-t border-border">
               <Button type="button" variant="outline" size="lg" onClick={() => setShowNewLead(false)}>
                 {t("cancel")}
@@ -739,14 +1267,18 @@ export default function LeadsList() {
                 disabled={createLead.isPending}
               >
                 {createLead.isPending ? (
-                  <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> {t("loading")}</span>
-                ) : t("save")}
+                  <span className="flex items-center gap-2">
+                    <Loader2 size={16} className="animate-spin" /> {t("loading")}
+                  </span>
+                ) : (
+                  t("save")
+                )}
               </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
-      {/* Export Excel Dialog */}
+
       <Dialog open={showExport} onOpenChange={setShowExport}>
         <DialogContent className="max-w-sm" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
@@ -757,22 +1289,33 @@ export default function LeadsList() {
           </DialogHeader>
           <div className="space-y-4 pt-1">
             <p className="text-sm text-muted-foreground">
-              {isRTL
-                ? "سيتم تطبيق الفلاتر الحالية على التصدير."
-              : "Current filters will be applied to the export."}
+              {isRTL ? "سيتم تطبيق الفلاتر الحالية على التصدير." : "Current filters will be applied to the export."}
             </p>
 
-            {/* Active filters summary */}
-            {(stage !== "all" || quality !== "all" || campaign || slaBreached || search || ownerId !== "all") && (
+            {hasActiveFilters && (
               <div className="text-xs bg-muted rounded-md p-3 space-y-1">
                 <p className="font-medium text-foreground">{isRTL ? "الفلاتر المفعلة:" : "Active filters:"}</p>
                 {stage !== "all" && <p>• {t("stage")}: {stage}</p>}
                 {fitStatusFilter !== "all" && <p>• {isRTL ? "حالة الملاءمة" : "Fit Status"}: {fitStatusFilter}</p>}
                 {quality !== "all" && <p>• {t("leadQuality")}: {quality}</p>}
                 {campaign && <p>• {t("campaign")}: {campaign}</p>}
-                {ownerId !== "all" && <p>• {isRTL ? "المسؤول" : "Sales Agent"}: {users?.find((u: any) => u.id === Number(ownerId))?.name ?? ownerId}</p>}
+                {ownerId !== "all" && (
+                  <p>
+                    • {isRTL ? "المسؤول" : "Sales Agent"}: {users?.find((u: any) => u.id === Number(ownerId))?.name ?? ownerId}
+                  </p>
+                )}
                 {slaBreached && <p>• {t("slaAlerts")}</p>}
                 {search && <p>• {t("search")}: "{search}"</p>}
+                {dateRange?.from && (
+                  <p>
+                    • {isRTL ? "من" : "From"}: {format(dateRange.from, "dd/MM/yyyy")}
+                  </p>
+                )}
+                {dateRange?.to && (
+                  <p>
+                    • {isRTL ? "إلى" : "To"}: {format(dateRange.to, "dd/MM/yyyy")}
+                  </p>
+                )}
               </div>
             )}
 
@@ -814,16 +1357,22 @@ export default function LeadsList() {
                 disabled={exporting}
               >
                 {exporting ? (
-                  <><Loader2 size={14} className="animate-spin" /> {isRTL ? "جارٍ التصدير..." : "Exporting..."}</>
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    {isRTL ? "جارٍ التصدير..." : "Exporting..."}
+                  </>
                 ) : (
-                  <><Download size={14} /> {isRTL ? `تصدير ${exportLimit} عميل` : `Export ${exportLimit} leads`}</>
+                  <>
+                    <Download size={14} />
+                    {isRTL ? `تصدير ${exportLimit} عميل` : `Export ${exportLimit} leads`}
+                  </>
                 )}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-      {/* Delete Confirmation Dialog */}
+
       <Dialog open={deleteConfirmId !== null} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
         <DialogContent className="max-w-sm" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
@@ -849,9 +1398,13 @@ export default function LeadsList() {
                 disabled={deleteLead.isPending}
               >
                 {deleteLead.isPending ? (
-                  <><Loader2 size={14} className="animate-spin" /> {t("loading")}</>
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> {t("loading")}
+                  </>
                 ) : (
-                  <><Trash2 size={14} /> {isRTL ? "حذف" : "Delete"}</>
+                  <>
+                    <Trash2 size={14} /> {isRTL ? "حذف" : "Delete"}
+                  </>
                 )}
               </Button>
             </div>
@@ -859,7 +1412,6 @@ export default function LeadsList() {
         </DialogContent>
       </Dialog>
 
-      {/* Quick Add Activity Dialog */}
       <Dialog open={quickActivityLeadId !== null} onOpenChange={(open) => { if (!open) setQuickActivityLeadId(null); }}>
         <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
@@ -869,7 +1421,9 @@ export default function LeadsList() {
             <div>
               <Label>{isRTL ? "النوع" : "Type"}</Label>
               <Select value={quickActivityType} onValueChange={setQuickActivityType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Call">{isRTL ? "مكالمة" : "Call"}</SelectItem>
                   <SelectItem value="Meeting">{isRTL ? "اجتماع" : "Meeting"}</SelectItem>
@@ -882,7 +1436,9 @@ export default function LeadsList() {
             <div>
               <Label>{isRTL ? "النتيجة" : "Outcome"}</Label>
               <Select value={quickActivityOutcome} onValueChange={setQuickActivityOutcome}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Interested">{isRTL ? "مهتم" : "Interested"}</SelectItem>
                   <SelectItem value="Not Interested">{isRTL ? "غير مهتم" : "Not Interested"}</SelectItem>
@@ -919,7 +1475,13 @@ export default function LeadsList() {
                 }}
                 disabled={createQuickActivity.isLoading}
               >
-                {createQuickActivity.isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (isRTL ? "حفظ" : "Save")}
+                {createQuickActivity.isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isRTL ? (
+                  "حفظ"
+                ) : (
+                  "Save"
+                )}
               </Button>
             </div>
           </div>
@@ -928,6 +1490,21 @@ export default function LeadsList() {
     </CRMLayout>
   );
 }
+
 function Users(props: any) {
-  return <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
 }
