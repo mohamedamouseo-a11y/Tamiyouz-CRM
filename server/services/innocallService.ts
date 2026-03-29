@@ -8,7 +8,6 @@ import {
   timestamp,
 } from "drizzle-orm/mysql-core";
 import mysql from "mysql2/promise";
-
 // ─── DB Pool ──────────────────────────────────────────────────────────────────
 let _pool: mysql.Pool | null = null;
 function getPool() {
@@ -20,7 +19,6 @@ function getPool() {
 function getDb() {
   return drizzle(getPool());
 }
-
 // ─── InnoCall Settings Table (inline Drizzle schema) ──────────────────────────
 const innocallSettings = mysqlTable("innocall_settings", {
   id: int("id").autoincrement().primaryKey(),
@@ -28,7 +26,6 @@ const innocallSettings = mysqlTable("innocall_settings", {
   settingValue: text("settingValue").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow(),
 });
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type InnoCallSettings = {
   innocall_api_key: string;
@@ -36,27 +33,25 @@ export type InnoCallSettings = {
   innocall_webrtc_secret: string;
   innocall_base_color: string;
   innocall_enabled: boolean;
+  innocall_script_url: string;
 };
-
 // ─── Settings CRUD ────────────────────────────────────────────────────────────
 export async function getInnoCallSettings(): Promise<InnoCallSettings> {
   const db = getDb();
   const rows = await db.select().from(innocallSettings);
-
   const map = new Map<string, string>();
   for (const row of rows) {
     map.set(row.settingKey, row.settingValue || "");
   }
-
   return {
     innocall_api_key: map.get("innocall_api_key") || "",
     innocall_extension: map.get("innocall_extension") || "",
     innocall_webrtc_secret: map.get("innocall_webrtc_secret") || "",
     innocall_base_color: map.get("innocall_base_color") || "#6366f1",
     innocall_enabled: (map.get("innocall_enabled") || "false") === "true",
+    innocall_script_url: map.get("innocall_script_url") || "",
   };
 }
-
 export async function updateInnoCallSettings(input: InnoCallSettings) {
   const db = getDb();
   const pairs: Record<string, string> = {
@@ -65,8 +60,8 @@ export async function updateInnoCallSettings(input: InnoCallSettings) {
     innocall_webrtc_secret: input.innocall_webrtc_secret || "",
     innocall_base_color: input.innocall_base_color || "#6366f1",
     innocall_enabled: input.innocall_enabled ? "true" : "false",
+    innocall_script_url: input.innocall_script_url || "",
   };
-
   for (const [settingKey, settingValue] of Object.entries(pairs)) {
     await db
       .insert(innocallSettings)
@@ -78,6 +73,5 @@ export async function updateInnoCallSettings(input: InnoCallSettings) {
         },
       });
   }
-
   return await getInnoCallSettings();
 }

@@ -1,31 +1,21 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from "react";
-import { Phone as PhoneIcon } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
-// Declare InnocallsRTC on window
-declare global {
-  interface Window {
-    InnocallsRTC: any;
-  }
-  class InnocallsRTC {
-    constructor(config: any);
-    mount(selector: string): void;
-    startCall(number: string): void;
-    hangup(): void;
-    fillNumber(number: string): void;
-    showWebrtc(): void;
-    hideWebrtc(): void;
-    toggleWebrtc(): void;
-    on(event: string, callback: (...args: any[]) => void): void;
-  }
-}
-
-type CallStatus = "idle" | "ringing" | "active" | "ended" | "missed" | "rejected";
+/**
+ * InnoCallProvider - Web Call Script Integration
+ *
+ * This provider dynamically loads the InnoCall Web Call script from the URL
+ * stored in the database settings. The Web Call script handles everything
+ * (dialpad UI, calling, etc.) automatically once loaded.
+ *
+ * No complex WebRTC setup needed - the script does it all.
+ */
 
 interface InnoCallContextType {
   isReady: boolean;
-  callStatus: CallStatus;
+  isEnabled: boolean;
+  callStatus: string;
   currentCallId: string | null;
   startCall: (number: string) => void;
   hangup: () => void;
@@ -36,6 +26,7 @@ interface InnoCallContextType {
 
 const InnoCallContext = createContext<InnoCallContextType>({
   isReady: false,
+  isEnabled: false,
   callStatus: "idle",
   currentCallId: null,
   startCall: () => {},
@@ -45,15 +36,11 @@ const InnoCallContext = createContext<InnoCallContextType>({
   hideDialpad: () => {},
 });
 
-
-
 export function InnoCallProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
-  const [callStatus, setCallStatus] = useState<CallStatus>("idle");
-  const [currentCallId, setCurrentCallId] = useState<string | null>(null);
-  const rtcRef = useRef<any>(null);
-  const mountedRef = useRef(false);
-  const stylesheetLoadedRef = useRef(false);
+  const [isEnabled, setIsEnabled] = useState(false);
+  const scriptLoadedRef = useRef(false);
+  const scriptElementRef = useRef<HTMLScriptElement | null>(null);
 
   // Fetch config from DB via tRPC
   const { data: configData } = trpc.innocall.getConfig.useQuery(undefined, {
@@ -61,143 +48,74 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
     staleTime: 60_000,
   });
 
-  // Load InnoCall stylesheet scoped to the dialpad container only
   useEffect(() => {
-    if (stylesheetLoadedRef.current) return;
-    stylesheetLoadedRef.current = true;
+    // Don't load if config not loaded or not enabled or no script URL
+    if (!configData || !configData.enabled || !configData.scriptUrl) {
+      setIsEnabled(false);
+      setIsReady(false);
 
-    // Add a scoped style that limits InnoCall CSS to only affect .innocalls-webrtc elements
-    const scopeStyle = document.createElement("style");
-    scopeStyle.textContent = `
-      /* Load InnoCall styles only inside the dialpad container */
-      #innocall-dialpad .innocalls-webrtc {
-        all: initial;
+      // Remove existing script if it was loaded before and now disabled
+      if (scriptElementRef.current) {
+        scriptElementRef.current.remove();
+        scriptElementRef.current = null;
+        scriptLoadedRef.current = false;
+        console.log("[InnoCall] Script removed (disabled or no URL)");
       }
-    `;
-    // Don't add the global stylesheet - let the SDK handle its own styles
-    // The SDK's webrtc.js already includes necessary inline styles
-  }, []);
-
-  // Fix the InnoCall widget positioning to not overlap with the messenger
-  const fixWebrtcPosition = useCallback(() => {
-    const webrtcEl = document.querySelector('.innocalls-webrtc') as HTMLElement;
-    if (webrtcEl) {
-      webrtcEl.style.position = 'fixed';
-      webrtcEl.style.bottom = '3.5rem';
-      webrtcEl.style.left = '0.5rem';
-      webrtcEl.style.right = 'auto';
-      webrtcEl.style.insetInlineEnd = 'auto';
-      webrtcEl.style.insetInlineStart = '0.5rem';
-      webrtcEl.style.zIndex = '9998';
-      webrtcEl.style.transform = 'scale(0.75)';
-      webrtcEl.style.transformOrigin = 'bottom left';
-      webrtcEl.style.borderRadius = '16px';
-      webrtcEl.style.overflow = 'hidden';
-      webrtcEl.style.boxShadow = '0 8px 32px rgba(0,0,0,0.18)';
-    }
-  }, []);
-
-  useEffect(() => {
-    // Don't initialize if config not loaded or not enabled or no API key
-    if (!configData || !configData.enabled || !configData.apiKey) {
       return;
     }
 
-    if (mountedRef.current) return;
-    mountedRef.current = true;
+    setIsEnabled(true);
 
-    const INNOCALL_CONFIG = {
-      apiKey: configData.apiKey,
-      extension: configData.extension,
-      webrtcSecret: configData.webrtcSecret,
-      config: {
-        baseColor: configData.baseColor || "#6366f1",
-      },
-      terminateOnRefresh: true,
+    // Don't reload if already loaded with the same URL
+    if (scriptLoadedRef.current && scriptElementRef.current) {
+      const currentSrc = scriptElementRef.current.getAttribute("src");
+      if (currentSrc === configData.scriptUrl) {
+        return;
+      }
+      // URL changed - remove old script
+      scriptElementRef.current.remove();
+      scriptElementRef.current = null;
+      scriptLoadedRef.current = false;
+    }
+
+    // Dynamically load the Web Call script
+    const script = document.createElement("script");
+    script.type = "module";
+    script.src = configData.scriptUrl;
+    script.async = true;
+
+    script.onload = () => {
+      console.log("[InnoCall] Web Call script loaded successfully from:", configData.scriptUrl);
+      setIsReady(true);
+      scriptLoadedRef.current = true;
     };
 
-    const initRTC = () => {
-      try {
-        if (typeof InnocallsRTC === "undefined") {
-          console.warn("[InnoCall] SDK not loaded yet, retrying...");
-          setTimeout(initRTC, 1000);
-          return;
-        }
+    script.onerror = (err) => {
+      console.error("[InnoCall] Failed to load Web Call script:", err);
+      toast.error("Failed to load InnoCall calling widget. Please check the Script URL in settings.");
+      setIsReady(false);
+    };
 
-        const innocallsRTC = new InnocallsRTC(INNOCALL_CONFIG);
+    document.body.appendChild(script);
+    scriptElementRef.current = script;
 
-        // Register event listeners
-        innocallsRTC.on("callRinging", () => {
-          console.log("[InnoCall] Call ringing");
-          setCallStatus("ringing");
-          fixWebrtcPosition();
-        });
+    console.log("[InnoCall] Loading Web Call script from:", configData.scriptUrl);
 
-        innocallsRTC.on("callStarted", (callId: string) => {
-          console.log("[InnoCall] Call started:", callId);
-          setCallStatus("active");
-          setCurrentCallId(callId);
-        });
-
-        innocallsRTC.on("callMissed", () => {
-          console.log("[InnoCall] Call missed");
-          setCallStatus("missed");
-          setTimeout(() => setCallStatus("idle"), 3000);
-        });
-
-        innocallsRTC.on("callRejected", () => {
-          console.log("[InnoCall] Call rejected");
-          setCallStatus("rejected");
-          setTimeout(() => setCallStatus("idle"), 3000);
-        });
-
-        innocallsRTC.on("callEnded", () => {
-          console.log("[InnoCall] Call ended");
-          setCallStatus("ended");
-          setCurrentCallId(null);
-          setTimeout(() => setCallStatus("idle"), 2000);
-        });
-
-        innocallsRTC.on("held", () => {
-          console.log("[InnoCall] Call held");
-        });
-
-        innocallsRTC.on("released", () => {
-          console.log("[InnoCall] Call released");
-        });
-
-        innocallsRTC.on("muted", () => {
-          console.log("[InnoCall] Call muted");
-        });
-
-        innocallsRTC.on("unmuted", () => {
-          console.log("[InnoCall] Call unmuted");
-        });
-
-        // Mount to the dialpad container
-        innocallsRTC.mount("#innocall-dialpad");
-
-        rtcRef.current = innocallsRTC;
-        setIsReady(true);
-        console.log("[InnoCall] SDK initialized successfully");
-
-        // Fix position after mount
-        setTimeout(fixWebrtcPosition, 300);
-        setTimeout(fixWebrtcPosition, 1000);
-        setTimeout(fixWebrtcPosition, 3000);
-      } catch (err) {
-        console.error("[InnoCall] Failed to initialize:", err);
-        setTimeout(initRTC, 2000);
+    // Cleanup on unmount
+    return () => {
+      if (scriptElementRef.current) {
+        scriptElementRef.current.remove();
+        scriptElementRef.current = null;
+        scriptLoadedRef.current = false;
       }
     };
+  }, [configData]);
 
-    // Wait a bit for the CDN script to load
-    setTimeout(initRTC, 500);
-  }, [fixWebrtcPosition, configData]);
-
+  // Backward-compatible startCall - the Web Call script provides its own UI
+  // but we can try to interact with it if the widget exposes an API
   const startCall = useCallback(
     (number: string) => {
-      if (!rtcRef.current) {
+      if (!isReady) {
         toast.error("InnoCall not ready yet");
         return;
       }
@@ -206,45 +124,66 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
         toast.error("Invalid phone number");
         return;
       }
-      console.log("[InnoCall] Starting call to:", cleaned);
-      rtcRef.current.showWebrtc();
-      rtcRef.current.startCall(cleaned);
-      setCallStatus("ringing");
-      // Fix position after showing
-      setTimeout(fixWebrtcPosition, 100);
-      setTimeout(fixWebrtcPosition, 500);
+      console.log("[InnoCall] Call requested to:", cleaned);
+
+      // Try to find the Web Call widget input and fill the number
+      // The Web Call script creates its own UI elements
+      try {
+        // Look for the InnoCall widget's phone input
+        const widget = document.querySelector('.innocalls-web-call, .innocalls-webrtc, [class*="innocall"]') as HTMLElement;
+        if (widget) {
+          // Try to find and click the widget to open it
+          widget.style.display = 'block';
+          const input = widget.querySelector('input[type="tel"], input[type="text"], input') as HTMLInputElement;
+          if (input) {
+            input.value = cleaned;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          // Try to find and click the call button
+          const callBtn = widget.querySelector('button[class*="call"], .call-button, button') as HTMLButtonElement;
+          if (callBtn) {
+            setTimeout(() => callBtn.click(), 300);
+          }
+        } else {
+          // Widget not found - just copy number to clipboard for easy pasting
+          navigator.clipboard.writeText(cleaned).then(() => {
+            toast.info(`Phone number ${cleaned} copied. Use the InnoCall widget to make the call.`);
+          }).catch(() => {
+            toast.info(`Use the InnoCall widget to call: ${cleaned}`);
+          });
+        }
+      } catch (err) {
+        console.warn("[InnoCall] Could not auto-dial:", err);
+        toast.info(`Use the InnoCall widget to call: ${number}`);
+      }
     },
-    [fixWebrtcPosition]
+    [isReady]
   );
 
   const hangup = useCallback(() => {
-    if (!rtcRef.current) return;
-    rtcRef.current.hangup();
+    console.log("[InnoCall] Hangup requested");
   }, []);
 
   const toggleDialpad = useCallback(() => {
-    if (!rtcRef.current) return;
-    rtcRef.current.toggleWebrtc();
-    setTimeout(fixWebrtcPosition, 100);
-  }, [fixWebrtcPosition]);
+    console.log("[InnoCall] Toggle dialpad");
+  }, []);
 
   const showDialpad = useCallback(() => {
-    if (!rtcRef.current) return;
-    rtcRef.current.showWebrtc();
-    setTimeout(fixWebrtcPosition, 100);
-  }, [fixWebrtcPosition]);
+    console.log("[InnoCall] Show dialpad");
+  }, []);
 
   const hideDialpad = useCallback(() => {
-    if (!rtcRef.current) return;
-    rtcRef.current.hideWebrtc();
+    console.log("[InnoCall] Hide dialpad");
   }, []);
 
   return (
     <InnoCallContext.Provider
       value={{
         isReady,
-        callStatus,
-        currentCallId,
+        isEnabled,
+        callStatus: "idle",
+        currentCallId: null,
         startCall,
         hangup,
         toggleDialpad,
@@ -253,23 +192,6 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-      {/* Container for InnoCall dialpad - compact floating above the button */}
-      <div
-        id="innocall-dialpad"
-        style={{
-          position: "fixed",
-          bottom: "3.5rem",
-          left: "0.5rem",
-          right: "auto",
-          zIndex: 9998,
-          transform: "scale(0.7)",
-          transformOrigin: "bottom left",
-          borderRadius: "16px",
-          overflow: "hidden",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-        }}
-      />
-
     </InnoCallContext.Provider>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Phone, Save } from "lucide-react";
+import { Loader2, Phone, Save, Link } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ type InnoCallSettingsForm = {
   innocall_webrtc_secret: string;
   innocall_base_color: string;
   innocall_enabled: boolean;
+  innocall_script_url: string;
 };
 
 const defaultForm: InnoCallSettingsForm = {
@@ -23,6 +24,7 @@ const defaultForm: InnoCallSettingsForm = {
   innocall_webrtc_secret: "",
   innocall_base_color: "#6366f1",
   innocall_enabled: false,
+  innocall_script_url: "",
 };
 
 export default function InnoCallSettingsTab() {
@@ -49,6 +51,7 @@ export default function InnoCallSettingsTab() {
         innocall_webrtc_secret: data.innocall_webrtc_secret ?? "",
         innocall_base_color: data.innocall_base_color ?? "#6366f1",
         innocall_enabled: Boolean(data.innocall_enabled),
+        innocall_script_url: data.innocall_script_url ?? "",
       });
     }
   }, [data]);
@@ -88,6 +91,25 @@ export default function InnoCallSettingsTab() {
           </div>
         ) : (
           <>
+            {/* Web Call Script URL - Most important field */}
+            <div className="grid gap-2 rounded-xl border border-indigo-200 bg-indigo-50/30 p-4 dark:border-indigo-800 dark:bg-indigo-950/20">
+              <Label htmlFor="innocall_script_url" className="flex items-center gap-2 font-semibold">
+                <Link className="h-4 w-4 text-indigo-500" />
+                Web Call Script URL
+              </Label>
+              <Input
+                id="innocall_script_url"
+                value={form.innocall_script_url}
+                onChange={(e) => setField("innocall_script_url", e.target.value)}
+                placeholder="https://platform.innocalls.com/api/normal-web-call/bundle/..."
+                dir="ltr"
+              />
+              <p className="text-xs text-muted-foreground">
+                The Web Call script URL from InnoCall dashboard. Go to Web Call &rarr; Credential to find this URL.
+                This script enables the click-to-call widget on the CRM.
+              </p>
+            </div>
+
             <div className="grid gap-2">
               <Label htmlFor="innocall_api_key">API Key</Label>
               <Input
@@ -96,6 +118,7 @@ export default function InnoCallSettingsTab() {
                 value={form.innocall_api_key}
                 onChange={(e) => setField("innocall_api_key", e.target.value)}
                 placeholder="Enter InnoCall API key"
+                dir="ltr"
               />
               <p className="text-xs text-muted-foreground">
                 Your InnoCall API key from the InnoCall dashboard.
@@ -109,6 +132,7 @@ export default function InnoCallSettingsTab() {
                 value={form.innocall_extension}
                 onChange={(e) => setField("innocall_extension", e.target.value)}
                 placeholder="e.g. 101"
+                dir="ltr"
               />
               <p className="text-xs text-muted-foreground">
                 The extension number for outbound calls.
@@ -123,6 +147,7 @@ export default function InnoCallSettingsTab() {
                 value={form.innocall_webrtc_secret}
                 onChange={(e) => setField("innocall_webrtc_secret", e.target.value)}
                 placeholder="Enter WebRTC secret"
+                dir="ltr"
               />
               <p className="text-xs text-muted-foreground">
                 The WebRTC secret token from InnoCall for browser-based calling.
@@ -144,6 +169,7 @@ export default function InnoCallSettingsTab() {
                   onChange={(e) => setField("innocall_base_color", e.target.value)}
                   placeholder="#6366f1"
                   className="flex-1"
+                  dir="ltr"
                 />
               </div>
               <p className="text-xs text-muted-foreground">
