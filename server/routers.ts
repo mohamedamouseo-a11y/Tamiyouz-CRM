@@ -10,6 +10,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { rakanRouter } from "./rakanRouter";
 import { tamaraRouter } from "./tamaraRouter";
 import { paymobRouter } from "./paymobRouter";
+import { innocallRouter } from "./innocallRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { createSessionToken } from "./auth";
 import bcrypt from "bcryptjs";
@@ -3846,6 +3847,7 @@ byLeadStageChanges: protectedProcedure
   rakan: rakanRouter,
   tamara: tamaraRouter,
   paymob: paymobRouter,
+  innocall: innocallRouter,
   // ─── Exchange Rates ──────────────────────────────────────────────────────────
   exchangeRates: router({
     list: adminProcedure.query(async () => {

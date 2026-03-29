@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from "react";
 import { Phone as PhoneIcon } from "lucide-react";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 // Declare InnocallsRTC on window
 declare global {
@@ -44,15 +45,7 @@ const InnoCallContext = createContext<InnoCallContextType>({
   hideDialpad: () => {},
 });
 
-const INNOCALL_CONFIG = {
-  apiKey: "ibpb9hrsf7j357g1mnt98vo6se7g7r18",
-  extension: "101",
-  webrtcSecret: "0.1773083939.nzwDDSRJMaGkXwEgyHK5F2if04EaQKIYGHKQcfD4ZMf9dOVFc3",
-  config: {
-    baseColor: "#6366f1",
-  },
-  terminateOnRefresh: true,
-};
+
 
 export function InnoCallProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
@@ -61,6 +54,12 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
   const rtcRef = useRef<any>(null);
   const mountedRef = useRef(false);
   const stylesheetLoadedRef = useRef(false);
+
+  // Fetch config from DB via tRPC
+  const { data: configData } = trpc.innocall.getConfig.useQuery(undefined, {
+    retry: 2,
+    staleTime: 60_000,
+  });
 
   // Load InnoCall stylesheet scoped to the dialpad container only
   useEffect(() => {
@@ -99,8 +98,23 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Don't initialize if config not loaded or not enabled or no API key
+    if (!configData || !configData.enabled || !configData.apiKey) {
+      return;
+    }
+
     if (mountedRef.current) return;
     mountedRef.current = true;
+
+    const INNOCALL_CONFIG = {
+      apiKey: configData.apiKey,
+      extension: configData.extension,
+      webrtcSecret: configData.webrtcSecret,
+      config: {
+        baseColor: configData.baseColor || "#6366f1",
+      },
+      terminateOnRefresh: true,
+    };
 
     const initRTC = () => {
       try {
@@ -179,7 +193,7 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
 
     // Wait a bit for the CDN script to load
     setTimeout(initRTC, 500);
-  }, [fixWebrtcPosition]);
+  }, [fixWebrtcPosition, configData]);
 
   const startCall = useCallback(
     (number: string) => {
