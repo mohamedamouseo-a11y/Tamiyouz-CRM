@@ -12,7 +12,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useThemeTokens } from "@/contexts/ThemeTokenContext";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Bell, Clock, Copy, Edit, Eye, EyeOff, FileSpreadsheet, GripVertical, Key, Mail, Palette, Plus, RefreshCw, Save, Send, Settings, Shield, Sliders, Trash2, Users, Check, Archive, SlidersHorizontal, Megaphone, Sparkles, Webhook , DollarSign, BarChart3} from "lucide-react";
+import { Bell, Clock, Copy, Edit, Eye, EyeOff, FileSpreadsheet, GripVertical, Key, Mail, Palette, Plus, RefreshCw, Save, Send, Settings, Shield, Sliders, Trash2, Users, Check, Archive, SlidersHorizontal, Megaphone, Sparkles, Webhook , DollarSign, BarChart3, Package, Undo2} from "lucide-react";
 import NotificationSettingsContent from "@/components/NotificationSettingsContent";
 import NotificationsTab from "@/components/NotificationsTab";
 import MeetingNotificationSettings from "@/components/MeetingNotificationSettings";
@@ -26,7 +26,7 @@ import RakanSettingsTab from "@/components/RakanSettingsTab";
 import TamaraSettingsTab from "@/components/TamaraSettingsTab";
 import PaymobSettingsTab from "@/components/PaymobSettingsTab";
 import DemoSyncTab from "@/components/DemoSyncTab";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -428,6 +428,10 @@ export default function AdminSettings() {
             {isSuperAdmin && <TabsTrigger value="demoSync" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               <RefreshCw size={13} />
               <span>{isRTL ? "مزامنة الديمو" : "Demo Sync"}</span>
+            </TabsTrigger>}
+            {isAdmin && <TabsTrigger value="packages" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
+              <Package size={13} />
+              <span>{isRTL ? "الباقات" : "Packages"}</span>
             </TabsTrigger>}
           </TabsList>
 
@@ -882,6 +886,9 @@ export default function AdminSettings() {
           {isSuperAdmin && <TabsContent value="demoSync" className="mt-4">
             <DemoSyncTab />
           </TabsContent>}
+          {isAdmin && <TabsContent value="packages" className="mt-4">
+            <PackagesTab isRTL={isRTL} />
+          </TabsContent>}
         </Tabs>
       </div>
       {/* Add/Edit User Dialog */}
@@ -1224,5 +1231,156 @@ export default function AdminSettings() {
         </DialogContent>
       </Dialog>
     </CRMLayout>
+  );
+}
+
+// ─── Packages Management Tab ───────────────────────────────────────────────
+function PackagesTab({ isRTL }: { isRTL: boolean }) {
+  const utils = trpc.useUtils();
+  const packagesQ = trpc.accountManagement.listAllPackages.useQuery();
+  const createM = trpc.accountManagement.createPackage.useMutation({
+    onSuccess: () => { utils.accountManagement.listAllPackages.invalidate(); toast.success(isRTL ? "تم إضافة الباقة بنجاح" : "Package added successfully"); },
+  });
+  const updateM = trpc.accountManagement.updatePackage.useMutation({
+    onSuccess: () => { utils.accountManagement.listAllPackages.invalidate(); toast.success(isRTL ? "تم تحديث الباقة بنجاح" : "Package updated successfully"); },
+  });
+  const deleteM = trpc.accountManagement.deletePackage.useMutation({
+    onSuccess: () => { utils.accountManagement.listAllPackages.invalidate(); toast.success(isRTL ? "تم حذف الباقة" : "Package deactivated"); },
+  });
+  const restoreM = trpc.accountManagement.restorePackage.useMutation({
+    onSuccess: () => { utils.accountManagement.listAllPackages.invalidate(); toast.success(isRTL ? "تم استعادة الباقة" : "Package restored"); },
+  });
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingPkg, setEditingPkg] = useState<any>(null);
+  const [form, setForm] = useState({ name: "", description: "", price: "", period: "" });
+
+  const openAdd = () => {
+    setEditingPkg(null);
+    setForm({ name: "", description: "", price: "", period: "" });
+    setDialogOpen(true);
+  };
+
+  const openEdit = (pkg: any) => {
+    setEditingPkg(pkg);
+    setForm({
+      name: pkg.name || "",
+      description: pkg.description || "",
+      price: pkg.price || "",
+      period: pkg.period || "",
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSave = () => {
+    if (!form.name.trim()) { toast.error(isRTL ? "اسم الباقة مطلوب" : "Package name is required"); return; }
+    if (editingPkg) {
+      updateM.mutate({ id: editingPkg.id, ...form });
+    } else {
+      createM.mutate(form);
+    }
+    setDialogOpen(false);
+  };
+
+  const packages = packagesQ.data ?? [];
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-lg">{isRTL ? "إدارة الباقات" : "Manage Packages"}</CardTitle>
+        <Button onClick={openAdd} size="sm" className="gap-1">
+          <Plus size={14} />
+          {isRTL ? "إضافة باقة" : "Add Package"}
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {packagesQ.isLoading ? (
+          <p className="text-muted-foreground text-center py-8">{isRTL ? "جاري التحميل..." : "Loading..."}</p>
+        ) : packages.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">{isRTL ? "لا توجد باقات" : "No packages found"}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-muted-foreground">
+                  <th className="py-2 px-3 text-start font-medium">{isRTL ? "الاسم" : "Name"}</th>
+                  <th className="py-2 px-3 text-start font-medium">{isRTL ? "الوصف" : "Description"}</th>
+                  <th className="py-2 px-3 text-start font-medium">{isRTL ? "السعر" : "Price"}</th>
+                  <th className="py-2 px-3 text-start font-medium">{isRTL ? "المدة" : "Period"}</th>
+                  <th className="py-2 px-3 text-start font-medium">{isRTL ? "الحالة" : "Status"}</th>
+                  <th className="py-2 px-3 text-start font-medium">{isRTL ? "إجراءات" : "Actions"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {packages.map((pkg: any) => (
+                  <tr key={pkg.id} className={`border-b hover:bg-muted/50 ${!pkg.isActive ? "opacity-50" : ""}`}>
+                    <td className="py-2 px-3 font-medium">{pkg.name}</td>
+                    <td className="py-2 px-3 text-muted-foreground">{pkg.description || "—"}</td>
+                    <td className="py-2 px-3">{pkg.price || "—"}</td>
+                    <td className="py-2 px-3">{pkg.period || "—"}</td>
+                    <td className="py-2 px-3">
+                      <Badge variant={pkg.isActive ? "default" : "secondary"}>
+                        {pkg.isActive ? (isRTL ? "نشط" : "Active") : (isRTL ? "غير نشط" : "Inactive")}
+                      </Badge>
+                    </td>
+                    <td className="py-2 px-3">
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(pkg)} title={isRTL ? "تعديل" : "Edit"}>
+                          <Edit size={14} />
+                        </Button>
+                        {pkg.isActive ? (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => deleteM.mutate({ id: pkg.id })} title={isRTL ? "تعطيل" : "Deactivate"}>
+                            <Trash2 size={14} />
+                          </Button>
+                        ) : (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500 hover:text-green-700" onClick={() => restoreM.mutate({ id: pkg.id })} title={isRTL ? "استعادة" : "Restore"}>
+                            <Undo2 size={14} />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+
+      {/* Add/Edit Package Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle>{editingPkg ? (isRTL ? "تعديل الباقة" : "Edit Package") : (isRTL ? "إضافة باقة جديدة" : "Add New Package")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{isRTL ? "اسم الباقة" : "Package Name"} *</Label>
+              <Input value={form.name} onChange={(e) => setForm(s => ({ ...s, name: e.target.value }))} placeholder={isRTL ? "مثال: SEO" : "e.g. SEO"} />
+            </div>
+            <div className="space-y-2">
+              <Label>{isRTL ? "الوصف" : "Description"}</Label>
+              <Input value={form.description} onChange={(e) => setForm(s => ({ ...s, description: e.target.value }))} placeholder={isRTL ? "وصف الباقة" : "Package description"} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{isRTL ? "السعر" : "Price"}</Label>
+                <Input value={form.price} onChange={(e) => setForm(s => ({ ...s, price: e.target.value }))} placeholder="0.00" />
+              </div>
+              <div className="space-y-2">
+                <Label>{isRTL ? "المدة" : "Period"}</Label>
+                <Input value={form.period} onChange={(e) => setForm(s => ({ ...s, period: e.target.value }))} placeholder={isRTL ? "مثال: 12 شهر" : "e.g. 12 months"} />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>{isRTL ? "إلغاء" : "Cancel"}</Button>
+              <Button onClick={handleSave} disabled={createM.isPending || updateM.isPending}>
+                {(createM.isPending || updateM.isPending) ? (isRTL ? "جاري الحفظ..." : "Saving...") : (isRTL ? "حفظ" : "Save")}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

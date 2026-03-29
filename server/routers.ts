@@ -119,6 +119,10 @@ import {
   updateContract,
   getServicePackages,
   createServicePackage,
+  updateServicePackage,
+  deleteServicePackage,
+  restoreServicePackage,
+  getAllServicePackages,
   getClientProfileById,
   getContractById,
   getRenewals,
@@ -2455,6 +2459,36 @@ byLeadStageChanges: protectedProcedure
       .mutation(async ({ input }) => {
         const id = await createServicePackage(input as any);
         return { id };
+      }),
+    listAllPackages: adminProcedure
+      .query(async () => {
+        return getAllServicePackages();
+      }),
+    updatePackage: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        price: z.string().optional(),
+        period: z.string().optional(),
+        services: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await updateServicePackage(id, data as any);
+        return { success: true };
+      }),
+    deletePackage: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteServicePackage(input.id);
+        return { success: true };
+      }),
+    restorePackage: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await restoreServicePackage(input.id);
+        return { success: true };
       }),
   }),
 

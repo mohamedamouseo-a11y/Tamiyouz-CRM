@@ -2472,6 +2472,26 @@ export async function createServicePackage(data: InsertServicePackage): Promise<
   const result = await db.insert(servicePackages).values(data);
   return Number(result[0].insertId);
 }
+export async function updateServicePackage(id: number, data: Partial<InsertServicePackage>): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(servicePackages).set(data).where(eq(servicePackages.id, id));
+}
+export async function deleteServicePackage(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(servicePackages).set({ isActive: 0 }).where(eq(servicePackages.id, id));
+}
+export async function restoreServicePackage(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(servicePackages).set({ isActive: 1 }).where(eq(servicePackages.id, id));
+}
+export async function getAllServicePackages(): Promise<ServicePackage[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(servicePackages).orderBy(desc(servicePackages.createdAt));
+}
 
 
 // ─── Phase 2: Client Profile with Contracts & Renewals ─────────────────────
