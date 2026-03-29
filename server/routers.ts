@@ -2579,6 +2579,23 @@ byLeadStageChanges: protectedProcedure
         });
         return { success: true };
       }),
+    delete: accountManagerProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const existing = await softDeleteFollowUp(input.id);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "soft_delete",
+          entityType: "follow_ups",
+          entityId: input.id,
+          entityName: existing?.type || `Follow-up #${input.id}`,
+          previousValue: existing,
+        });
+        return { success: true };
+      }),
+
   }),
 
   // ─── Phase 3: Client Tasks ─────────────────────────────────────────────
@@ -2649,6 +2666,23 @@ byLeadStageChanges: protectedProcedure
         await updateClientTask(input.id, patch);
         return { success: true };
       }),
+    delete: accountManagerProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const existing = await softDeleteClientTask(input.id);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "soft_delete",
+          entityType: "client_tasks",
+          entityId: input.id,
+          entityName: existing?.title || `Task #${input.id}`,
+          previousValue: existing,
+        });
+        return { success: true };
+      }),
+
   }),
 
   // ─── Phase 3: Onboarding ───────────────────────────────────────────────
@@ -2789,6 +2823,23 @@ byLeadStageChanges: protectedProcedure
       .mutation(async ({ input }) => {
         return updateObjective(input.id, { title: input.title, status: input.status });
       }),
+    delete: accountManagerProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const existing = await softDeleteObjective(input.id);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "soft_delete",
+          entityType: "client_objectives",
+          entityId: input.id,
+          entityName: existing?.title || `Objective #${input.id}`,
+          previousValue: existing,
+        });
+        return { success: true };
+      }),
+
 
   }),
 
@@ -2836,6 +2887,23 @@ byLeadStageChanges: protectedProcedure
         if (patch.dueDate) patch.dueDate = new Date(patch.dueDate);
         return updateDeliverable(input.id, patch);
       }),
+    delete: accountManagerProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const existing = await softDeleteDeliverable(input.id);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "soft_delete",
+          entityType: "deliverables",
+          entityId: input.id,
+          entityName: existing?.name || `Deliverable #${input.id}`,
+          previousValue: existing,
+        });
+        return { success: true };
+      }),
+
   }),
 
   // ─── Phase 5: Upsell Opportunities ────────────────────────────────────
@@ -2878,6 +2946,23 @@ byLeadStageChanges: protectedProcedure
       .mutation(async ({ input }) => {
         return updateUpsellOpportunity(input.id, input.data);
       }),
+    delete: accountManagerProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const existing = await softDeleteUpsell(input.id);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "soft_delete",
+          entityType: "upsell_opportunities",
+          entityId: input.id,
+          entityName: existing?.title || `Upsell #${input.id}`,
+          previousValue: existing,
+        });
+        return { success: true };
+      }),
+
   }),
 
   // ─── Phase 5: Client Communications ───────────────────────────────────
@@ -2917,6 +3002,23 @@ byLeadStageChanges: protectedProcedure
       .mutation(async ({ input }) => {
         return updateClientCommunication(input.id, input.data);
       }),
+    delete: accountManagerProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const existing = await softDeleteCommunication(input.id);
+        await createAuditLog({
+          userId: ctx.user.id,
+          userName: ctx.user.name,
+          userRole: ctx.user.role,
+          action: "soft_delete",
+          entityType: "client_communications",
+          entityId: input.id,
+          entityName: existing?.channelName || `Channel #${input.id}`,
+          previousValue: existing,
+        });
+        return { success: true };
+      }),
+
 
   }),
 
