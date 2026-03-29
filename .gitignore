@@ -11,3 +11,4 @@ google-calendar-key.json
 ecosystem.config.cjs
 .env*
 git-auto-sync.sh
+storage/developer-hub.json
