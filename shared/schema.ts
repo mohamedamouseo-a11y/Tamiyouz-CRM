@@ -458,6 +458,7 @@ export const followUps = mysqlTable("follow_ups", {
 
 	status: mysqlEnum('status', ['Pending','Completed']).default('Pending'),
 	createdAt: timestamp({ mode: 'string' }).default(sql`(now())`).notNull(),
+	deletedAt: timestamp({ mode: 'string' }),
 },
 (table) => [
 	primaryKey({ columns: [table.id], name: "follow_ups_id"}),
@@ -477,6 +478,7 @@ export const clientTasks = mysqlTable("client_tasks", {
 
 	createdBy: int().notNull(),
 	createdAt: timestamp({ mode: 'string' }).default(sql`(now())`).notNull(),
+	deletedAt: timestamp({ mode: 'string' }),
 },
 (table) => [
 	primaryKey({ columns: [table.id], name: "client_tasks_id"}),
@@ -514,6 +516,7 @@ export const clientObjectives = mysqlTable("client_objectives", {
 	title: varchar({ length: 255 }).notNull(),
 	status: mysqlEnum(['OnTrack','AtRisk','OffTrack']).default('OnTrack'),
 	createdAt: timestamp({ mode: 'string' }).default(sql`(now())`).notNull(),
+	deletedAt: timestamp({ mode: 'string' }),
 },
 (table) => [
 	primaryKey({ columns: [table.id], name: "client_objectives_id"}),
@@ -546,6 +549,7 @@ export const deliverables = mysqlTable("deliverables", {
 	deliveredAt: timestamp({ mode: 'string' }),
 	assignedTo: int(),
 	createdAt: timestamp({ mode: 'string' }).default(sql`(now())`).notNull(),
+	deletedAt: timestamp({ mode: 'string' }),
 },
 (table) => [
 	primaryKey({ columns: [table.id], name: "deliverables_id"}),
@@ -564,6 +568,7 @@ export const upsellOpportunities = mysqlTable("upsell_opportunities", {
 
 	createdBy: int().notNull(),
 	createdAt: timestamp({ mode: 'string' }).default(sql`(now())`).notNull(),
+	deletedAt: timestamp({ mode: 'string' }),
 },
 (table) => [
 	primaryKey({ columns: [table.id], name: "upsell_opportunities_id"}),

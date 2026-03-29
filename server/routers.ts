@@ -182,6 +182,8 @@ import {
   getExchangeRates,
   upsertExchangeRate,
 } from "./db";
+
+import { softDeleteFollowUp, restoreFollowUp, softDeleteClientTask, restoreClientTask, softDeleteObjective, restoreObjective, softDeleteDeliverable, restoreDeliverable, softDeleteUpsell, restoreUpsell, softDeleteCommunication, restoreCommunication } from "./db";
 import { buildReportEmail } from "./emailReports";
 import { createLeadSourcesRouter } from "./leadSourcesRouter";
 import {

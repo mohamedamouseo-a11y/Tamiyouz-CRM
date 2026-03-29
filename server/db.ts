@@ -3570,6 +3570,80 @@ export async function updateClientCommunication(id: number, data: { channelName?
   const [row] = await db.select().from(clientCommunications).where(eq(clientCommunications.id, id)).limit(1);
   return row;
 }
+
+// ─── Soft Delete & Restore Functions ────────────────────────────────────
+export async function softDeleteFollowUp(id: number): Promise<any> {
+  const db = await getDb();
+  if (!db) return null;
+  const [existing] = await db.select().from(followUps).where(eq(followUps.id, id));
+  await db.update(followUps).set({ deletedAt: new Date() } as any).where(eq(followUps.id, id));
+  return existing;
+}
+export async function restoreFollowUp(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(followUps).set({ deletedAt: null } as any).where(eq(followUps.id, id));
+}
+export async function softDeleteClientTask(id: number): Promise<any> {
+  const db = await getDb();
+  if (!db) return null;
+  const [existing] = await db.select().from(clientTasks).where(eq(clientTasks.id, id));
+  await db.update(clientTasks).set({ deletedAt: new Date() } as any).where(eq(clientTasks.id, id));
+  return existing;
+}
+export async function restoreClientTask(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(clientTasks).set({ deletedAt: null } as any).where(eq(clientTasks.id, id));
+}
+export async function softDeleteObjective(id: number): Promise<any> {
+  const db = await getDb();
+  if (!db) return null;
+  const [existing] = await db.select().from(clientObjectives).where(eq(clientObjectives.id, id));
+  await db.update(clientObjectives).set({ deletedAt: new Date() } as any).where(eq(clientObjectives.id, id));
+  return existing;
+}
+export async function restoreObjective(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(clientObjectives).set({ deletedAt: null } as any).where(eq(clientObjectives.id, id));
+}
+export async function softDeleteDeliverable(id: number): Promise<any> {
+  const db = await getDb();
+  if (!db) return null;
+  const [existing] = await db.select().from(deliverables).where(eq(deliverables.id, id));
+  await db.update(deliverables).set({ deletedAt: new Date() } as any).where(eq(deliverables.id, id));
+  return existing;
+}
+export async function restoreDeliverable(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(deliverables).set({ deletedAt: null } as any).where(eq(deliverables.id, id));
+}
+export async function softDeleteUpsell(id: number): Promise<any> {
+  const db = await getDb();
+  if (!db) return null;
+  const [existing] = await db.select().from(upsellOpportunities).where(eq(upsellOpportunities.id, id));
+  await db.update(upsellOpportunities).set({ deletedAt: new Date() } as any).where(eq(upsellOpportunities.id, id));
+  return existing;
+}
+export async function restoreUpsell(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(upsellOpportunities).set({ deletedAt: null } as any).where(eq(upsellOpportunities.id, id));
+}
+export async function softDeleteCommunication(id: number): Promise<any> {
+  const db = await getDb();
+  if (!db) return null;
+  const [existing] = await db.select().from(clientCommunications).where(eq(clientCommunications.id, id));
+  await db.update(clientCommunications).set({ deletedAt: new Date() } as any).where(eq(clientCommunications.id, id));
+  return existing;
+}
+export async function restoreCommunication(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(clientCommunications).set({ deletedAt: null } as any).where(eq(clientCommunications.id, id));
+}
 // ─── Phase 5: CSAT Surveys ─────────────────────────────────────────────────
 
 export async function submitCSAT(data: { clientId: number; contractId?: number | null; score: number; feedback?: string | null }) {
