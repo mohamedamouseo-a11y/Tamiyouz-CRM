@@ -17,6 +17,9 @@ import { useAuth } from "@/_core/hooks/useAuth";
  *
  * FIX: The getConfig query is now only enabled when the user is authenticated,
  * preventing UNAUTHORIZED errors on the login page that caused infinite reloads.
+ *
+ * FIX: The widget uses Shadow DOM, so hide/show now targets the shadow host
+ * element (a div with shadowRoot under document.body) instead of CSS selectors.
  */
 
 interface InnoCallContextType {
@@ -51,10 +54,17 @@ const InnoCallContext = createContext<InnoCallContextType>({
   toggleWidget: () => {},
 });
 
-const WIDGET_SELECTORS = '.innocalls-web-call, .innocalls-webrtc, [class*="innocall"], [id*="innocall"], [class*="InnoCall"], [id*="InnoCall"]';
+/**
+ * Find the InnoCall shadow host element.
+ * The InnoCall widget injects a <div> with a shadowRoot directly under <body>.
+ */
+function findShadowHost(): HTMLElement | null {
+  const children = Array.from(document.body.children) as HTMLElement[];
+  return children.find((el) => el.shadowRoot != null) || null;
+}
 
 /**
- * Makes an InnoCall widget element draggable via mouse/touch.
+ * Makes the shadow host element draggable via mouse/touch.
  */
 function makeDraggable(el: HTMLElement) {
   if (el.dataset.draggable === "true") return;
@@ -72,10 +82,12 @@ function makeDraggable(el: HTMLElement) {
   }
 
   const rect = el.getBoundingClientRect();
-  el.style.left = rect.left + "px";
-  el.style.top = rect.top + "px";
-  el.style.right = "auto";
-  el.style.bottom = "auto";
+  if (rect.width > 0 && rect.height > 0) {
+    el.style.left = rect.left + "px";
+    el.style.top = rect.top + "px";
+    el.style.right = "auto";
+    el.style.bottom = "auto";
+  }
   el.style.cursor = "move";
   el.style.zIndex = "999999";
   el.style.userSelect = "none";
@@ -133,76 +145,52 @@ function makeDraggable(el: HTMLElement) {
     document.removeEventListener("mouseup", onMouseUp);
     document.removeEventListener("touchend", onMouseUp);
   };
+
+  console.log("[InnoCall] Shadow host made draggable");
 }
 
 /**
- * Observe the DOM for InnoCall widget elements and make them draggable.
+ * Observe for the shadow host to appear and make it draggable.
  */
 function observeAndMakeDraggable(): MutationObserver {
-  const selectors = [
-    '.innocalls-web-call',
-    '.innocalls-webrtc',
-    '[class*="innocall"]',
-    '[id*="innocall"]',
-    '[class*="InnoCall"]',
-    '[id*="InnoCall"]',
-  ];
-
-  const checkExisting = () => {
-    selectors.forEach((sel) => {
-      document.querySelectorAll(sel).forEach((el) => {
-        if (el instanceof HTMLElement) {
-          makeDraggable(el);
-        }
-      });
-    });
+  const tryAttach = () => {
+    const host = findShadowHost();
+    if (host) {
+      makeDraggable(host);
+    }
   };
 
-  checkExisting();
+  // Try immediately
+  tryAttach();
 
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      if (mutation.type === "childList") {
-        mutation.addedNodes.forEach((node) => {
-          if (node instanceof HTMLElement) {
-            selectors.forEach((sel) => {
-              if (node.matches?.(sel)) {
-                makeDraggable(node);
-              }
-              node.querySelectorAll?.(sel)?.forEach((child) => {
-                if (child instanceof HTMLElement) {
-                  makeDraggable(child);
-                }
-              });
-            });
-          }
-        });
-      }
-    }
+  const observer = new MutationObserver(() => {
+    tryAttach();
   });
 
   observer.observe(document.body, {
     childList: true,
-    subtree: true,
+    subtree: false,
   });
 
   return observer;
 }
 
-/** Hide all InnoCall widget elements */
+/** Hide the InnoCall widget by hiding the shadow host element */
 function hideWidgetElements() {
-  document.querySelectorAll<HTMLElement>(WIDGET_SELECTORS).forEach((el) => {
-    el.style.display = "none";
-  });
-  console.log("[InnoCall] Widget hidden");
+  const host = findShadowHost();
+  if (host) {
+    host.style.display = "none";
+    console.log("[InnoCall] Widget hidden (shadow host)");
+  }
 }
 
-/** Show all InnoCall widget elements */
+/** Show the InnoCall widget by showing the shadow host element */
 function showWidgetElements() {
-  document.querySelectorAll<HTMLElement>(WIDGET_SELECTORS).forEach((el) => {
-    el.style.display = "";
-  });
-  console.log("[InnoCall] Widget shown");
+  const host = findShadowHost();
+  if (host) {
+    host.style.display = "";
+    console.log("[InnoCall] Widget shown (shadow host)");
+  }
 }
 
 export function InnoCallProvider({ children }: { children: ReactNode }) {
@@ -236,13 +224,14 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
 
   /** Completely remove the widget and script */
   const removeWidget = useCallback(() => {
-    const widgets = document.querySelectorAll(WIDGET_SELECTORS);
-    widgets.forEach((el) => {
-      if ((el as any).__dragCleanup) {
-        (el as any).__dragCleanup();
+    // Remove the shadow host
+    const host = findShadowHost();
+    if (host) {
+      if ((host as any).__dragCleanup) {
+        (host as any).__dragCleanup();
       }
-      el.remove();
-    });
+      host.remove();
+    }
 
     if (observerRef.current) {
       observerRef.current.disconnect();
@@ -323,7 +312,7 @@ export function InnoCallProvider({ children }: { children: ReactNode }) {
   );
 
   /**
-   * startCall: 
+   * startCall:
    * - First click: loads the script and shows the widget
    * - Subsequent clicks: toggles widget visibility (hide/show)
    * - Always copies the phone number to clipboard
