@@ -4209,3 +4209,26 @@ export async function upsertExchangeRate(fromCurrency: string, toCurrency: strin
     ON DUPLICATE KEY UPDATE rate = VALUES(rate), updatedAt = CURRENT_TIMESTAMP
   `);
 }
+
+// ─── Dynamic Campaign Names (union of all sources) ────────────────────────────
+export async function getDistinctCampaignNames(): Promise<string[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.execute(sql`
+    SELECT DISTINCT name AS campaignName FROM (
+      -- 1) Campaigns table
+      SELECT name FROM campaigns WHERE deletedAt IS NULL AND name IS NOT NULL AND name != ''
+      UNION
+      -- 2) Lead campaignName
+      SELECT campaignName AS name FROM leads WHERE deletedAt IS NULL AND campaignName IS NOT NULL AND campaignName != ''
+      UNION
+      -- 3) Meta campaign snapshots
+      SELECT campaignName AS name FROM meta_campaign_snapshots WHERE campaignName IS NOT NULL AND campaignName != ''
+      UNION
+      -- 4) TikTok campaign snapshots
+      SELECT campaign_name AS name FROM tiktok_campaign_snapshots WHERE campaign_name IS NOT NULL AND campaign_name != ''
+    ) AS all_campaigns
+    ORDER BY campaignName
+  `);
+  return (rows as any[]).map((r: any) => r.campaignName);
+}
