@@ -1409,20 +1409,19 @@ export default function LeadProfile() {
               </Card>
             </div>
 
-            <div className="space-y-4 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin overflow-hidden">
-              <Collapsible open={dealOpen} onOpenChange={setDealOpen}>
-                <Card className="rounded-2xl border-border/70 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <CardTitle className="text-sm font-semibold">{t("dealInfo")}</CardTitle>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
-                          <ChevronDown className={`h-4 w-4 transition-transform ${dealOpen ? "rotate-180" : ""}`} />
-                        </Button>
-                      </CollapsibleTrigger>
-                    </div>
+            <div className="lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] overflow-hidden">
+              <Card className="rounded-2xl border-border/70 shadow-sm h-full flex flex-col">
+                <Tabs defaultValue="deals" className="w-full flex flex-col h-full">
+                  <CardHeader className="pb-2 pt-3 shrink-0">
+                    <TabsList className="w-full">
+                      <TabsTrigger value="deals" className="flex-1 text-xs gap-1"><CreditCard size={12} />{t("dealInfo")}</TabsTrigger>
+                      <TabsTrigger value="reminders" className="flex-1 text-xs gap-1"><CalendarClock size={12} />{isRTL ? "تذكيرات" : "Reminders"}</TabsTrigger>
+                      <TabsTrigger value="history" className="flex-1 text-xs gap-1"><ArrowRightLeft size={12} />{isRTL ? "سجل" : "History"}</TabsTrigger>
+                    </TabsList>
                   </CardHeader>
-                  <CollapsibleContent>
+
+                  {/* ── Tab 1: Deals + Team ── */}
+                  <TabsContent value="deals" className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
                     <CardContent className="space-y-4">
                       {!deal ? (
                         <EmptyState
@@ -1525,27 +1524,13 @@ export default function LeadProfile() {
                         </div>
                       )}
                     </CardContent>
-                  </CollapsibleContent>
-                </Card>
-              </Collapsible>
 
-              <Collapsible open={teamOpen} onOpenChange={setTeamOpen}>
-                <Card className="rounded-2xl border-border/70 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        <Users size={16} className="text-purple-600" />
-                        {isRTL ? "الفريق والمتعاونون" : "Team & collaborators"}
-                      </CardTitle>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
-                          <ChevronDown className={`h-4 w-4 transition-transform ${teamOpen ? "rotate-180" : ""}`} />
-                        </Button>
-                      </CollapsibleTrigger>
-                    </div>
-                  </CardHeader>
-                  <CollapsibleContent>
-                    <CardContent className="space-y-3">
+                    {/* ── Team section inside Tab 1 ── */}
+                    <CardContent className="border-t border-border/60 pt-4 space-y-3">
+                      <h4 className="text-xs font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+                        <Users size={14} className="text-purple-600" />
+                        {isRTL ? "الفريق والمتعاونون" : "Team & Collaborators"}
+                      </h4>
                       {(leadAssignments as any[])?.length ? (
                         <div className="space-y-2">
                           {(leadAssignments as any[])?.map((a: any) => {
@@ -1598,50 +1583,20 @@ export default function LeadProfile() {
                         />
                       )}
                     </CardContent>
-                  </CollapsibleContent>
-                </Card>
-              </Collapsible>
+                  </TabsContent>
 
-              <Collapsible open={remindersOpen} onOpenChange={setRemindersOpen}>
-                <Card className="rounded-2xl border-border/70 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        <CalendarClock size={16} className="text-orange-600" />
-                        {isRTL ? "التذكيرات" : "Reminders"}
-                      </CardTitle>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
-                          <ChevronDown className={`h-4 w-4 transition-transform ${remindersOpen ? "rotate-180" : ""}`} />
-                        </Button>
-                      </CollapsibleTrigger>
-                    </div>
-                  </CardHeader>
-                  <CollapsibleContent>
-                    <CardContent>
+                  {/* ── Tab 2: Reminders + Attachments ── */}
+                  <TabsContent value="reminders" className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
+                    <CardContent className="space-y-4">
                       <LeadReminders leadId={leadId} />
                     </CardContent>
-                  </CollapsibleContent>
-                </Card>
-              </Collapsible>
 
-              <Collapsible open={attachmentsOpen} onOpenChange={setAttachmentsOpen}>
-                <Card className="rounded-2xl border-border/70 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        <Paperclip size={16} />
+                    {/* ── Attachments section inside Tab 2 ── */}
+                    <CardContent className="border-t border-border/60 pt-4 space-y-4">
+                      <h4 className="text-xs font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+                        <Paperclip size={14} />
                         {t("attachments" as any)}
-                      </CardTitle>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
-                          <ChevronDown className={`h-4 w-4 transition-transform ${attachmentsOpen ? "rotate-180" : ""}`} />
-                        </Button>
-                      </CollapsibleTrigger>
-                    </div>
-                  </CardHeader>
-                  <CollapsibleContent>
-                    <CardContent className="space-y-4">
+                      </h4>
                       {canEdit && (
                         <form onSubmit={attachmentHandleSubmit(onAddAttachment)} className="space-y-3 rounded-2xl border border-dashed border-border/70 p-3">
                           <div>
@@ -1755,27 +1710,11 @@ export default function LeadProfile() {
                         </div>
                       )}
                     </CardContent>
-                  </CollapsibleContent>
-                </Card>
-              </Collapsible>
+                  </TabsContent>
 
-              <Collapsible open={transfersOpen} onOpenChange={setTransfersOpen}>
-                <Card className="rounded-2xl border-border/70 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        <ArrowRightLeft size={16} />
-                        {t("transferHistory" as any)}
-                      </CardTitle>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
-                          <ChevronDown className={`h-4 w-4 transition-transform ${transfersOpen ? "rotate-180" : ""}`} />
-                        </Button>
-                      </CollapsibleTrigger>
-                    </div>
-                  </CardHeader>
-                  <CollapsibleContent>
-                    <CardContent>
+                  {/* ── Tab 3: Transfer History ── */}
+                  <TabsContent value="history" className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
+                    <CardContent className="space-y-3">
                       {!(transfers as any)?.length ? (
                         <EmptyState
                           icon={ArrowRightLeft}
@@ -1802,9 +1741,9 @@ export default function LeadProfile() {
                         </div>
                       )}
                     </CardContent>
-                  </CollapsibleContent>
-                </Card>
-              </Collapsible>
+                  </TabsContent>
+                </Tabs>
+              </Card>
             </div>
           </div>
         </div>
