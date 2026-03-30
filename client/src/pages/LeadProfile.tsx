@@ -13,34 +13,42 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useThemeTokens } from "@/contexts/ThemeTokenContext";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { differenceInDays, differenceInHours, format } from "date-fns";
+import { differenceInDays, differenceInHours, format, isToday, isYesterday } from "date-fns";
 import {
+  Activity,
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
   ArrowRightLeft,
+  CalendarClock,
   CheckCircle,
+  ChevronDown,
   Clock,
   Copy,
+  CreditCard,
   Download,
   Edit,
+  ExternalLink,
   FileSpreadsheet,
   FileText,
+  FolderOpen,
   Image as ImageIcon,
   Link2,
   Loader2,
+  Mail,
   MessageCircle,
   MessageSquare,
   Paperclip,
@@ -48,14 +56,11 @@ import {
   Plus,
   Save,
   Send,
+  ShieldAlert,
   Trash2,
   UserPlus,
   Users,
-  Eye,
   XCircle,
-  Activity,
-  ExternalLink,
-  CreditCard,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -68,14 +73,14 @@ const OUTCOMES = ["Contacted", "NoAnswer", "Interested", "NotInterested", "Meeti
 const STAGES_FALLBACK = ["Contacted Us", "Contacted", "Leads", "Meeting Scheduled", "Proposal Delivered", "Won", "Contact Again", "Lost"];
 const DEAL_TYPES = ["New", "Contract", "Renewal", "Upsell"];
 
-const activityIcons: Record<string, string> = {
-  WhatsApp: "💬",
-  Call: "📞",
-  SMS: "📱",
-  Meeting: "🤝",
-  Offer: "📄",
-  Email: "📧",
-  Note: "📝",
+const activityIconMap: Record<string, any> = {
+  WhatsApp: MessageCircle,
+  Call: Phone,
+  SMS: MessageSquare,
+  Meeting: Users,
+  Offer: FileText,
+  Email: Mail,
+  Note: FileText,
 };
 
 const outcomeColors: Record<string, string> = {
@@ -112,12 +117,12 @@ const fitStatusScore: Record<string, number> = {
   Pending: 0,
 };
 
-const fitStatusConfig: Record<string, { label: string; icon: string; color: string; bg: string }> = {
-  Fit: { label: "Fit", icon: "✅", color: "text-green-700", bg: "bg-green-50 border-green-200" },
-  "Not Fit": { label: "Not Fit", icon: "❌", color: "text-red-700", bg: "bg-red-50 border-red-200" },
-  Pending: { label: "Pending", icon: "⏳", color: "text-yellow-700", bg: "bg-yellow-50 border-yellow-200" },
+const fitStatusConfig: Record<string, { label: string; labelAr: string; color: string; bg: string; icon: any }> = {
+  Fit: { label: "Fit", labelAr: "مناسب", color: "text-green-700", bg: "bg-green-50 border-green-200", icon: CheckCircle },
+  "Not Fit": { label: "Not Fit", labelAr: "غير مناسب", color: "text-red-700", bg: "bg-red-50 border-red-200", icon: XCircle },
+  Pending: { label: "Pending", labelAr: "قيد المراجعة", color: "text-yellow-700", bg: "bg-yellow-50 border-yellow-200", icon: Clock },
 };
-// ── Lead Classification: Lead → Prospect → Opportunity ──
+
 type ClassificationType = "Lead" | "Prospect" | "Opportunity";
 interface ClassificationConfig {
   label: string;
@@ -125,12 +130,11 @@ interface ClassificationConfig {
   color: string;
   bg: string;
   border: string;
-  icon: string;
 }
 const classificationConfig: Record<ClassificationType, ClassificationConfig> = {
-  Lead: { label: "Lead", labelAr: "عميل محتمل", color: "#3b82f6", bg: "bg-blue-50", border: "border-blue-300", icon: "🔵" },
-  Prospect: { label: "Prospect", labelAr: "عميل مهتم", color: "#f59e0b", bg: "bg-amber-50", border: "border-amber-300", icon: "🟡" },
-  Opportunity: { label: "Opportunity", labelAr: "فرصة بيع", color: "#22c55e", bg: "bg-green-50", border: "border-green-300", icon: "🟢" },
+  Lead: { label: "Lead", labelAr: "عميل محتمل", color: "#3b82f6", bg: "bg-blue-50", border: "border-blue-300" },
+  Prospect: { label: "Prospect", labelAr: "عميل مهتم", color: "#f59e0b", bg: "bg-amber-50", border: "border-amber-300" },
+  Opportunity: { label: "Opportunity", labelAr: "فرصة بيع", color: "#22c55e", bg: "bg-green-50", border: "border-green-300" },
 };
 
 function getLeadClassification(
@@ -145,7 +149,6 @@ function getLeadClassification(
   const q = leadQuality ?? "Unknown";
   const fs = fitStatus ?? "Pending";
 
-  // Check Opportunity first (highest priority)
   let oppScore = 0;
   if (["Proposal Delivered", "Won"].includes(stage)) oppScore++;
   if (hasDeal) oppScore++;
@@ -154,7 +157,6 @@ function getLeadClassification(
   if (priceOfferSent) oppScore++;
   if (oppScore >= 2) return "Opportunity";
 
-  // Check Prospect
   let prospScore = 0;
   if (["Leads", "Meeting Scheduled"].includes(stage)) prospScore++;
   if (activitiesCount >= 2) prospScore++;
@@ -163,10 +165,8 @@ function getLeadClassification(
   if (lastContactDays !== null && lastContactDays <= 7) prospScore++;
   if (prospScore >= 2) return "Prospect";
 
-  // Default: Lead
   return "Lead";
 }
-
 
 function toDate(value?: string | Date | null) {
   if (!value) return null;
@@ -183,14 +183,10 @@ function relativeTimeLabel(date: Date | null, t: (key: any) => string, isRTL: bo
   if (hours < 1) return t("justNow");
 
   if (days >= 1) {
-    return isRTL
-      ? `${days} ${t(days === 1 ? "day" : "days")}`
-      : `${days} ${t(days === 1 ? "day" : "days")}`;
+    return isRTL ? `${days} ${t(days === 1 ? "day" : "days")}` : `${days} ${t(days === 1 ? "day" : "days")}`;
   }
 
-  return isRTL
-    ? `${hours} ${t(hours === 1 ? "hour" : "hours")}`
-    : `${hours} ${t(hours === 1 ? "hour" : "hours")}`;
+  return isRTL ? `${hours} ${t(hours === 1 ? "hour" : "hours")}` : `${hours} ${t(hours === 1 ? "hour" : "hours")}`;
 }
 
 function normalizePhone(phone?: string | null) {
@@ -220,14 +216,10 @@ function getSlaState(progress: number) {
 function getAttachmentMeta(fileName?: string | null, fileType?: string | null, fileUrl?: string | null, t?: (key: any) => string) {
   const source = `${fileType ?? ""} ${fileName ?? ""} ${fileUrl ?? ""}`.toLowerCase();
 
-  if (source.includes("pdf")) {
-    return { icon: FileText, label: t ? t("fileTypePdf") : "PDF" };
-  }
-
+  if (source.includes("pdf")) return { icon: FileText, label: t ? t("fileTypePdf") : "PDF" };
   if (source.includes("xls") || source.includes("xlsx") || source.includes("sheet") || source.includes("csv")) {
     return { icon: FileSpreadsheet, label: t ? t("fileTypeExcel") : "Excel" };
   }
-
   if (["png", "jpg", "jpeg", "gif", "webp", "image"].some((token) => source.includes(token))) {
     return { icon: ImageIcon, label: t ? t("fileTypeImage") : "Image" };
   }
@@ -259,11 +251,21 @@ function getStageState(stage: string, currentStage: string, stageNames: string[]
 
   const currentIndex = stageNames.indexOf(currentStage);
   const stageIndex = stageNames.indexOf(stage);
-  // Handle stages not in the list
   if (currentIndex === -1) return stage === currentStage ? "current" : "upcoming";
   if (stageIndex < currentIndex) return "completed";
   if (stageIndex === currentIndex) return "current";
   return "upcoming";
+}
+
+function isProbablyUrl(value?: string | null) {
+  if (!value) return false;
+  return /^https?:\/\//i.test(value) || /^www\./i.test(value);
+}
+
+function formatFeedDateLabel(date: Date, isRTL: boolean) {
+  if (isToday(date)) return isRTL ? "اليوم" : "Today";
+  if (isYesterday(date)) return isRTL ? "أمس" : "Yesterday";
+  return format(date, "dd/MM/yyyy");
 }
 
 function LeadScoreRing({ score, t }: { score: number; t: (key: any) => string }) {
@@ -273,7 +275,7 @@ function LeadScoreRing({ score, t }: { score: number; t: (key: any) => string })
   const color = getScoreColor(score);
 
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-2.5 py-1.5">
+    <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-2.5 py-1.5 shadow-sm">
       <div className="relative h-11 w-11">
         <svg className="h-11 w-11 -rotate-90" viewBox="0 0 44 44">
           <circle cx="22" cy="22" r={radius} fill="none" stroke="#e5e7eb" strokeWidth="4" />
@@ -313,19 +315,28 @@ export default function LeadProfile() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
   const [assignRole, setAssignRole] = useState<string>("collaborator");
+  const [assignUserId, setAssignUserId] = useState<number>(0);
+  const [assignReason, setAssignReason] = useState("");
+  const [assignNotes, setAssignNotes] = useState("");
   const [noteText, setNoteText] = useState("");
   const [tamaraLoading, setTamaraLoading] = useState(false);
   const [sendViaTamara, setSendViaTamara] = useState(false);
   const [paymobLoading, setPaymobLoading] = useState(false);
+
+  const [composerMode, setComposerMode] = useState<"note" | "activity">("note");
+  const [dealOpen, setDealOpen] = useState(true);
+  const [teamOpen, setTeamOpen] = useState(true);
+  const [remindersOpen, setRemindersOpen] = useState(true);
+  const [attachmentsOpen, setAttachmentsOpen] = useState(true);
+  const [transfersOpen, setTransfersOpen] = useState(false);
 
   const { data: lead, isLoading, refetch } = trpc.leads.byId.useQuery({ id: leadId }, { enabled: Number.isFinite(leadId) });
   const { data: activities, refetch: refetchActivities } = trpc.activities.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const { data: deal, refetch: refetchDeal } = trpc.deals.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const { data: stages } = trpc.pipeline.list.useQuery();
   const { data: campaigns } = trpc.campaigns.list.useQuery();
-  const { data: users } = trpc.users.list.useQuery(undefined, {
-    enabled: ["Admin", "SalesManager", "admin"].includes(user?.role ?? ""),
-  });
+  const { data: allUsers } = trpc.users.list.useQuery();
+  const users = ["Admin", "SalesManager", "admin"].includes(user?.role ?? "") ? allUsers : undefined;
   const { data: internalNotes, refetch: refetchNotes } = trpc.notes.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const { data: transfers, refetch: refetchTransfers } = trpc.transfers.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const { data: attachments, refetch: refetchAttachments } = trpc.attachments.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
@@ -335,10 +346,8 @@ export default function LeadProfile() {
   const { data: paymobStatus } = trpc.paymob.isEnabled.useQuery();
   const { data: slaConfig } = trpc.sla.get.useQuery();
 
-  const { data: allUsers } = trpc.users.list.useQuery(undefined, { enabled: true });
-
   const [, navigate] = useLocation();
-  const { startCall: innocallStartCall, isReady: innocallReady, isEnabled: innocallEnabled, isLoading: innocallLoading } = useInnoCall();
+  const { startCall: innocallStartCall, isEnabled: innocallEnabled } = useInnoCall();
 
   const updateLead = trpc.leads.update.useMutation({
     onSuccess: () => {
@@ -380,7 +389,6 @@ export default function LeadProfile() {
       setShowDeal(false);
       refetchDeal();
       dealReset();
-      // Auto-trigger Tamara checkout if user toggled sendViaTamara
       if (sendViaTamara && tamaraStatus?.enabled && newDeal?.id) {
         setTamaraLoading(true);
         tamaraCheckout.mutate({ dealId: newDeal.id });
@@ -479,10 +487,14 @@ export default function LeadProfile() {
     onSuccess: () => {
       toast.success(isRTL ? "تم تعيين المتعاون بنجاح" : "Collaborator assigned successfully");
       setShowAssign(false);
+      setAssignUserId(0);
+      setAssignReason("");
+      setAssignNotes("");
       refetchAssignments();
     },
     onError: (e) => toast.error(e.message),
   });
+
   const removeAssignment = trpc.assignments.remove.useMutation({
     onSuccess: () => {
       toast.success(isRTL ? "تم إزالة التعيين" : "Assignment removed");
@@ -490,6 +502,7 @@ export default function LeadProfile() {
     },
     onError: (e) => toast.error(e.message),
   });
+
   const createAttachment = trpc.attachments.create.useMutation({
     onSuccess: () => {
       toast.success(t("addAttachmentSuccess" as any));
@@ -522,6 +535,7 @@ export default function LeadProfile() {
           notes: lead.notes ?? "",
           mediaBuyerNotes: lead.mediaBuyerNotes ?? "",
           serviceIntroduced: lead.serviceIntroduced ?? "",
+          fitStatus: (lead as any).fitStatus ?? "Pending",
         }
       : undefined,
   });
@@ -531,7 +545,7 @@ export default function LeadProfile() {
   });
 
   const { register: dealRegister, handleSubmit: dealHandleSubmit, reset: dealReset, setValue: dealSetValue } = useForm({
-    defaultValues: { valueSar: "", status: "Pending" as const, dealType: "New" as const, lossReason: "", notes: "" },
+    defaultValues: { valueSar: "", status: "Pending" as const, dealType: "New" as const, lossReason: "", notes: "", currency: "SAR" as string },
   });
 
   const { register: transferRegister, handleSubmit: transferHandleSubmit, reset: transferReset, setValue: transferSetValue } = useForm({
@@ -619,6 +633,26 @@ export default function LeadProfile() {
       .sort((a, b) => (b.activityDate?.getTime() ?? 0) - (a.activityDate?.getTime() ?? 0))[0] ?? null;
   }, [activities]);
 
+  const feedItems = useMemo(() => {
+    const activityItems = (activities ?? []).map((activity: any) => ({
+      id: `activity-${activity.id}`,
+      itemId: activity.id,
+      kind: "activity" as const,
+      date: toDate(activity.activityTime ?? activity.createdAt) ?? new Date(),
+      data: activity,
+    }));
+
+    const noteItems = ((internalNotes as any[]) ?? []).map((note: any) => ({
+      id: `note-${note.id}`,
+      itemId: note.id,
+      kind: "note" as const,
+      date: toDate(note.createdAt) ?? new Date(),
+      data: note,
+    }));
+
+    return [...activityItems, ...noteItems].sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [activities, internalNotes]);
+
   const lastActivityDate = lastActivity?.activityDate ?? null;
   const leadCreatedAt = toDate(lead?.createdAt) ?? new Date();
   const daysSinceLastContact = lastActivityDate ? differenceInDays(new Date(), lastActivityDate) : differenceInDays(new Date(), leadCreatedAt);
@@ -640,7 +674,10 @@ export default function LeadProfile() {
   const slaProgressValue = slaEnabled && slaThresholdHours > 0 ? Math.min(100, (slaElapsedHours / slaThresholdHours) * 100) : 0;
   const slaStatus = getSlaState(slaProgressValue);
   const isSlaBreached = slaEnabled && (Boolean(lead?.slaBreached) || slaElapsedHours > slaThresholdHours);
-  const pendingDealNeedsAttention = Boolean(deal?.status === "Pending" && differenceInDays(new Date(), toDate((deal as any)?.updatedAt) ?? toDate((deal as any)?.createdAt) ?? new Date()) >= 3);
+  const pendingDealNeedsAttention = Boolean(
+    deal?.status === "Pending" &&
+      differenceInDays(new Date(), toDate((deal as any)?.updatedAt) ?? toDate((deal as any)?.createdAt) ?? new Date()) >= 3
+  );
   const phoneDigits = normalizePhone(lead?.phone);
   const whatsappUrl = phoneDigits ? `https://wa.me/${phoneDigits}` : "";
 
@@ -684,7 +721,7 @@ export default function LeadProfile() {
     !lead?.ownerId
       ? {
           key: "owner",
-          icon: MessageSquare,
+          icon: ShieldAlert,
           title: t("owner"),
           description: t("unassignedLeadAlert" as any),
           className: "border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-100",
@@ -700,6 +737,11 @@ export default function LeadProfile() {
         }
       : null,
   ].filter(Boolean) as Array<{ key: string; icon: any; title: string; description: string; className: string }>;
+
+  const stageList = useMemo(
+    () => stages ?? STAGES_FALLBACK.map((stageName) => ({ name: stageName, nameAr: stageName })),
+    [stages]
+  );
 
   if (isLoading) {
     return (
@@ -722,922 +764,1051 @@ export default function LeadProfile() {
   const transferableAgents = (allUsers ?? []).filter(
     (u: any) => u.id !== user?.id && u.isActive && ["SalesAgent", "SalesManager", "Admin"].includes(u.role)
   );
+  const fitConfig = fitStatusConfig[(lead as any)?.fitStatus ?? "Pending"] ?? fitStatusConfig.Pending;
+  const FitIcon = fitConfig.icon;
 
   return (
     <CRMLayout>
-      <div className="p-6 space-y-6 fade-in" dir={isRTL ? "rtl" : "ltr"}>
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/leads">{t("leads")}</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{lead.name ?? lead.phone}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+      <div className="min-h-screen p-4 md:p-6" dir={isRTL ? "rtl" : "ltr"}>
+        <div className="mx-auto max-w-[1800px] space-y-4">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/leads">{t("leads")}</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{lead.name ?? lead.phone}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
 
-        {smartAlerts.length > 0 && (
-          <div className="space-y-3">
-            {smartAlerts.map((alert) => {
-              const AlertIcon = alert.icon;
-              return (
-                <Alert key={alert.key} className={alert.className}>
-                  <AlertTitle className="flex items-center gap-2">
-                    <AlertIcon size={16} />
-                    {alert.title}
-                  </AlertTitle>
-                  <AlertDescription>{alert.description}</AlertDescription>
-                </Alert>
-              );
-            })}
-          </div>
-        )}
+          {smartAlerts.length > 0 && (
+            <div className="space-y-3">
+              {smartAlerts.map((alert) => {
+                const AlertIcon = alert.icon;
+                return (
+                  <Alert key={alert.key} className={alert.className}>
+                    <AlertTitle className="flex items-center gap-2">
+                      <AlertIcon size={16} />
+                      {alert.title}
+                    </AlertTitle>
+                    <AlertDescription>{alert.description}</AlertDescription>
+                  </Alert>
+                );
+              })}
+            </div>
+          )}
 
-        <Card className="overflow-hidden border-0 shadow-sm">
-          <div className="h-1" style={{ background: `linear-gradient(90deg, ${classConfig.color}, ${stageColor[lead.stage] ?? tokens.primaryColor})` }} />
-          <CardContent className="p-5 md:p-6 space-y-5">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div className="space-y-4 flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Link href="/leads">
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <BackIcon size={16} />
-                    </Button>
-                  </Link>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h1 className="text-2xl font-bold text-foreground truncate">{lead.name ?? lead.phone}</h1>
-                      <LeadQualityBadge quality={lead.leadQuality} />
-                      <span
-                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium text-white"
-                        style={{ background: stageColor[lead.stage] ?? tokens.primaryColor }}
-                      >
-                        {t(lead.stage as any)}
-                      </span>
-                      {isSlaBreached && (
-                        <Badge variant="destructive" className="gap-1">
-                          <AlertTriangle size={11} /> SLA
-                        </Badge>
-                      )}
-                      {lead.isDuplicate && (
-                        <Badge variant="outline" className="gap-1">
-                          <Copy size={11} /> {t("duplicate")}
-                        </Badge>
-                      )}
-                      <LeadScoreRing score={leadScore} t={t} />
-                      {(() => {
-                        const fs = (lead as any)?.fitStatus ?? "Pending";
-                        const cfg = fitStatusConfig[fs] ?? fitStatusConfig.Pending;
-                        return (
-                          <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm font-medium ${cfg.bg} ${cfg.color}`}>
-                            <span>{cfg.icon}</span>
-                            <span>{t(fs as any) || fs}</span>
-                          </span>
-                        );
-                      })()}
-                      {/* Lead Classification Badge - text only */}
-                      <span className="text-sm font-bold" style={{ color: classConfig.color }}>
-                        {isRTL ? classConfig.labelAr : classConfig.label}
-                      </span>
-                    </div>
-
-                    <p className="text-muted-foreground text-sm mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span>
-                        {t("createdAt")}: {format(new Date(lead.createdAt), "dd/MM/yyyy HH:mm")}
-                      </span>
-                      {lead.leadTime && (
-                        <span>
-                          {t("leadTime")}: {format(new Date(lead.leadTime), "dd/MM/yyyy HH:mm")}
-                        </span>
-                      )}
-                      <span>
-                        {t("lastContact" as any)}: {lastActivityDate ? `${t("sincePrefix" as any)} ${relativeTimeLabel(lastActivityDate, t, isRTL)}` : t("noContactYet" as any)}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/20 p-4">
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">SLA</p>
-                      <p className="text-sm font-medium" style={{ color: slaStatus.color }}>
-                        {t(slaStatus.labelKey as any)}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <Badge variant="outline">{t("slaProgress" as any)} {Math.round(slaProgressValue)}%</Badge>
-                      <Badge variant={isSlaBreached ? "destructive" : "outline"}>
-                        {isSlaBreached
-                          ? `${t("slaExceededSince" as any)} ${relativeTimeLabel(slaReferenceDate, t, isRTL)}`
-                          : `${slaElapsedHours}/${slaThresholdHours}h`}
-                      </Badge>
-                    </div>
-                  </div>
-                  <Progress value={slaProgressValue} className="h-2" />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 xl:items-end">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={() => whatsappUrl && window.open(whatsappUrl, "_blank", "noopener,noreferrer")}
-                    disabled={!whatsappUrl}
-                    title={t("whatsapp" as any)}
-                  >
-                    <MessageCircle size={16} />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={() => lead.phone && innocallStartCall(lead.phone)}
-                    disabled={!lead.phone || !innocallEnabled}
-                    title={t("Call" as any)}
-                  >
-                    <Phone size={16} />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={onCopyPhone}
-                    disabled={!lead.phone}
-                    title={t("copyPhone" as any)}
-                  >
-                    <Copy size={16} />
-                  </Button>
-                </div>
-
-                <div className="flex flex-wrap gap-2 xl:justify-end">
-                  {canEdit && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
-                        onClick={() => setShowTransfer(true)}
-                      >
-                        <ArrowRightLeft size={14} /> {isRTL ? "تسليم" : "Handover"}
+          <div className="sticky top-0 z-30 rounded-2xl border border-border/70 bg-background/90 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/75">
+            <div
+              className="h-1 rounded-t-2xl"
+              style={{ background: `linear-gradient(90deg, ${classConfig.color}, ${stageColor[lead.stage] ?? tokens.primaryColor})` }}
+            />
+            <div className="p-4 md:p-5">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Link href="/leads">
+                      <Button variant="ghost" size="icon" className="mt-0.5 h-9 w-9 shrink-0 rounded-xl">
+                        <BackIcon size={16} />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-purple-600 border-purple-200 hover:bg-purple-50"
-                        onClick={() => setShowAssign(true)}
-                      >
-                        <UserPlus size={14} /> {isRTL ? "تعيين متعاون" : "Assign"}
-                      </Button>
-                      {editMode ? (
-                        <>
-                          <Button variant="outline" size="sm" onClick={() => setEditMode(false)}>
-                            {t("cancel")}
+                    </Link>
+
+                    <div className="min-w-0 flex-1 space-y-3">
+                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h1 className="min-w-0 break-words text-2xl font-bold text-foreground md:text-3xl">{lead.name ?? lead.phone}</h1>
+                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${classConfig.bg} ${classConfig.border}`} style={{ color: classConfig.color }}>
+                              {isRTL ? classConfig.labelAr : classConfig.label}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-3 py-1 hover:bg-muted/70"
+                              onClick={onCopyPhone}
+                            >
+                              <Phone size={14} />
+                              <span dir="ltr" className="font-medium">{lead.phone || "—"}</span>
+                            </button>
+                            <span>
+                              {t("createdAt")}: {format(new Date(lead.createdAt), "dd/MM/yyyy HH:mm")}
+                            </span>
+                            {lead.leadTime && (
+                              <span>
+                                {t("leadTime")}: {format(new Date(lead.leadTime), "dd/MM/yyyy HH:mm")}
+                              </span>
+                            )}
+                            <span>
+                              {t("lastContact" as any)}:{" "}
+                              {lastActivityDate ? `${t("sincePrefix" as any)} ${relativeTimeLabel(lastActivityDate, t, isRTL)}` : t("noContactYet" as any)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                          <Button
+                            variant="outline"
+                            className="gap-2 rounded-xl"
+                            onClick={() => whatsappUrl && window.open(whatsappUrl, "_blank", "noopener,noreferrer")}
+                            disabled={!whatsappUrl}
+                          >
+                            <MessageCircle size={16} />
+                            {isRTL ? "واتساب" : "WhatsApp"}
                           </Button>
                           <Button
-                            size="sm"
-                            style={{ background: tokens.primaryColor }}
-                            className="text-white gap-1.5"
-                            onClick={handleSubmit(onSaveLead)}
-                            disabled={updateLead.isPending}
+                            variant="outline"
+                            className="gap-2 rounded-xl"
+                            onClick={() => lead.phone && innocallStartCall(lead.phone)}
+                            disabled={!lead.phone || !innocallEnabled}
                           >
-                            <Save size={14} /> {t("save")}
+                            <Phone size={16} />
+                            {isRTL ? "اتصال" : "Call"}
                           </Button>
-                        </>
-                      ) : (
-                        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditMode(true)}>
-                          <Edit size={14} /> {t("edit")}
-                        </Button>
-                      )}
-                    </>
-                  )}
-                  {(user?.role === "Admin" || user?.role === "admin") && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 text-destructive hover:bg-destructive hover:text-white"
-                      onClick={() => setShowDeleteConfirm(true)}
-                    >
-                      <Trash2 size={14} /> {isRTL ? "حذف" : "Delete"}
-                    </Button>
-                  )}
+                          {canEdit && (
+                            editMode ? (
+                              <>
+                                <Button variant="outline" className="rounded-xl" onClick={() => setEditMode(false)}>
+                                  {t("cancel")}
+                                </Button>
+                                <Button
+                                  className="gap-2 rounded-xl text-white"
+                                  style={{ background: tokens.primaryColor }}
+                                  onClick={handleSubmit(onSaveLead)}
+                                  disabled={updateLead.isPending}
+                                >
+                                  {updateLead.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                  {t("save")}
+                                </Button>
+                              </>
+                            ) : (
+                              <Button variant="outline" className="gap-2 rounded-xl" onClick={() => setEditMode(true)}>
+                                <Edit size={16} />
+                                {t("edit")}
+                              </Button>
+                            )
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-3 py-1.5">
+                            <span
+                              className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold text-white"
+                              style={{ background: stageColor[lead.stage] ?? tokens.primaryColor }}
+                            >
+                              {t(lead.stage as any)}
+                            </span>
+                            <LeadQualityBadge quality={lead.leadQuality} />
+                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${fitConfig.bg} ${fitConfig.color}`}>
+                              <FitIcon size={12} />
+                              {isRTL ? fitConfig.labelAr : fitConfig.label}
+                            </span>
+                            {lead.isDuplicate && (
+                              <Badge variant="outline" className="gap-1">
+                                <Copy size={11} />
+                                {t("duplicate")}
+                              </Badge>
+                            )}
+                            {isSlaBreached && (
+                              <Badge variant="destructive" className="gap-1">
+                                <AlertTriangle size={11} />
+                                SLA
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3">
+                          <LeadScoreRing score={leadScore} t={t} />
+                          <div className="min-w-[220px] rounded-2xl border border-border/60 bg-muted/20 p-3">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">SLA</p>
+                                <p className="text-sm font-medium" style={{ color: slaStatus.color }}>
+                                  {t(slaStatus.labelKey as any)}
+                                </p>
+                              </div>
+                              <div className="text-right text-xs text-muted-foreground">
+                                <p>{Math.round(slaProgressValue)}%</p>
+                                <p>{slaElapsedHours}/{slaThresholdHours}h</p>
+                              </div>
+                            </div>
+                            <Progress value={slaProgressValue} className="h-2" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {canEdit && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 rounded-xl text-blue-600 border-blue-200 hover:bg-blue-50"
+                              onClick={() => setShowTransfer(true)}
+                            >
+                              <ArrowRightLeft size={14} />
+                              {isRTL ? "تسليم" : "Handover"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 rounded-xl text-purple-600 border-purple-200 hover:bg-purple-50"
+                              onClick={() => setShowAssign(true)}
+                            >
+                              <UserPlus size={14} />
+                              {isRTL ? "تعيين متعاون" : "Assign"}
+                            </Button>
+                          </>
+                        )}
+                        {(user?.role === "Admin" || user?.role === "admin") && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 rounded-xl text-destructive hover:bg-destructive hover:text-white"
+                            onClick={() => setShowDeleteConfirm(true)}
+                          >
+                            <Trash2 size={14} />
+                            {isRTL ? "حذف" : "Delete"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-
-              {/* ─── Collaborators / Team ─── */}
-              {(leadAssignments as any[])?.length > 0 && (
-                <Card className="border-purple-200 bg-purple-50/30">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Users size={16} className="text-purple-600" />
-                      {isRTL ? "فريق العمل على هذا الـ Lead" : "Lead Team"}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex flex-wrap gap-2">
-                      {(leadAssignments as any[])?.map((a: any) => {
-                        const roleLabels: Record<string, string> = {
-                          owner: isRTL ? "المالك" : "Owner",
-                          collaborator: isRTL ? "متعاون" : "Collaborator",
-                          observer: isRTL ? "مراقب" : "Observer",
-                          client_success: "Client Success",
-                          account_manager: "Account Manager",
-                        };
-                        const roleColors: Record<string, string> = {
-                          owner: "bg-blue-100 text-blue-800 border-blue-300",
-                          collaborator: "bg-purple-100 text-purple-800 border-purple-300",
-                          observer: "bg-gray-100 text-gray-600 border-gray-300",
-                          client_success: "bg-amber-100 text-amber-800 border-amber-300",
-                          account_manager: "bg-green-100 text-green-800 border-green-300",
-                        };
-                        return (
-                          <div key={a.id} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${roleColors[a.role] ?? "bg-gray-100"}`}>
-                            {a.role === "observer" ? <Eye size={12} /> : <Users size={12} />}
-                            <span>{a.userName}</span>
-                            <Badge variant="outline" className="text-[10px] px-1 py-0">{roleLabels[a.role] ?? a.role}</Badge>
-                            {a.role !== "owner" && canEdit && (
-                              <button className="ml-1 text-red-400 hover:text-red-600" onClick={() => removeAssignment.mutate({ assignmentId: a.id })} title={isRTL ? "إزالة" : "Remove"}>
-                                <XCircle size={12} />
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-            <Tabs defaultValue="info" className="space-y-4">
-              <TabsList className="grid grid-cols-5 w-full md:w-auto md:inline-grid">
-                <TabsTrigger value="info">{t("infoTab" as any)}</TabsTrigger>
-                <TabsTrigger value="formData">{t("formDataTab" as any)}</TabsTrigger>
-                <TabsTrigger value="activities">{t("activitiesTab" as any)}</TabsTrigger>
-                <TabsTrigger value="notes">{t("notesTab" as any)}</TabsTrigger>
-                <TabsTrigger value="reminders">{t("remindersTab" as any)}</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="info" className="space-y-4">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-semibold">{t("stageJourney" as any)}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <div className="min-w-[720px] flex items-start justify-between gap-4">
-                        {(stages ?? STAGES_FALLBACK.map((s) => ({ name: s, nameAr: s }))).map((stageItem: any, index: number) => {
-                          const stage = stageItem.name ?? stageItem;
-                          const stageNames = (stages ?? STAGES_FALLBACK.map((s) => ({ name: s, nameAr: s }))).map((s: any) => s.name ?? s);
-                          const state = getStageState(stage, lead.stage, stageNames);
-                          const isCompleted = state === "completed";
-                          const isCurrent = state === "current";
-                          const color = isCompleted ? "#22c55e" : isCurrent ? stageColor[stage] ?? tokens.primaryColor : "#cbd5e1";
-                          const stageDate = stageTimelineDates[stage];
-
-                          return (
-                            <div key={stage} className="flex-1 min-w-[90px] text-center">
-                              <div className="flex items-center">
-                                <div className="h-[2px] flex-1" style={{ backgroundColor: index === 0 ? "transparent" : (isCompleted || isCurrent ? color : "#e5e7eb") }} />
-                                <div
-                                  className="mx-2 flex h-10 w-10 items-center justify-center rounded-full border-2 text-xs font-semibold text-white"
-                                  style={{ borderColor: color, backgroundColor: color }}
-                                >
-                                  {index + 1}
-                                </div>
-                                <div className="h-[2px] flex-1" style={{ backgroundColor: isCompleted ? color : "#e5e7eb" }} />
-                              </div>
-                              <p className="mt-2 text-sm font-medium text-foreground">{isRTL && stageItem.nameAr ? stageItem.nameAr : (t(stage as any) || stage)}</p>
-                              <p className="mt-1 text-[11px] text-muted-foreground">
-                                {stageDate ? format(new Date(stageDate), "dd/MM/yyyy") : "—"}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-semibold">{t("basicInfo")}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {editMode ? (
-                        <>
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[340px,minmax(0,1fr),360px]">
+            <div className="space-y-4 xl:sticky xl:top-28 xl:self-start">
+              <Card className="rounded-2xl border-border/70 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">{t("basicInfo")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {editMode ? (
+                    <>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
+                        <div>
+                          <Label className="text-xs">{t("leadName")}</Label>
+                          <Input {...register("name")} className="mt-1" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">{t("phone")}</Label>
+                          <Input {...register("phone")} className="mt-1" dir="ltr" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">{t("country")}</Label>
+                          <Input {...register("country")} className="mt-1" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">{t("businessProfile")}</Label>
+                          <Input {...register("businessProfile")} className="mt-1" dir="ltr" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">{t("leadQuality")}</Label>
+                          <Select defaultValue={lead.leadQuality} onValueChange={(v) => setValue("leadQuality", v as any)}>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {["Hot", "Warm", "Cold", "Bad", "Unknown"].map((q) => (
+                                <SelectItem key={q} value={q}>{t(q as any)}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">{isRTL ? "حالة الملاءمة" : "Fit Status"}</Label>
+                          <Select defaultValue={(lead as any).fitStatus ?? "Pending"} onValueChange={(v) => setValue("fitStatus", v as any)}>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Fit">{isRTL ? "مناسب" : "Fit"}</SelectItem>
+                              <SelectItem value="Not Fit">{isRTL ? "غير مناسب" : "Not Fit"}</SelectItem>
+                              <SelectItem value="Pending">{isRTL ? "قيد المراجعة" : "Pending"}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">{t("stage")}</Label>
+                          <Select defaultValue={lead.stage} onValueChange={(v) => setValue("stage", v)}>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {stageList.map((stageItem: any) => (
+                                <SelectItem key={stageItem.name} value={stageItem.name}>
+                                  {isRTL && stageItem.nameAr ? stageItem.nameAr : stageItem.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {["Admin", "SalesManager", "admin"].includes(user?.role ?? "") && (
                           <div>
-                            <Label className="text-xs">{t("leadName")}</Label>
-                            <Input {...register("name")} className="mt-1" />
-                          </div>
-                          <div>
-                            <Label className="text-xs">{t("phone")}</Label>
-                            <Input {...register("phone")} className="mt-1" dir="ltr" />
-                          </div>
-                          <div>
-                            <Label className="text-xs">{t("country")}</Label>
-                            <Input {...register("country")} className="mt-1" />
-                          </div>
-                          <div>
-                            <Label className="text-xs">{t("businessProfile")}</Label>
-                            <Input {...register("businessProfile")} className="mt-1" />
-                          </div>
-                          <div>
-                            <Label className="text-xs">{t("leadQuality")}</Label>
-                            <Select defaultValue={lead.leadQuality} onValueChange={(v) => setValue("leadQuality", v as any)}>
-                              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {["Hot", "Warm", "Cold", "Bad", "Unknown"].map((q) => (
-                                  <SelectItem key={q} value={q}>{t(q as any)}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label className="text-xs">{isRTL ? "حالة الملاءمة" : "Fit Status"}</Label>
-                            <Select defaultValue={(lead as any).fitStatus ?? "Pending"} onValueChange={(v) => setValue("fitStatus", v as any)}>
-                              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Fit">{isRTL ? "✅ مناسب" : "✅ Fit"}</SelectItem>
-                                <SelectItem value="Not Fit">{isRTL ? "❌ غير مناسب" : "❌ Not Fit"}</SelectItem>
-                                <SelectItem value="Pending">{isRTL ? "⏳ قيد المراجعة" : "⏳ Pending"}</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label className="text-xs">{t("stage")}</Label>
-                            <Select defaultValue={lead.stage} onValueChange={(v) => setValue("stage", v)}>
-                              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {(stages ?? STAGES_FALLBACK.map((s) => ({ name: s, nameAr: s }))).map((stageItem: any) => (
-                                  <SelectItem key={stageItem.name} value={stageItem.name}>
-                                    {isRTL && stageItem.nameAr ? stageItem.nameAr : stageItem.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          {["Admin", "SalesManager", "admin"].includes(user?.role ?? "") && (
-                            <div>
-                              <Label className="text-xs">{t("owner")}</Label>
-                              <Select
-                                defaultValue={lead.ownerId ? String(lead.ownerId) : undefined}
-                                onValueChange={(v) => setValue("ownerId", v === "none" ? undefined : Number(v))}
-                              >
-                                <SelectTrigger className="mt-1"><SelectValue placeholder="—" /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">—</SelectItem>
-                                  {users?.filter((u: any) => u.role === "SalesAgent").map((u: any) => (
-                                    <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-                          <div>
-                            <Label className="text-xs">{t("campaign")}</Label>
-                            <Select defaultValue={lead.campaignName ?? "none"} onValueChange={(v) => setValue("campaignName", v === "none" ? "" : v)}>
-                              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                            <Label className="text-xs">{t("owner")}</Label>
+                            <Select
+                              defaultValue={lead.ownerId ? String(lead.ownerId) : undefined}
+                              onValueChange={(v) => setValue("ownerId", v === "none" ? undefined : Number(v))}
+                            >
+                              <SelectTrigger className="mt-1"><SelectValue placeholder="—" /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="none">—</SelectItem>
-                                {campaigns?.map((campaign: any) => (
-                                  <SelectItem key={campaign.id} value={campaign.name}>{campaign.name}</SelectItem>
+                                {users?.filter((u: any) => u.role === "SalesAgent").map((u: any) => (
+                                  <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                           </div>
-                        </>
-                      ) : (
-                        <>
-                          <InfoRow label={t("leadName")} value={lead.name} />
-                          <InfoRow label={t("phone")} value={lead.phone} mono />
-                          <InfoRow label={t("country")} value={lead.country} />
-                          <InfoRow label={t("businessProfile")} value={lead.businessProfile} />
-                          <InfoRow label={t("campaign")} value={lead.campaignName} />
-                          <InfoRow label={t("adCreative")} value={lead.adCreative} />
-                          <InfoRow label={t("owner")} value={(lead as any).ownerName ?? (!lead.ownerId ? t("ownerUnassigned" as any) : undefined)} />
-                          <InfoRow label={t("lastContact" as any)} value={lastActivityDate ? `${t("sincePrefix" as any)} ${relativeTimeLabel(lastActivityDate, t, isRTL)}` : t("noContactYet" as any)} />
-                        </>
-                      )}
-                    </div>
-
-                    <div className="mt-4">
-                      <Label className="text-xs">{t("notes")}</Label>
-                      {editMode ? (
-                        <Textarea {...register("notes")} className="mt-1 text-sm" rows={3} />
-                      ) : (
-                        <p className="mt-1 text-sm text-foreground bg-muted/30 rounded-md p-2 min-h-12">{lead.notes ?? "—"}</p>
-                      )}
-                    </div>
-
-                    {(user?.role === "MediaBuyer" || user?.role === "Admin" || user?.role === "admin") && (
-                      <div className="mt-4">
-                        <Label className="text-xs">{t("mediaBuyerNotes")}</Label>
-                        {editMode && user?.role !== "MediaBuyer" ? (
-                          <Textarea {...register("mediaBuyerNotes")} className="mt-1 text-sm" rows={2} />
-                        ) : (
-                          <p className="mt-1 text-sm text-foreground bg-muted/30 rounded-md p-2 min-h-10">{lead.mediaBuyerNotes ?? "—"}</p>
                         )}
+                        <div>
+                          <Label className="text-xs">{t("campaign")}</Label>
+                          <Select defaultValue={lead.campaignName ?? "none"} onValueChange={(v) => setValue("campaignName", v === "none" ? "" : v)}>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">—</SelectItem>
+                              {campaigns?.map((campaign: any) => (
+                                <SelectItem key={campaign.id} value={campaign.name}>{campaign.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
 
-              <TabsContent value="formData" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm font-semibold">{t("formDataTitle" as any)}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {(() => {
-                      const customData = (lead as any).customFieldsData;
-                      const sourceData = (lead as any).sourceMetadata;
-                      if (!customData || Object.keys(customData).length === 0) {
-                        return (
-                          <div className="py-8 text-center text-muted-foreground text-sm">
-                            <FileText size={32} className="mx-auto mb-2 opacity-30" />
-                            <p>{t("noFormData" as any)}</p>
-                          </div>
-                        );
-                      }
-                      const cleanLabel = (key: string) => {
-                        return key
-                          .replace(/_/g, " ")
-                          .replace(/؟/g, "؟")
-                          .replace(/\s+/g, " ")
-                          .trim();
-                      };
-                      return (
-                        <div className="space-y-3">
-                          {Object.entries(customData)
-                            .filter(([key]) => key !== "inbox_url")
-                            .map(([key, value]) => (
-                            <div key={key} className="flex flex-col gap-1 border-b border-border/50 pb-2 last:border-0">
-                              <span className="text-xs font-medium text-muted-foreground">{cleanLabel(key)}</span>
-                              <span className="text-sm text-foreground">{String(value).replace(/_/g, " ") || "—"}</span>
-                            </div>
-                          ))}
-                          {customData.inbox_url && (
-                            <div className="flex flex-col gap-1 border-b border-border/50 pb-2">
-                              <span className="text-xs font-medium text-muted-foreground">Inbox URL</span>
-                              <a href={customData.inbox_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                                <Link2 size={12} /> {t("openInbox" as any)}
-                              </a>
-                            </div>
+                      <div>
+                        <Label className="text-xs">{t("notes")}</Label>
+                        <Textarea {...register("notes")} className="mt-1 text-sm" rows={3} />
+                      </div>
+
+                      {(user?.role === "MediaBuyer" || user?.role === "Admin" || user?.role === "admin") && (
+                        <div>
+                          <Label className="text-xs">{t("mediaBuyerNotes")}</Label>
+                          {user?.role !== "MediaBuyer" ? (
+                            <Textarea {...register("mediaBuyerNotes")} className="mt-1 text-sm" rows={2} />
+                          ) : (
+                            <p className="mt-1 rounded-xl bg-muted/30 p-3 text-sm text-foreground">{lead.mediaBuyerNotes ?? "—"}</p>
                           )}
-                          {sourceData && (
-                            <div className="mt-4 pt-3 border-t">
-                              <span className="text-xs font-semibold text-muted-foreground mb-2 block">{t("sourceInfo" as any)}</span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      <InfoRow label={t("leadName")} value={lead.name} />
+                      <InfoRow label={t("phone")} value={lead.phone} mono />
+                      <InfoRow label={t("country")} value={lead.country} />
+                      <InfoRow label={t("businessProfile")} value={lead.businessProfile} isLink />
+                      <InfoRow label={t("campaign")} value={lead.campaignName} />
+                      <InfoRow label={t("adCreative")} value={lead.adCreative} />
+                      <InfoRow label={t("owner")} value={(lead as any).ownerName ?? (!lead.ownerId ? t("ownerUnassigned" as any) : undefined)} />
+                      <InfoRow
+                        label={t("lastContact" as any)}
+                        value={lastActivityDate ? `${t("sincePrefix" as any)} ${relativeTimeLabel(lastActivityDate, t, isRTL)}` : t("noContactYet" as any)}
+                      />
+                      <InfoRow label={isRTL ? "حالة الملاءمة" : "Fit Status"} value={isRTL ? fitConfig.labelAr : fitConfig.label} />
+                      <InfoRow label={t("notes")} value={lead.notes} multiline />
+                      {(user?.role === "MediaBuyer" || user?.role === "Admin" || user?.role === "admin") && (
+                        <InfoRow label={t("mediaBuyerNotes")} value={lead.mediaBuyerNotes} multiline />
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border-border/70 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">{t("formDataTab" as any)}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const customData = (lead as any).customFieldsData;
+                    const sourceData = (lead as any).sourceMetadata;
+                    if (!customData || Object.keys(customData).length === 0) {
+                      return (
+                        <EmptyState
+                          icon={FileText}
+                          title={isRTL ? "لا توجد بيانات نموذج" : "No form data yet"}
+                          description={isRTL ? "لم تصل أي حقول إضافية من النموذج لهذا العميل حتى الآن." : "No extra form fields were captured for this lead yet."}
+                        />
+                      );
+                    }
+
+                    const cleanLabel = (key: string) =>
+                      key.replace(/_/g, " ").replace(/؟/g, "؟").replace(/\s+/g, " ").trim();
+
+                    return (
+                      <div className="space-y-3">
+                        {Object.entries(customData)
+                          .filter(([key]) => key !== "inbox_url")
+                          .map(([key, value]) => (
+                            <InfoRow key={key} label={cleanLabel(key)} value={String(value ?? "")} multiline />
+                          ))}
+
+                        {customData.inbox_url && (
+                          <InfoRow label="Inbox URL" value={customData.inbox_url} isLink />
+                        )}
+
+                        {sourceData && (
+                          <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+                            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              {t("sourceInfo" as any)}
+                            </p>
+                            <div className="grid grid-cols-1 gap-3">
                               {sourceData.provider && <InfoRow label={t("provider" as any)} value={sourceData.provider} />}
                               {sourceData.synced_via && <InfoRow label={t("syncMethod" as any)} value={sourceData.synced_via} />}
                               {sourceData.campaign_id && <InfoRow label="Campaign ID" value={sourceData.campaign_id} mono />}
                               {sourceData.form_id && <InfoRow label="Form ID" value={sourceData.form_id} mono />}
                               {sourceData.ad_id && <InfoRow label="Ad ID" value={sourceData.ad_id} mono />}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="activities" className="space-y-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-3">
-                    <CardTitle className="text-sm font-semibold">{t("activityTimeline")}</CardTitle>
-                    {canEdit && (
-                      <Button size="sm" variant="outline" className="gap-1.5 text-xs h-7" onClick={() => setShowActivity(true)}>
-                        <Plus size={12} /> {t("newActivity")}
-                      </Button>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    {!activities?.length ? (
-                      <div className="py-8 text-center text-muted-foreground text-sm">
-                        <Clock size={32} className="mx-auto mb-2 opacity-30" />
-                        <p>{t("noActivities")}</p>
-                        {canEdit && (
-                          <Button variant="outline" size="sm" className="mt-3 gap-1.5" onClick={() => setShowActivity(true)}>
-                            <Plus size={12} /> {t("addFirstActivity")}
-                          </Button>
+                          </div>
                         )}
                       </div>
-                    ) : (
-                      <div className="activity-timeline">
-                        {activities.map((act: any) => (
-                          <div key={act.id} className="activity-timeline-item">
-                            <div className={`absolute ${isRTL ? "right-0" : "left-0"} top-0 w-6 h-6 rounded-full bg-background border-2 border-primary flex items-center justify-center text-xs`}>
-                              {activityIcons[act.type] ?? "📌"}
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border-border/70 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">{t("salesInfo")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {editMode ? (
+                    <>
+                      <div>
+                        <Label className="text-xs">{t("serviceIntroduced")}</Label>
+                        <Input {...register("serviceIntroduced")} className="mt-1" />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("adCreative")}</Label>
+                        <Input {...register("adCreative")} className="mt-1" />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <InfoRow label={t("serviceIntroduced")} value={lead.serviceIntroduced} />
+                      <InfoRow label={t("adCreative")} value={lead.adCreative} />
+                    </>
+                  )}
+                  {lead.priceOfferSent && (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700">
+                      <CheckCircle size={14} />
+                      {t("priceOfferSent")}
+                    </div>
+                  )}
+                  {lead.priceOfferLink && <InfoRow label={t("priceOfferLink")} value={lead.priceOfferLink} isLink />}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="min-w-0 space-y-4">
+              <Card className="rounded-2xl border-border/70 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">{t("stageJourney" as any)}</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <ScrollArea className="w-full whitespace-nowrap">
+                    <div className="inline-flex min-w-full items-start gap-4 pb-4">
+                      {stageList.map((stageItem: any, index: number) => {
+                        const stage = stageItem.name ?? stageItem;
+                        const stageNames = stageList.map((s: any) => s.name ?? s);
+                        const state = getStageState(stage, lead.stage, stageNames);
+                        const isCompleted = state === "completed";
+                        const isCurrent = state === "current";
+                        const color = isCompleted ? "#22c55e" : isCurrent ? stageColor[stage] ?? tokens.primaryColor : "#cbd5e1";
+                        const stageDate = stageTimelineDates[stage];
+
+                        return (
+                          <div key={stage} className="flex min-w-[170px] items-start gap-3">
+                            <div className="flex flex-col items-center">
+                              <div
+                                className="flex h-12 w-12 items-center justify-center rounded-full border-4 bg-background text-sm font-bold"
+                                style={{ borderColor: color, color }}
+                              >
+                                {index + 1}
+                              </div>
+                              {index !== stageList.length - 1 && (
+                                <div
+                                  className="mt-2 h-20 w-1 rounded-full xl:hidden"
+                                  style={{ backgroundColor: isCompleted ? color : "#e5e7eb" }}
+                                />
+                              )}
                             </div>
-                            <div className="bg-muted/30 rounded-lg p-3">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-medium text-sm">{t(act.type as any)}</span>
-                                    {act.outcome && (
-                                      <span className={`text-xs font-medium ${outcomeColors[act.outcome] ?? ""}`}>
-                                        · {t(act.outcome as any)}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {act.notes && <p className="text-xs text-muted-foreground mt-1">{act.notes}</p>}
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    <Clock size={10} className="inline mr-1" />
-                                    {format(new Date(act.activityTime), "dd/MM/yyyy HH:mm")}
-                                    {(act as any).userName && ` · ${(act as any).userName}`}
-                                  </p>
-                                </div>
-                                {canEdit && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                                    onClick={() => deleteActivity.mutate({ id: act.id })}
+
+                            <div className="relative min-w-0 flex-1 pt-1">
+                              <div
+                                className={`absolute ${isRTL ? "right-0" : "left-0"} top-6 hidden h-1 w-[calc(100%+1rem)] rounded-full xl:block`}
+                                style={{ backgroundColor: isCompleted ? color : isCurrent ? color : "#e5e7eb" }}
+                              />
+                              <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 shadow-sm">
+                                <p className="break-words text-sm font-semibold text-foreground">
+                                  {isRTL && stageItem.nameAr ? stageItem.nameAr : (t(stage as any) || stage)}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {stageDate ? format(new Date(stageDate), "dd/MM/yyyy") : "—"}
+                                </p>
+                                <div className="mt-2">
+                                  <Badge
+                                    variant="outline"
+                                    className="border-transparent text-[11px]"
+                                    style={{
+                                      backgroundColor: isCurrent ? `${color}18` : isCompleted ? "#dcfce7" : "#f1f5f9",
+                                      color,
+                                    }}
                                   >
-                                    <Trash2 size={12} />
-                                  </Button>
-                                )}
+                                    {isCurrent ? (isRTL ? "الحالية" : "Current") : isCompleted ? (isRTL ? "تمت" : "Completed") : (isRTL ? "قادمة" : "Upcoming")}
+                                  </Badge>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
 
-              <TabsContent value="notes" className="space-y-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-3">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      <MessageSquare size={14} />
-                      {t("internalNotes" as any)}
-                    </CardTitle>
-                    <Badge variant="outline" className="text-xs">{(internalNotes as any)?.length ?? 0}</Badge>
-                  </CardHeader>
-                  <CardContent>
-                    {canEdit && (
-                      <div className="flex gap-2 mb-4">
+              <Card className="rounded-2xl border-border/70 shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <CardTitle className="text-sm font-semibold">
+                        {isRTL ? "المساحة العملية" : "Lead workspace"}
+                      </CardTitle>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {isRTL
+                          ? "سجّل ملاحظاتك وأنشطتك في مكان واحد بترتيب زمني واضح."
+                          : "Log notes and activities in one unified chronological feed."}
+                      </p>
+                    </div>
+
+                    <div className="inline-flex rounded-xl border border-border/60 bg-muted/30 p-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={composerMode === "note" ? "default" : "ghost"}
+                        className="rounded-lg"
+                        style={composerMode === "note" ? { background: tokens.primaryColor, color: "white" } : {}}
+                        onClick={() => setComposerMode("note")}
+                      >
+                        <MessageSquare size={14} className="me-1" />
+                        {isRTL ? "إضافة ملاحظة" : "Add note"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={composerMode === "activity" ? "default" : "ghost"}
+                        className="rounded-lg"
+                        style={composerMode === "activity" ? { background: tokens.primaryColor, color: "white" } : {}}
+                        onClick={() => setComposerMode("activity")}
+                      >
+                        <Activity size={14} className="me-1" />
+                        {isRTL ? "تسجيل نشاط" : "Log activity"}
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-6">
+                  <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                    {composerMode === "note" ? (
+                      <div className="space-y-3">
+                        <Label className="text-xs font-medium text-muted-foreground">
+                          {isRTL ? "ملاحظة داخلية للفريق" : "Internal note for your team"}
+                        </Label>
                         <Textarea
                           value={noteText}
                           onChange={(e) => setNoteText(e.target.value)}
-                          placeholder={t("writeNote" as any)}
-                          className="text-sm min-h-[60px] flex-1"
-                          rows={2}
+                          placeholder={isRTL ? "اكتب ملاحظة سريعة أو التحديث الأهم عن العميل..." : "Write a quick note or the most important update about this lead..."}
+                          className="min-h-[110px] text-sm"
+                          rows={4}
                         />
-                        <Button
-                          size="sm"
-                          style={{ background: tokens.primaryColor }}
-                          className="text-white self-end gap-1.5 h-9"
-                          onClick={onAddNote}
-                          disabled={createNote.isPending || !noteText.trim()}
-                        >
-                          {createNote.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                          {t("addNote" as any)}
-                        </Button>
-                      </div>
-                    )}
-
-                    {!(internalNotes as any)?.length ? (
-                      <div className="py-6 text-center text-muted-foreground text-sm">
-                        <MessageSquare size={28} className="mx-auto mb-2 opacity-30" />
-                        <p>{t("noNotes" as any)}</p>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs text-muted-foreground">
+                            {isRTL ? "ستظهر هذه الملاحظة مباشرة داخل الخط الزمني." : "This note will appear directly in the activity feed."}
+                          </p>
+                          <Button
+                            size="sm"
+                            style={{ background: tokens.primaryColor }}
+                            className="gap-2 rounded-xl text-white"
+                            onClick={onAddNote}
+                            disabled={createNote.isPending || !noteText.trim()}
+                          >
+                            {createNote.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                            {isRTL ? "حفظ الملاحظة" : "Save note"}
+                          </Button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        {(internalNotes as any).map((note: any) => (
-                          <div key={note.id} className="bg-muted/30 rounded-lg p-3 border border-border/50">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1">
-                                <p className="text-sm text-foreground whitespace-pre-wrap">{note.content}</p>
-                                <div className="flex items-center gap-2 mt-2">
-                                  <span className="text-xs font-medium text-primary">{note.userName ?? "—"}</span>
-                                  <span className="text-xs text-muted-foreground">{format(new Date(note.createdAt), "dd/MM/yyyy HH:mm")}</span>
-                                </div>
-                              </div>
-                              {(user?.role === "Admin" || user?.role === "admin" || note.userId === user?.id) && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                                  onClick={() => deleteNote.mutate({ id: note.id })}
-                                >
-                                  <Trash2 size={12} />
-                                </Button>
-                              )}
-                            </div>
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                            <Activity size={20} />
                           </div>
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="text-sm font-semibold text-foreground">
+                              {isRTL ? "سجّل آخر تواصل أو خطوة تمت مع العميل" : "Log the latest touchpoint or action taken"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {isRTL
+                                ? "استخدم النموذج الكامل حتى تحفظ نوع النشاط والنتيجة والوقت بدقة."
+                                : "Use the full activity form to save the type, outcome, and timestamp accurately."}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" className="gap-2 rounded-xl" onClick={() => setShowActivity(true)}>
+                            <Plus size={14} />
+                            {t("newActivity")}
+                          </Button>
+                          {lastActivityDate && (
+                            <div className="inline-flex items-center gap-2 rounded-xl border border-border/60 bg-background px-3 py-2 text-xs text-muted-foreground">
+                              <Clock size={13} />
+                              {isRTL ? "آخر نشاط:" : "Latest activity:"} {relativeTimeLabel(lastActivityDate, t, isRTL)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {feedItems.length === 0 ? (
+                    <EmptyState
+                      icon={Activity}
+                      title={isRTL ? "لا يوجد سجل نشاط بعد" : "No activity feed yet"}
+                      description={isRTL ? "ابدأ بإضافة ملاحظة أو تسجيل أول نشاط حتى يتكوّن التاريخ الكامل لهذا العميل." : "Start by adding a note or logging the first activity to build this lead’s history."}
+                      actionLabel={composerMode === "note" ? (isRTL ? "أضف أول ملاحظة" : "Add first note") : t("newActivity")}
+                      onAction={composerMode === "note" ? undefined : () => setShowActivity(true)}
+                    />
+                  ) : (
+                    <div className="relative">
+                      <div className={`absolute ${isRTL ? "right-[18px]" : "left-[18px]"} top-0 h-full w-px bg-border/70`} />
+                      <div className="space-y-5">
+                        {feedItems.map((item, index) => (
+                          <FeedItemCard
+                            key={item.id}
+                            item={item}
+                            isRTL={isRTL}
+                            t={t}
+                            isFirstInDay={
+                              index === 0 ||
+                              formatFeedDateLabel(item.date, isRTL) !== formatFeedDateLabel(feedItems[index - 1].date, isRTL)
+                            }
+                            onDeleteActivity={(activityId: number) => deleteActivity.mutate({ id: activityId })}
+                            onDeleteNote={(noteId: number) => deleteNote.mutate({ id: noteId })}
+                            canEdit={canEdit}
+                            userId={user?.id}
+                            userRole={user?.role}
+                          />
                         ))}
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              <TabsContent value="reminders" className="space-y-4">
-                <LeadReminders leadId={leadId} />
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">{t("dealInfo")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!deal ? (
-                  <div className="py-6 text-center">
-                    <p className="text-muted-foreground text-sm mb-3">{t("noDeal")}</p>
-                    {canEdit && (
-                      <Button
-                        size="sm"
-                        style={{ background: tokens.primaryColor }}
-                        className="text-white gap-1.5"
-                        onClick={() => setShowDeal(true)}
-                      >
-                        <Plus size={12} /> {t("createDeal")}
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-2xl font-bold text-foreground">
-                        {deal.valueSar ? `${Number(deal.valueSar).toLocaleString()} ${(deal as any).currency || "SAR"}` : "—"}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                          deal.status === "Won"
-                            ? "bg-green-100 text-green-700"
-                            : deal.status === "Lost"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-yellow-100 text-yellow-700"
-                        }`}
-                      >
-                        {deal.status === "Won" ? <CheckCircle size={11} /> : deal.status === "Lost" ? <XCircle size={11} /> : <Clock size={11} />}
-                        {t(deal.status as any)}
-                      </span>
                     </div>
-                    <InfoRow label={t("dealType")} value={t(deal.dealType as any)} />
-                    {deal.closedAt && <InfoRow label={t("closedAt")} value={format(new Date(deal.closedAt), "dd/MM/yyyy")} />}
-                    {deal.lossReason && <InfoRow label={t("lossReason")} value={deal.lossReason} />}
-                    {deal.notes && <InfoRow label={t("notes")} value={deal.notes} />}
-                    {canEdit && (
-                      <div className="pt-2 flex gap-2">
-                        <Select defaultValue={deal.status} onValueChange={(v) => updateDeal.mutate({ id: deal.id, status: v as any })}>
-                          <SelectTrigger className="flex-1 h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Pending">{t("Pending")}</SelectItem>
-                            <SelectItem value="Won">{t("Won")}</SelectItem>
-                            <SelectItem value="Lost">{t("Lost")}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    {tamaraStatus?.enabled && deal.status === "Pending" && (
-                      <div className="pt-3 border-t border-border/50 mt-3">
-                        <Button
-                          size="sm"
-                          className="w-full gap-2 text-white font-medium"
-                          style={{ background: "linear-gradient(135deg, #c084fc 0%, #f472b6 50%, #fb923c 100%)" }}
-                          onClick={handleTamaraPayment}
-                          disabled={tamaraLoading}
-                        >
-                          {tamaraLoading ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M4.5 12.5C4.5 12.5 4.5 8 8 8C11.5 8 11.5 12.5 11.5 12.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-                              <circle cx="17" cy="10.5" r="4" fill="white" />
-                            </svg>
-                          )}
-                          {isRTL ? "ادفع عبر تمارا" : "Pay with Tamara"}
-                          <ExternalLink size={12} />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-4 xl:sticky xl:top-28 xl:self-start">
+              <Collapsible open={dealOpen} onOpenChange={setDealOpen}>
+                <Card className="rounded-2xl border-border/70 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle className="text-sm font-semibold">{t("dealInfo")}</CardTitle>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
+                          <ChevronDown className={`h-4 w-4 transition-transform ${dealOpen ? "rotate-180" : ""}`} />
                         </Button>
-                        <p className="text-[10px] text-muted-foreground text-center mt-1.5">
-                          {isRTL ? "الدفع بالتقسيط عبر تمارا" : "Pay in installments via Tamara"}
-                        </p>
-                      </div>
-                    )}
-                    {((deal as any).currency === "EGP" ? paymobStatus?.eg : paymobStatus?.sa) && deal.status === "Pending" && (
-                      <div className="pt-3 border-t border-border/50 mt-3">
-                        <Button
-                          size="sm"
-                          className="w-full gap-2 text-white font-medium"
-                          style={{ background: "linear-gradient(135deg, #3b82f6 0%, #10b981 100%)" }}
-                          onClick={handlePaymobPayment}
-                          disabled={paymobLoading}
-                        >
-                          {paymobLoading ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : null}
-                          {isRTL ? "ادفع عبر Paymob" : "Pay with Paymob"}
-                          <ExternalLink size={12} />
-                        </Button>
-                        <p className="text-[10px] text-muted-foreground text-center mt-1.5">
-                          {isRTL ? "الدفع بالبطاقة أو المحفظة عبر Paymob" : "Pay by card or wallet via Paymob"}
-                        </p>
-                      </div>
-                    )}
-                    {canEdit && deal.status !== "Won" && (
-                      <div className="pt-2 border-t border-border/50 mt-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="w-full gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => {
-                            if (confirm(isRTL ? "هل أنت متأكد من إلغاء هذه الصفقة؟" : "Are you sure you want to cancel this deal?")) {
-                              cancelDeal.mutate({ id: deal.id, leadId });
-                            }
-                          }}
-                          disabled={cancelDeal.isPending}
-                        >
-                          {cancelDeal.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                          {isRTL ? "إلغاء الصفقة" : "Cancel Deal"}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <ArrowRightLeft size={14} />
-                  {t("transferHistory" as any)}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!(transfers as any)?.length ? (
-                  <div className="py-4 text-center text-muted-foreground text-xs">{t("noTransfers" as any)}</div>
-                ) : (
-                  <div className="space-y-3">
-                    {(transfers as any).map((tr: any) => (
-                      <div key={tr.id} className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="font-medium text-blue-700 dark:text-blue-300">{tr.fromUserName}</span>
-                          <ArrowRight size={12} className="text-blue-500" />
-                          <span className="font-medium text-blue-700 dark:text-blue-300">{tr.toUserName}</span>
-                        </div>
-                        {tr.reason && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            <span className="font-medium">{t("transferReason" as any)}:</span> {tr.reason}
-                          </p>
-                        )}
-                        {tr.notes && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            <span className="font-medium">{t("transferNotes" as any)}:</span> {tr.notes}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-1">
-                          <Clock size={10} className="inline mr-1" />
-                          {format(new Date(tr.createdAt), "dd/MM/yyyy HH:mm")}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">{t("salesInfo")}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <InfoRow label={t("serviceIntroduced")} value={lead.serviceIntroduced} />
-                <InfoRow label={t("adCreative")} value={lead.adCreative} />
-                {lead.priceOfferSent && (
-                  <div className="flex items-center gap-2">
-                    <CheckCircle size={14} className="text-green-600" />
-                    <span className="text-xs text-green-600">{t("priceOfferSent")}</span>
-                  </div>
-                )}
-                {lead.priceOfferLink && (
-                  <a href={lead.priceOfferLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline block">
-                    {t("priceOfferLink")}
-                  </a>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Paperclip size={14} />
-                  {t("attachments" as any)}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {canEdit && (
-                  <form onSubmit={attachmentHandleSubmit(onAddAttachment)} className="space-y-3 rounded-lg border border-dashed border-border/70 p-3">
-                    <div>
-                      <Label className="text-xs">{t("attachmentName" as any)}</Label>
-                      <Input {...attachmentRegister("fileName")} className="mt-1" />
+                      </CollapsibleTrigger>
                     </div>
-                    <div>
-                      <Label className="text-xs">{t("attachmentUrl" as any)}</Label>
-                      <div className="relative mt-1">
-                        <Link2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input {...attachmentRegister("fileUrl", { required: true })} className="pl-9" placeholder="https://..." dir="ltr" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="text-xs">{t("attachmentType" as any)}</Label>
-                        <Input {...attachmentRegister("fileType")} className="mt-1" />
-                      </div>
-                      <div>
-                        <Label className="text-xs">{t("attachmentSize" as any)}</Label>
-                        <Input {...attachmentRegister("fileSize")} type="number" min="0" className="mt-1" dir="ltr" />
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">{t("temporaryUrlField" as any)}</p>
-                    <Button
-                      type="submit"
-                      size="sm"
-                      style={{ background: tokens.primaryColor }}
-                      className="text-white gap-1.5"
-                      disabled={createAttachment.isPending}
-                    >
-                      {createAttachment.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                      {t("addAttachment" as any)}
-                    </Button>
-                  </form>
-                )}
-
-                {!attachments?.length ? (
-                  <div className="py-6 text-center text-muted-foreground text-sm">
-                    <Paperclip size={26} className="mx-auto mb-2 opacity-30" />
-                    <p>{t("noAttachments" as any)}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {attachments.map((attachment: any) => {
-                      const attachmentMeta = getAttachmentMeta(attachment.fileName, attachment.fileType, attachment.fileUrl, t);
-                      const AttachmentIcon = attachmentMeta.icon;
-
-                      return (
-                        <div key={attachment.id} className="rounded-lg border border-border/60 p-3 bg-muted/20">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-start gap-3 min-w-0 flex-1">
-                              <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-background border border-border/60">
-                                <AttachmentIcon size={16} />
+                  </CardHeader>
+                  <CollapsibleContent>
+                    <CardContent className="space-y-4">
+                      {!deal ? (
+                        <EmptyState
+                          icon={CreditCard}
+                          title={isRTL ? "لا توجد صفقة بعد" : "No deal yet"}
+                          description={isRTL ? "أنشئ أول صفقة لهذا العميل وابدأ تتبّع القيمة والمرحلة ووسائل الدفع من مكان واحد." : "Create the first deal for this lead and start tracking value, status, and payment options from one place."}
+                          actionLabel={t("createDeal")}
+                          onAction={canEdit ? () => setShowDeal(true) : undefined}
+                        />
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("dealValue")}</p>
+                                <p className="mt-1 text-2xl font-bold text-foreground">
+                                  {deal.valueSar ? `${Number(deal.valueSar).toLocaleString()} ${(deal as any).currency || "SAR"}` : "—"}
+                                </p>
                               </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-foreground truncate">{attachment.fileName}</p>
-                                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                                  <span>{attachmentMeta.label}</span>
-                                  <span>•</span>
-                                  <span>{formatAttachmentSize(attachment.fileSize)}</span>
-                                  <span>•</span>
-                                  <span>{format(new Date(attachment.createdAt), "dd/MM/yyyy")}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.open(attachment.fileUrl, "_blank", "noopener,noreferrer")}>
-                                <Download size={14} />
-                              </Button>
-                              {canEdit && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  onClick={() => deleteAttachment.mutate({ id: attachment.id })}
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              )}
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
+                                  deal.status === "Won"
+                                    ? "bg-green-100 text-green-700"
+                                    : deal.status === "Lost"
+                                      ? "bg-red-100 text-red-700"
+                                      : "bg-yellow-100 text-yellow-700"
+                                }`}
+                              >
+                                {deal.status === "Won" ? <CheckCircle size={11} /> : deal.status === "Lost" ? <XCircle size={11} /> : <Clock size={11} />}
+                                {t(deal.status as any)}
+                              </span>
                             </div>
                           </div>
+
+                          <div className="grid grid-cols-1 gap-3">
+                            <InfoRow label={t("dealType")} value={t(deal.dealType as any)} />
+                            {deal.closedAt && <InfoRow label={t("closedAt")} value={format(new Date(deal.closedAt), "dd/MM/yyyy")} />}
+                            {deal.lossReason && <InfoRow label={t("lossReason")} value={deal.lossReason} multiline />}
+                            {deal.notes && <InfoRow label={t("notes")} value={deal.notes} multiline />}
+                          </div>
+
+                          {canEdit && (
+                            <div className="rounded-2xl border border-border/60 p-3">
+                              <Label className="text-xs">{t("dealStatus")}</Label>
+                              <Select defaultValue={deal.status} onValueChange={(v) => updateDeal.mutate({ id: deal.id, status: v as any })}>
+                                <SelectTrigger className="mt-2 h-10">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Pending">{t("Pending")}</SelectItem>
+                                  <SelectItem value="Won">{t("Won")}</SelectItem>
+                                  <SelectItem value="Lost">{t("Lost")}</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {tamaraStatus?.enabled && deal.status === "Pending" && (
+                            <Button
+                              size="sm"
+                              className="w-full gap-2 rounded-xl text-white font-medium"
+                              style={{ background: "linear-gradient(135deg, #c084fc 0%, #f472b6 50%, #fb923c 100%)" }}
+                              onClick={handleTamaraPayment}
+                              disabled={tamaraLoading}
+                            >
+                              {tamaraLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                              {isRTL ? "ادفع عبر تمارا" : "Pay with Tamara"}
+                            </Button>
+                          )}
+
+                          {((deal as any).currency === "EGP" ? paymobStatus?.eg : paymobStatus?.sa) && deal.status === "Pending" && (
+                            <Button
+                              size="sm"
+                              className="w-full gap-2 rounded-xl text-white font-medium"
+                              style={{ background: "linear-gradient(135deg, #3b82f6 0%, #10b981 100%)" }}
+                              onClick={handlePaymobPayment}
+                              disabled={paymobLoading}
+                            >
+                              {paymobLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                              {isRTL ? "ادفع عبر Paymob" : "Pay with Paymob"}
+                            </Button>
+                          )}
+
+                          {canEdit && deal.status !== "Won" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full gap-2 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => {
+                                if (confirm(isRTL ? "هل أنت متأكد من إلغاء هذه الصفقة؟" : "Are you sure you want to cancel this deal?")) {
+                                  cancelDeal.mutate({ id: deal.id, leadId });
+                                }
+                              }}
+                              disabled={cancelDeal.isPending}
+                            >
+                              {cancelDeal.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                              {isRTL ? "إلغاء الصفقة" : "Cancel Deal"}
+                            </Button>
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+
+              <Collapsible open={teamOpen} onOpenChange={setTeamOpen}>
+                <Card className="rounded-2xl border-border/70 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <Users size={16} className="text-purple-600" />
+                        {isRTL ? "الفريق والمتعاونون" : "Team & collaborators"}
+                      </CardTitle>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
+                          <ChevronDown className={`h-4 w-4 transition-transform ${teamOpen ? "rotate-180" : ""}`} />
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                  </CardHeader>
+                  <CollapsibleContent>
+                    <CardContent className="space-y-3">
+                      {(leadAssignments as any[])?.length ? (
+                        <div className="space-y-2">
+                          {(leadAssignments as any[])?.map((a: any) => {
+                            const roleLabels: Record<string, string> = {
+                              owner: isRTL ? "المالك" : "Owner",
+                              collaborator: isRTL ? "متعاون" : "Collaborator",
+                              observer: isRTL ? "مراقب" : "Observer",
+                              client_success: "Client Success",
+                              account_manager: "Account Manager",
+                            };
+                            const roleColors: Record<string, string> = {
+                              owner: "bg-blue-100 text-blue-800 border-blue-300",
+                              collaborator: "bg-purple-100 text-purple-800 border-purple-300",
+                              observer: "bg-gray-100 text-gray-600 border-gray-300",
+                              client_success: "bg-amber-100 text-amber-800 border-amber-300",
+                              account_manager: "bg-green-100 text-green-800 border-green-300",
+                            };
+
+                            return (
+                              <div key={a.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/20 p-3">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-medium text-foreground">{a.userName}</p>
+                                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                                    <Badge variant="outline" className={`border ${roleColors[a.role] ?? "bg-gray-100"}`}>
+                                      {roleLabels[a.role] ?? a.role}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                {a.role !== "owner" && canEdit && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 rounded-xl text-muted-foreground hover:text-destructive"
+                                    onClick={() => removeAssignment.mutate({ assignmentId: a.id })}
+                                  >
+                                    <XCircle size={14} />
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <EmptyState
+                          icon={Users}
+                          title={isRTL ? "لا يوجد متعاونون" : "No collaborators yet"}
+                          description={isRTL ? "أضف شخصًا من الفريق لمتابعة هذا العميل أو عرضه فقط." : "Assign teammates to collaborate on or observe this lead."}
+                          actionLabel={isRTL ? "تعيين متعاون" : "Assign collaborator"}
+                          onAction={canEdit ? () => setShowAssign(true) : undefined}
+                        />
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+
+              <Collapsible open={remindersOpen} onOpenChange={setRemindersOpen}>
+                <Card className="rounded-2xl border-border/70 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <CalendarClock size={16} className="text-orange-600" />
+                        {isRTL ? "التذكيرات" : "Reminders"}
+                      </CardTitle>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
+                          <ChevronDown className={`h-4 w-4 transition-transform ${remindersOpen ? "rotate-180" : ""}`} />
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                  </CardHeader>
+                  <CollapsibleContent>
+                    <CardContent>
+                      <LeadReminders leadId={leadId} />
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+
+              <Collapsible open={attachmentsOpen} onOpenChange={setAttachmentsOpen}>
+                <Card className="rounded-2xl border-border/70 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <Paperclip size={16} />
+                        {t("attachments" as any)}
+                      </CardTitle>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
+                          <ChevronDown className={`h-4 w-4 transition-transform ${attachmentsOpen ? "rotate-180" : ""}`} />
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                  </CardHeader>
+                  <CollapsibleContent>
+                    <CardContent className="space-y-4">
+                      {canEdit && (
+                        <form onSubmit={attachmentHandleSubmit(onAddAttachment)} className="space-y-3 rounded-2xl border border-dashed border-border/70 p-3">
+                          <div>
+                            <Label className="text-xs">{t("attachmentName" as any)}</Label>
+                            <Input {...attachmentRegister("fileName")} className="mt-1" />
+                          </div>
+                          <div>
+                            <Label className="text-xs">{t("attachmentUrl" as any)}</Label>
+                            <div className="relative mt-1">
+                              <Link2 size={14} className={`absolute ${isRTL ? "right-3" : "left-3"} top-1/2 -translate-y-1/2 text-muted-foreground`} />
+                              <Input
+                                id="attachment-url-input"
+                                {...attachmentRegister("fileUrl", { required: true })}
+                                className={isRTL ? "pr-9" : "pl-9"}
+                                placeholder="https://..."
+                                dir="ltr"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs">{t("attachmentType" as any)}</Label>
+                              <Input {...attachmentRegister("fileType")} className="mt-1" />
+                            </div>
+                            <div>
+                              <Label className="text-xs">{t("attachmentSize" as any)}</Label>
+                              <Input {...attachmentRegister("fileSize")} type="number" min="0" className="mt-1" dir="ltr" />
+                            </div>
+                          </div>
+                          <Button
+                            type="submit"
+                            size="sm"
+                            style={{ background: tokens.primaryColor }}
+                            className="gap-2 rounded-xl text-white"
+                            disabled={createAttachment.isPending}
+                          >
+                            {createAttachment.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                            {t("addAttachment" as any)}
+                          </Button>
+                        </form>
+                      )}
+
+                      {!attachments?.length ? (
+                        <EmptyState
+                          icon={FolderOpen}
+                          title={isRTL ? "لا توجد مرفقات" : "No attachments yet"}
+                          description={isRTL ? "ارفع أو أضف أول ملف مرتبط بالعميل حتى يكون كل شيء محفوظًا في مكان واحد." : "Add the first file or URL attachment so everything stays organized in one place."}
+                          actionLabel={isRTL ? "أضف مرفقًا" : "Add attachment"}
+                          onAction={() => {
+                            const target = document.getElementById("attachment-url-input");
+                            target?.focus();
+                          }}
+                        />
+                      ) : (
+                        <div className="space-y-3">
+                          {attachments.map((attachment: any) => {
+                            const attachmentMeta = getAttachmentMeta(attachment.fileName, attachment.fileType, attachment.fileUrl, t);
+                            const AttachmentIcon = attachmentMeta.icon;
+
+                            return (
+                              <div key={attachment.id} className="rounded-2xl border border-border/60 bg-muted/20 p-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-background">
+                                      <AttachmentIcon size={16} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-sm font-medium text-foreground">{attachment.fileName}</p>
+                                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                        <span>{attachmentMeta.label}</span>
+                                        <span>•</span>
+                                        <span>{formatAttachmentSize(attachment.fileSize)}</span>
+                                        <span>•</span>
+                                        <span>{format(new Date(attachment.createdAt), "dd/MM/yyyy")}</span>
+                                      </div>
+                                      <a
+                                        href={attachment.fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="mt-2 inline-flex max-w-full items-center gap-1.5 truncate text-xs text-primary hover:underline"
+                                      >
+                                        <ExternalLink size={12} />
+                                        <span className="truncate" dir="ltr">{attachment.fileUrl}</span>
+                                      </a>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 rounded-xl"
+                                      onClick={() => window.open(attachment.fileUrl, "_blank", "noopener,noreferrer")}
+                                    >
+                                      <Download size={14} />
+                                    </Button>
+                                    {canEdit && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 rounded-xl text-muted-foreground hover:text-destructive"
+                                        onClick={() => deleteAttachment.mutate({ id: attachment.id })}
+                                      >
+                                        <Trash2 size={14} />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+
+              <Collapsible open={transfersOpen} onOpenChange={setTransfersOpen}>
+                <Card className="rounded-2xl border-border/70 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <ArrowRightLeft size={16} />
+                        {t("transferHistory" as any)}
+                      </CardTitle>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
+                          <ChevronDown className={`h-4 w-4 transition-transform ${transfersOpen ? "rotate-180" : ""}`} />
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                  </CardHeader>
+                  <CollapsibleContent>
+                    <CardContent>
+                      {!(transfers as any)?.length ? (
+                        <EmptyState
+                          icon={ArrowRightLeft}
+                          title={isRTL ? "لا يوجد سجل تسليم" : "No handover history"}
+                          description={isRTL ? "سيظهر هنا تاريخ نقل العميل بين أعضاء الفريق." : "Lead handover events between teammates will appear here."}
+                        />
+                      ) : (
+                        <div className="space-y-3">
+                          {(transfers as any).map((tr: any) => (
+                            <div key={tr.id} className="rounded-2xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950/30">
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="font-medium text-blue-700 dark:text-blue-300">{tr.fromUserName}</span>
+                                <ArrowRight size={12} className="text-blue-500" />
+                                <span className="font-medium text-blue-700 dark:text-blue-300">{tr.toUserName}</span>
+                              </div>
+                              {tr.reason && <p className="mt-2 text-xs text-muted-foreground"><span className="font-medium">{t("transferReason" as any)}:</span> {tr.reason}</p>}
+                              {tr.notes && <p className="mt-1 text-xs text-muted-foreground"><span className="font-medium">{t("transferNotes" as any)}:</span> {tr.notes}</p>}
+                              <p className="mt-2 text-xs text-muted-foreground">
+                                <Clock size={10} className="me-1 inline" />
+                                {format(new Date(tr.createdAt), "dd/MM/yyyy HH:mm")}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+            </div>
           </div>
         </div>
       </div>
@@ -1678,7 +1849,7 @@ export default function LeadProfile() {
               <Label>{t("notes")}</Label>
               <Textarea {...actRegister("notes")} rows={3} />
             </div>
-            <div className="flex gap-2 justify-end">
+            <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShowActivity(false)}>{t("cancel")}</Button>
               <Button type="submit" style={{ background: tokens.primaryColor }} className="text-white" disabled={createActivity.isPending}>
                 {createActivity.isPending ? t("loading") : t("save")}
@@ -1740,7 +1911,7 @@ export default function LeadProfile() {
               <Textarea {...dealRegister("notes")} rows={2} />
             </div>
             {tamaraStatus?.enabled && (
-              <div className="flex items-center justify-between rounded-lg border p-3" style={{ borderColor: "#c084fc40", background: "linear-gradient(135deg, #c084fc10 0%, #f472b610 50%, #fb923c10 100%)" }}>
+              <div className="flex items-center justify-between rounded-xl border p-3" style={{ borderColor: "#c084fc40", background: "linear-gradient(135deg, #c084fc10 0%, #f472b610 50%, #fb923c10 100%)" }}>
                 <div>
                   <p className="text-sm font-medium">{isRTL ? "إرسال رابط تمارا" : "Send Tamara Payment Link"}</p>
                   <p className="text-[10px] text-muted-foreground">{isRTL ? "ادفع بالتقسيط عبر تمارا" : "Auto-send installment payment link"}</p>
@@ -1748,7 +1919,7 @@ export default function LeadProfile() {
                 <Switch checked={sendViaTamara} onCheckedChange={setSendViaTamara} />
               </div>
             )}
-            <div className="flex gap-2 justify-end">
+            <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShowDeal(false)}>{t("cancel")}</Button>
               <Button type="submit" style={{ background: tokens.primaryColor }} className="text-white" disabled={createDeal.isPending}>
                 {createDeal.isPending ? t("loading") : t("save")}
@@ -1792,14 +1963,10 @@ export default function LeadProfile() {
                 placeholder={isRTL ? "اكتب ملاحظات للزميل عن حالة العميل..." : "Write notes for your colleague about the lead status..."}
               />
             </div>
-            <div className="flex gap-2 justify-end">
+            <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShowTransfer(false)}>{t("cancel")}</Button>
-              <Button type="submit" className="text-white gap-1.5" style={{ background: "#3b82f6" }} disabled={transferLead.isPending}>
-                {transferLead.isPending ? (
-                  <><Loader2 size={14} className="animate-spin" /> {t("loading")}</>
-                ) : (
-                  <><ArrowRightLeft size={14} /> {t("transferLead" as any)}</>
-                )}
+              <Button type="submit" className="gap-1.5 text-white" style={{ background: "#3b82f6" }} disabled={transferLead.isPending}>
+                {transferLead.isPending ? <><Loader2 size={14} className="animate-spin" /> {t("loading")}</> : <><ArrowRightLeft size={14} /> {t("transferLead" as any)}</>}
               </Button>
             </div>
           </form>
@@ -1820,21 +1987,16 @@ export default function LeadProfile() {
                 ? "هل أنت متأكد من حذف هذا العميل؟ سيتم حذف جميع الأنشطة والصفقات المرتبطة. لا يمكن التراجع عن هذا الإجراء."
                 : "Are you sure you want to delete this lead? All associated activities and deals will also be deleted. This action cannot be undone."}
             </p>
-            <div className="flex gap-2 justify-end">
+            <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShowDeleteConfirm(false)}>{t("cancel")}</Button>
               <Button variant="destructive" className="gap-1.5" onClick={() => deleteLead.mutate({ id: leadId })} disabled={deleteLead.isPending}>
-                {deleteLead.isPending ? (
-                  <><Loader2 size={14} className="animate-spin" /> {t("loading")}</>
-                ) : (
-                  <><Trash2 size={14} /> {isRTL ? "حذف" : "Delete"}</>
-                )}
+                {deleteLead.isPending ? <><Loader2 size={14} className="animate-spin" /> {t("loading")}</> : <><Trash2 size={14} /> {isRTL ? "حذف" : "Delete"}</>}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* ─── Assign Collaborator Dialog ─── */}
       <Dialog open={showAssign} onOpenChange={setShowAssign}>
         <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
           <DialogHeader>
@@ -1846,10 +2008,7 @@ export default function LeadProfile() {
           <div className="space-y-4">
             <div>
               <Label>{isRTL ? "اختر الشخص" : "Select Person"}</Label>
-              <Select onValueChange={(v) => {
-                const el = document.getElementById("assign-user-id") as HTMLInputElement;
-                if (el) el.value = v;
-              }}>
+              <Select onValueChange={(v) => setAssignUserId(Number(v))}>
                 <SelectTrigger><SelectValue placeholder={isRTL ? "اختر..." : "Select..."} /></SelectTrigger>
                 <SelectContent>
                   {(allUsers ?? []).filter((u: any) => u.id !== lead?.ownerId).map((agent: any) => (
@@ -1859,7 +2018,6 @@ export default function LeadProfile() {
                   ))}
                 </SelectContent>
               </Select>
-              <input type="hidden" id="assign-user-id" />
             </div>
             <div>
               <Label>{isRTL ? "الدور" : "Role"}</Label>
@@ -1875,46 +2033,206 @@ export default function LeadProfile() {
             </div>
             <div>
               <Label>{isRTL ? "السبب" : "Reason"}</Label>
-              <Input id="assign-reason" placeholder={isRTL ? "مثال: متابعة الشيفت التاني" : "e.g. Second shift follow-up"} />
+              <Input value={assignReason} onChange={(e) => setAssignReason(e.target.value)} placeholder={isRTL ? "مثال: متابعة الشيفت التاني" : "e.g. Second shift follow-up"} />
             </div>
             <div>
               <Label>{isRTL ? "ملاحظات" : "Notes"}</Label>
-              <Textarea id="assign-notes" rows={2} placeholder={isRTL ? "ملاحظات إضافية..." : "Additional notes..."} />
+              <Textarea value={assignNotes} onChange={(e) => setAssignNotes(e.target.value)} rows={2} placeholder={isRTL ? "ملاحظات إضافية..." : "Additional notes..."} />
             </div>
-            <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={() => setShowAssign(false)}>{t("cancel")}</Button>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => { setShowAssign(false); setAssignUserId(0); setAssignReason(""); setAssignNotes(""); }}>{t("cancel")}</Button>
               <Button
-                className="text-white gap-1.5"
+                className="gap-1.5 text-white"
                 style={{ background: "#8b5cf6" }}
                 disabled={assignCollaborator.isPending}
                 onClick={() => {
-                  const userId = Number((document.getElementById("assign-user-id") as HTMLInputElement)?.value);
-                  const reason = (document.getElementById("assign-reason") as HTMLInputElement)?.value;
-                  const notes = (document.getElementById("assign-notes") as HTMLTextAreaElement)?.value;
-                  if (!userId) { toast.error(isRTL ? "اختر شخص" : "Select a person"); return; }
-                  assignCollaborator.mutate({ leadId, userId, role: assignRole as any, reason: reason || undefined, notes: notes || undefined });
+                  if (!assignUserId) {
+                    toast.error(isRTL ? "اختر شخص" : "Select a person");
+                    return;
+                  }
+                  assignCollaborator.mutate({ leadId, userId: assignUserId, role: assignRole as any, reason: assignReason || undefined, notes: assignNotes || undefined });
                 }}
               >
-                {assignCollaborator.isPending ? (
-                  <><Loader2 size={14} className="animate-spin" /> {t("loading")}</>
-                ) : (
-                  <><UserPlus size={14} /> {isRTL ? "تعيين" : "Assign"}</>
-                )}
+                {assignCollaborator.isPending ? <><Loader2 size={14} className="animate-spin" /> {t("loading")}</> : <><UserPlus size={14} /> {isRTL ? "تعيين" : "Assign"}</>}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-
     </CRMLayout>
   );
 }
 
-function InfoRow({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
+function FeedItemCard({
+  item,
+  isRTL,
+  t,
+  isFirstInDay,
+  onDeleteActivity,
+  onDeleteNote,
+  canEdit,
+  userId,
+  userRole,
+}: {
+  item: { id: string; itemId: number; kind: "activity" | "note"; date: Date; data: any };
+  isRTL: boolean;
+  t: (key: any) => string;
+  isFirstInDay: boolean;
+  onDeleteActivity: (id: number) => void;
+  onDeleteNote: (id: number) => void;
+  canEdit: boolean;
+  userId?: number;
+  userRole?: string;
+}) {
+  const isNote = item.kind === "note";
+  const Icon = isNote ? MessageSquare : activityIconMap[item.data.type] ?? Activity;
+  const title = isNote
+    ? (isRTL ? "ملاحظة داخلية" : "Internal note")
+    : `${t(item.data.type as any)}${item.data.outcome ? ` · ${t(item.data.outcome as any)}` : ""}`;
+
+  const subtitle = isNote
+    ? item.data.userName ?? "—"
+    : `${item.data.userName ?? "—"}${item.data.outcome ? ` • ${t(item.data.outcome as any)}` : ""}`;
+
+  const canDeleteCurrentNote = isNote ? (item.data.userId === userId || userRole === "Admin" || userRole === "admin") : false;
+  const canDeleteThis = isNote ? canDeleteCurrentNote : canEdit;
+  const dayLabel = formatFeedDateLabel(item.date, isRTL);
+
   return (
-    <div>
-      <span className="text-xs text-muted-foreground block">{label}</span>
-      <span className={`text-sm text-foreground ${mono ? "font-mono" : ""}`}>{value ?? "—"}</span>
+    <div className="relative ps-12">
+      {isFirstInDay && (
+        <div className="mb-3 flex items-center gap-3">
+          <div className={`absolute ${isRTL ? "right-[18px]" : "left-[18px]"} top-1 h-3 w-3 -translate-x-1/2 rounded-full bg-primary`} />
+          <div className="inline-flex items-center rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-semibold text-muted-foreground shadow-sm">
+            {dayLabel}
+          </div>
+        </div>
+      )}
+
+      <div className={`absolute ${isRTL ? "right-[18px]" : "left-[18px]"} top-4 -translate-x-1/2`}>
+        <div className={`flex h-9 w-9 items-center justify-center rounded-2xl border ${isNote ? "border-violet-200 bg-violet-50 text-violet-600" : "border-blue-200 bg-blue-50 text-blue-600"} shadow-sm`}>
+          <Icon size={16} />
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-border/60 bg-background p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-foreground">{title}</p>
+              {item.kind === "activity" && item.data.outcome && (
+                <span className={`text-xs font-medium ${outcomeColors[item.data.outcome] ?? "text-muted-foreground"}`}>
+                  {t(item.data.outcome as any)}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              <span>{subtitle}</span>
+              <span>•</span>
+              <span>{format(item.date, "dd/MM/yyyy HH:mm")}</span>
+            </div>
+
+            {isNote ? (
+              <p className="break-words whitespace-pre-wrap text-sm text-foreground">{item.data.content}</p>
+            ) : item.data.notes ? (
+              <p className="break-words whitespace-pre-wrap text-sm text-foreground">{item.data.notes}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {isRTL ? "تم تسجيل هذا النشاط بدون ملاحظات إضافية." : "This activity was logged without additional notes."}
+              </p>
+            )}
+          </div>
+
+          {canDeleteThis && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:text-destructive"
+              onClick={() => (isNote ? onDeleteNote(item.itemId) : onDeleteActivity(item.itemId))}
+            >
+              <Trash2 size={14} />
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  icon: any;
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-6 text-center">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-background shadow-sm">
+        <Icon size={24} className="text-muted-foreground" />
+      </div>
+      <p className="text-sm font-semibold text-foreground">{title}</p>
+      <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">{description}</p>
+      {actionLabel && onAction && (
+        <Button variant="outline" className="mt-4 gap-2 rounded-xl" onClick={onAction}>
+          <Plus size={14} />
+          {actionLabel}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+  mono,
+  multiline,
+  isLink,
+}: {
+  label: string;
+  value?: string | null;
+  mono?: boolean;
+  multiline?: boolean;
+  isLink?: boolean;
+}) {
+  const safeValue = value ?? "—";
+  const treatAsLink = isLink || isProbablyUrl(value);
+  const linkValue = value?.startsWith("http") ? value : value ? `https://${value}` : undefined;
+
+  return (
+    <div className="min-w-0 space-y-1">
+      <span className="block text-xs text-muted-foreground">{label}</span>
+
+      {treatAsLink && value ? (
+        <a
+          href={linkValue}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group inline-flex max-w-full items-center gap-2 overflow-hidden rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-sm text-primary transition-colors hover:bg-muted/40"
+        >
+          <Link2 size={14} className="shrink-0" />
+          <span className="min-w-0 flex-1 truncate break-all">{value}</span>
+          <ExternalLink size={13} className="shrink-0 opacity-70 transition-opacity group-hover:opacity-100" />
+        </a>
+      ) : (
+        <span
+          className={[
+            "block min-w-0 text-sm text-foreground",
+            mono ? "font-mono" : "",
+            multiline ? "break-words whitespace-pre-wrap" : "truncate break-all overflow-hidden",
+          ].join(" ")}
+        >
+          {safeValue}
+        </span>
+      )}
     </div>
   );
 }
