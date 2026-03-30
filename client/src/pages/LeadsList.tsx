@@ -900,10 +900,11 @@ export default function LeadsList() {
                               <Check className={`mr-2 h-4 w-4 ${!campaign ? "opacity-100" : "opacity-0"}`} />
                               {isRTL ? "الكل" : "All"}
                             </CommandItem>
-                            {distinctCampaignNames?.map((name) => (
+                            {distinctCampaignNames?.map((name, idx) => (
                               <CommandItem
-                                key={name}
+                                key={`campaign-${idx}-${name}`}
                                 value={name}
+                                keywords={[name]}
                                 onSelect={() => {
                                   setCampaign(name === campaign ? "" : name);
                                   setPage(0);
