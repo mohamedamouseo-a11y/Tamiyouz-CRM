@@ -48,6 +48,7 @@ import {
   getAgentStats,
   getAllUsers,
   getCampaigns,
+  getDistinctCampaignNames,
   getCustomFields,
   getDealByLead,
   getDealsByUser,
@@ -1046,6 +1047,7 @@ export const appRouter = router({
   // ─── Campaigns ────────────────────────────────────────────────────────────
   campaigns: router({
     list: protectedProcedure.query(() => getCampaigns()),
+    distinctNames: protectedProcedure.query(() => getDistinctCampaignNames()),
 
     create: mediaBuyerOrAdminProcedure
       .input(

@@ -389,6 +389,7 @@ export default function LeadsList() {
   });
 
   const { data: campaigns } = trpc.campaigns.list.useQuery();
+  const { data: distinctCampaignNames } = trpc.campaigns.distinctNames.useQuery();
   const { data: stages } = trpc.pipeline.list.useQuery();
   const { data: users } = trpc.users.list.useQuery(undefined, {
     enabled: isAdminOrManager,
@@ -872,9 +873,9 @@ export default function LeadsList() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t("all")}</SelectItem>
-                      {campaigns?.map((c) => (
-                        <SelectItem key={c.id} value={c.name}>
-                          {c.name}
+                      {distinctCampaignNames?.map((name) => (
+                        <SelectItem key={name} value={name}>
+                          {name}
                         </SelectItem>
                       ))}
                     </SelectContent>
