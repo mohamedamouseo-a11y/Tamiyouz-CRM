@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useThemeTokens } from "@/contexts/ThemeTokenContext";
@@ -15,6 +16,8 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
   AlertTriangle,
+  Check,
+  ChevronsUpDown,
   Copy,
   Download,
   Loader2,
@@ -166,6 +169,7 @@ export default function LeadsList() {
   const [quality, setQuality] = useState<string>(() => initialParams.get("quality") ?? "all");
   const [fitStatusFilter, setFitStatusFilter] = useState<string>(() => initialParams.get("fitStatus") ?? "all");
   const [campaign, setCampaign] = useState<string>(() => initialParams.get("campaign") ?? "");
+  const [campaignOpen, setCampaignOpen] = useState(false);
   const [slaBreached, setSlaBreached] = useState(() => initialParams.get("slaBreached") === "true");
   const [page, setPage] = useState(getInitialPage);
   const [showNewLead, setShowNewLead] = useState(false);
@@ -861,25 +865,60 @@ export default function LeadsList() {
               {visibleColumns.includes("campaign") && (
                 <div className="space-y-2 min-w-[170px]">
                   <Label>{isRTL ? "الحملة" : "Campaign"}</Label>
-                  <Select
-                    value={campaign || "all"}
-                    onValueChange={(v) => {
-                      setCampaign(v === "all" ? "" : v);
-                      setPage(0);
-                    }}
-                  >
-                    <SelectTrigger className="w-[170px]">
-                      <SelectValue placeholder={t("campaign")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("all")}</SelectItem>
-                      {distinctCampaignNames?.map((name) => (
-                        <SelectItem key={name} value={name}>
-                          {name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={campaignOpen} onOpenChange={setCampaignOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={campaignOpen}
+                        className="w-[220px] justify-between text-sm font-normal h-9 truncate"
+                      >
+                        <span className="truncate">
+                          {campaign
+                            ? campaign.length > 24
+                              ? campaign.slice(0, 24) + "…"
+                              : campaign
+                            : isRTL ? "الكل" : "All"}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[280px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder={isRTL ? "ابحث عن حملة..." : "Search campaigns..."} />
+                        <CommandList>
+                          <CommandEmpty>{isRTL ? "لا توجد نتائج" : "No campaigns found."}</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="__all__"
+                              onSelect={() => {
+                                setCampaign("");
+                                setPage(0);
+                                setCampaignOpen(false);
+                              }}
+                            >
+                              <Check className={`mr-2 h-4 w-4 ${!campaign ? "opacity-100" : "opacity-0"}`} />
+                              {isRTL ? "الكل" : "All"}
+                            </CommandItem>
+                            {distinctCampaignNames?.map((name) => (
+                              <CommandItem
+                                key={name}
+                                value={name}
+                                onSelect={() => {
+                                  setCampaign(name === campaign ? "" : name);
+                                  setPage(0);
+                                  setCampaignOpen(false);
+                                }}
+                              >
+                                <Check className={`mr-2 h-4 w-4 ${campaign === name ? "opacity-100" : "opacity-0"}`} />
+                                {name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
 
@@ -1509,3 +1548,4 @@ function Users(props: any) {
     </svg>
   );
 }
+
