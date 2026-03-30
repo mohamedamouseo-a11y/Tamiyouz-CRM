@@ -4232,3 +4232,28 @@ export async function getDistinctCampaignNames(): Promise<string[]> {
   `);
   return (rows as any[]).map((r: any) => r.campaignName);
 }
+
+// ─── Get Entity By ID (for audit log details) ────────────────────────────────
+export async function getActivityById(id: number) {
+  const db = await getDb();
+  const result = await db.select().from(activities).where(eq(activities.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getUserById(id: number) {
+  const db = await getDb();
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getCampaignById(id: number) {
+  const db = await getDb();
+  const result = await db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getInternalNoteById(id: number) {
+  const db = await getDb();
+  const result = await db.select().from(internalNotes).where(eq(internalNotes.id, id)).limit(1);
+  return result[0];
+}
