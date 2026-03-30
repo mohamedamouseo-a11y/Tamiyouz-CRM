@@ -498,3 +498,14 @@ button:not(:disabled):hover,
   color: #cbd5e1;
   border-color: #64748b;
 }
+
+
+/* Lead Profile 3-column grid layout */
+.lead-profile-grid {
+  grid-template-columns: 1fr;
+}
+@media (min-width: 1024px) {
+  .lead-profile-grid {
+    grid-template-columns: 340px minmax(0, 1fr) 360px;
+  }
+}

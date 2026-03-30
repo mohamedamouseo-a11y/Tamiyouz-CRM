@@ -987,7 +987,7 @@ export default function LeadProfile() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[340px,minmax(0,1fr),360px]">
+          <div className="lead-profile-grid grid gap-6">
             <div className="space-y-4 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin">
               <Card className="rounded-2xl border-border/70 shadow-sm">
                 <CardHeader className="pb-3">
