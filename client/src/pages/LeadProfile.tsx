@@ -899,90 +899,94 @@ export default function LeadProfile() {
                         </div>
                       </div>
 
-                      {!headerCollapsed && <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-3 py-1.5">
-                            <span
-                              className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold text-white"
-                              style={{ background: stageColor[lead.stage] ?? tokens.primaryColor }}
-                            >
-                              {t(lead.stage as any)}
-                            </span>
-                            <LeadQualityBadge quality={lead.leadQuality} />
-                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${fitConfig.bg} ${fitConfig.color}`}>
-                              <FitIcon size={12} />
-                              {isRTL ? fitConfig.labelAr : fitConfig.label}
-                            </span>
-                            {lead.isDuplicate && (
-                              <Badge variant="outline" className="gap-1">
-                                <Copy size={11} />
-                                {t("duplicate")}
-                              </Badge>
-                            )}
-                            {isSlaBreached && (
-                              <Badge variant="destructive" className="gap-1">
-                                <AlertTriangle size={11} />
-                                SLA
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-3">
-                          <LeadScoreRing score={leadScore} t={t} />
-                          <div className="min-w-[220px] rounded-2xl border border-border/60 bg-muted/20 p-3">
-                            <div className="mb-2 flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">SLA</p>
-                                <p className="text-sm font-medium" style={{ color: slaStatus.color }}>
-                                  {t(slaStatus.labelKey as any)}
-                                </p>
-                              </div>
-                              <div className="text-right text-xs text-muted-foreground">
-                                <p>{Math.round(slaProgressValue)}%</p>
-                                <p>{slaElapsedHours}/{slaThresholdHours}h</p>
+                      {!headerCollapsed && (
+                        <>
+                          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-3 py-1.5">
+                                <span
+                                  className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold text-white"
+                                  style={{ background: stageColor[lead.stage] ?? tokens.primaryColor }}
+                                >
+                                  {t(lead.stage as any)}
+                                </span>
+                                <LeadQualityBadge quality={lead.leadQuality} />
+                                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${fitConfig.bg} ${fitConfig.color}`}>
+                                  <FitIcon size={12} />
+                                  {isRTL ? fitConfig.labelAr : fitConfig.label}
+                                </span>
+                                {lead.isDuplicate && (
+                                  <Badge variant="outline" className="gap-1">
+                                    <Copy size={11} />
+                                    {t("duplicate")}
+                                  </Badge>
+                                )}
+                                {isSlaBreached && (
+                                  <Badge variant="destructive" className="gap-1">
+                                    <AlertTriangle size={11} />
+                                    SLA
+                                  </Badge>
+                                )}
                               </div>
                             </div>
-                            <Progress value={slaProgressValue} className="h-2" />
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        {canEdit && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1.5 rounded-xl text-blue-600 border-blue-200 hover:bg-blue-50"
-                              onClick={() => setShowTransfer(true)}
-                            >
-                              <ArrowRightLeft size={14} />
-                              {isRTL ? "تسليم" : "Handover"}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1.5 rounded-xl text-purple-600 border-purple-200 hover:bg-purple-50"
-                              onClick={() => setShowAssign(true)}
-                            >
-                              <UserPlus size={14} />
-                              {isRTL ? "تعيين متعاون" : "Assign"}
-                            </Button>
-                          </>
-                        )}
-                        {(user?.role === "Admin" || user?.role === "admin") && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5 rounded-xl text-destructive hover:bg-destructive hover:text-white"
-                            onClick={() => setShowDeleteConfirm(true)}
-                          >
-                            <Trash2 size={14} />
-                            {isRTL ? "حذف" : "Delete"}
-                          </Button>
-                        )}
-                      </div>}
+                            <div className="flex flex-wrap items-center gap-3">
+                              <LeadScoreRing score={leadScore} t={t} />
+                              <div className="min-w-[220px] rounded-2xl border border-border/60 bg-muted/20 p-3">
+                                <div className="mb-2 flex items-center justify-between gap-3">
+                                  <div>
+                                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">SLA</p>
+                                    <p className="text-sm font-medium" style={{ color: slaStatus.color }}>
+                                      {t(slaStatus.labelKey as any)}
+                                    </p>
+                                  </div>
+                                  <div className="text-right text-xs text-muted-foreground">
+                                    <p>{Math.round(slaProgressValue)}%</p>
+                                    <p>{slaElapsedHours}/{slaThresholdHours}h</p>
+                                  </div>
+                                </div>
+                                <Progress value={slaProgressValue} className="h-2" />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {canEdit && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1.5 rounded-xl text-blue-600 border-blue-200 hover:bg-blue-50"
+                                  onClick={() => setShowTransfer(true)}
+                                >
+                                  <ArrowRightLeft size={14} />
+                                  {isRTL ? "تسليم" : "Handover"}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1.5 rounded-xl text-purple-600 border-purple-200 hover:bg-purple-50"
+                                  onClick={() => setShowAssign(true)}
+                                >
+                                  <UserPlus size={14} />
+                                  {isRTL ? "تعيين متعاون" : "Assign"}
+                                </Button>
+                              </>
+                            )}
+                            {(user?.role === "Admin" || user?.role === "admin") && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5 rounded-xl text-destructive hover:bg-destructive hover:text-white"
+                                onClick={() => setShowDeleteConfirm(true)}
+                              >
+                                <Trash2 size={14} />
+                                {isRTL ? "حذف" : "Delete"}
+                              </Button>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
