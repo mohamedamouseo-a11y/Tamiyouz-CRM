@@ -4230,7 +4230,7 @@ export async function getDistinctCampaignNames(): Promise<string[]> {
     ) AS all_campaigns
     ORDER BY campaignName
   `);
-  return ((rows as any)[0] as any[]).map((r: any) => r.campaignName);
+  return (rows as any[]).map((r: any) => r.campaignName);
 }
 
 // ─── Get Entity By ID (for audit log details) ────────────────────────────────
