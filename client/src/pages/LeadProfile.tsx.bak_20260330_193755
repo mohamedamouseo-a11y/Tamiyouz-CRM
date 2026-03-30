@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,7 +36,6 @@ import {
   CalendarClock,
   CheckCircle,
   ChevronDown,
-  ChevronUp,
   Clock,
   Copy,
   CreditCard,
@@ -331,7 +329,6 @@ export default function LeadProfile() {
   const [remindersOpen, setRemindersOpen] = useState(true);
   const [attachmentsOpen, setAttachmentsOpen] = useState(true);
   const [transfersOpen, setTransfersOpen] = useState(false);
-  const [headerCollapsed, setHeaderCollapsed] = useState(false);
 
   const { data: lead, isLoading, refetch } = trpc.leads.byId.useQuery({ id: leadId }, { enabled: Number.isFinite(leadId) });
   const { data: activities, refetch: refetchActivities } = trpc.activities.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
@@ -810,21 +807,21 @@ export default function LeadProfile() {
               className="h-1 rounded-t-2xl"
               style={{ background: `linear-gradient(90deg, ${classConfig.color}, ${stageColor[lead.stage] ?? tokens.primaryColor})` }}
             />
-            <div className="p-3 md:p-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex items-start gap-2">
+            <div className="p-4 md:p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div className="flex items-start gap-3">
                     <Link href="/leads">
-                      <Button variant="ghost" size="icon" className="mt-0.5 h-8 w-8 shrink-0 rounded-xl">
+                      <Button variant="ghost" size="icon" className="mt-0.5 h-9 w-9 shrink-0 rounded-xl">
                         <BackIcon size={16} />
                       </Button>
                     </Link>
 
-                    <div className="min-w-0 flex-1 space-y-2">
+                    <div className="min-w-0 flex-1 space-y-3">
                       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                        <div className="min-w-0 space-y-1.5">
+                        <div className="min-w-0 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h1 className="min-w-0 break-words text-xl font-bold text-foreground md:text-2xl">{lead.name ?? lead.phone}</h1>
+                            <h1 className="min-w-0 break-words text-2xl font-bold text-foreground md:text-3xl">{lead.name ?? lead.phone}</h1>
                             <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${classConfig.bg} ${classConfig.border}`} style={{ color: classConfig.color }}>
                               {isRTL ? classConfig.labelAr : classConfig.label}
                             </span>
@@ -899,7 +896,7 @@ export default function LeadProfile() {
                         </div>
                       </div>
 
-                      {!headerCollapsed && <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-3 py-1.5">
                             <span
@@ -982,36 +979,21 @@ export default function LeadProfile() {
                             {isRTL ? "حذف" : "Delete"}
                           </Button>
                         )}
-                      </div>}
+                      </div>
                     </div>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 rounded-xl self-start mt-1"
-                  onClick={() => setHeaderCollapsed(!headerCollapsed)}
-                  title={headerCollapsed ? (isRTL ? "توسيع" : "Expand") : (isRTL ? "تصغير" : "Collapse")}
-                >
-                  {headerCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                </Button>
               </div>
             </div>
           </div>
 
           <div className="lead-profile-grid grid gap-6">
-            <div className="space-y-4 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin overflow-hidden">
+            <div className="space-y-4 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin">
               <Card className="rounded-2xl border-border/70 shadow-sm">
-                <Tabs defaultValue="basic" className="w-full">
-                  <CardHeader className="pb-2 pt-3">
-                    <TabsList className="w-full">
-                      <TabsTrigger value="basic" className="flex-1 text-xs">{t("basicInfo")}</TabsTrigger>
-                      <TabsTrigger value="form" className="flex-1 text-xs">{t("formDataTab" as any)}</TabsTrigger>
-                      <TabsTrigger value="sales" className="flex-1 text-xs">{t("salesInfo")}</TabsTrigger>
-                    </TabsList>
-                  </CardHeader>
-                  <TabsContent value="basic">
-                <CardContent className="space-y-3 pt-0">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">{t("basicInfo")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   {editMode ? (
                     <>
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-1">
@@ -1134,10 +1116,13 @@ export default function LeadProfile() {
                     </div>
                   )}
                 </CardContent>
-                  </TabsContent>
+              </Card>
 
-                  <TabsContent value="form">
-                <CardContent className="pt-0">
+              <Card className="rounded-2xl border-border/70 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">{t("formDataTab" as any)}</CardTitle>
+                </CardHeader>
+                <CardContent>
                   {(() => {
                     const customData = (lead as any).customFieldsData;
                     const sourceData = (lead as any).sourceMetadata;
@@ -1184,10 +1169,13 @@ export default function LeadProfile() {
                     );
                   })()}
                 </CardContent>
-                  </TabsContent>
+              </Card>
 
-                  <TabsContent value="sales">
-                <CardContent className="space-y-3 pt-0">
+              <Card className="rounded-2xl border-border/70 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">{t("salesInfo")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
                   {editMode ? (
                     <>
                       <div>
@@ -1213,8 +1201,6 @@ export default function LeadProfile() {
                   )}
                   {lead.priceOfferLink && <InfoRow label={t("priceOfferLink")} value={lead.priceOfferLink} isLink />}
                 </CardContent>
-                  </TabsContent>
-                </Tabs>
               </Card>
             </div>
 
@@ -1225,7 +1211,7 @@ export default function LeadProfile() {
                 </CardHeader>
                 <CardContent className="pt-0">
                   <ScrollArea className="w-full whitespace-nowrap">
-                    <div className="inline-flex min-w-full items-center gap-0 pb-2">
+                    <div className="inline-flex min-w-full items-start gap-4 pb-4">
                       {stageList.map((stageItem: any, index: number) => {
                         const stage = stageItem.name ?? stageItem;
                         const stageNames = stageList.map((s: any) => s.name ?? s);
@@ -1236,27 +1222,48 @@ export default function LeadProfile() {
                         const stageDate = stageTimelineDates[stage];
 
                         return (
-                          <div key={stage} className="flex items-center">
-                            <div className="flex flex-col items-center gap-1 min-w-[90px]">
+                          <div key={stage} className="flex min-w-[170px] items-start gap-3">
+                            <div className="flex flex-col items-center">
                               <div
-                                className={`flex h-8 w-8 items-center justify-center rounded-full border-[3px] bg-background text-xs font-bold transition-all ${isCurrent ? 'ring-2 ring-offset-1' : ''}`}
-                                style={{ borderColor: color, color, ...(isCurrent ? { ringColor: `${color}40` } : {}) }}
+                                className="flex h-12 w-12 items-center justify-center rounded-full border-4 bg-background text-sm font-bold"
+                                style={{ borderColor: color, color }}
                               >
-                                {isCompleted ? <CheckCircle size={14} style={{ color }} /> : index + 1}
+                                {index + 1}
                               </div>
-                              <p className="text-[11px] font-medium text-foreground text-center whitespace-normal leading-tight max-w-[85px]">
-                                {isRTL && stageItem.nameAr ? stageItem.nameAr : (t(stage as any) || stage)}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {stageDate ? format(new Date(stageDate), "dd/MM") : ""}
-                              </p>
+                              {index !== stageList.length - 1 && (
+                                <div
+                                  className="mt-2 h-20 w-1 rounded-full lg:hidden"
+                                  style={{ backgroundColor: isCompleted ? color : "#e5e7eb" }}
+                                />
+                              )}
                             </div>
-                            {index !== stageList.length - 1 && (
+
+                            <div className="relative min-w-0 flex-1 pt-1">
                               <div
-                                className="h-[3px] w-6 rounded-full mx-0.5 shrink-0"
-                                style={{ backgroundColor: isCompleted ? "#22c55e" : "#e5e7eb" }}
+                                className={`absolute ${isRTL ? "right-0" : "left-0"} top-6 hidden h-1 w-[calc(100%+1rem)] rounded-full lg:block`}
+                                style={{ backgroundColor: isCompleted ? color : isCurrent ? color : "#e5e7eb" }}
                               />
-                            )}
+                              <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 shadow-sm">
+                                <p className="break-words text-sm font-semibold text-foreground">
+                                  {isRTL && stageItem.nameAr ? stageItem.nameAr : (t(stage as any) || stage)}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {stageDate ? format(new Date(stageDate), "dd/MM/yyyy") : "—"}
+                                </p>
+                                <div className="mt-2">
+                                  <Badge
+                                    variant="outline"
+                                    className="border-transparent text-[11px]"
+                                    style={{
+                                      backgroundColor: isCurrent ? `${color}18` : isCompleted ? "#dcfce7" : "#f1f5f9",
+                                      color,
+                                    }}
+                                  >
+                                    {isCurrent ? (isRTL ? "الحالية" : "Current") : isCompleted ? (isRTL ? "تمت" : "Completed") : (isRTL ? "قادمة" : "Upcoming")}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
@@ -1309,16 +1316,16 @@ export default function LeadProfile() {
                 <CardContent className="space-y-6">
                   <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
                     {composerMode === "note" ? (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <Label className="text-xs font-medium text-muted-foreground">
                           {isRTL ? "ملاحظة داخلية للفريق" : "Internal note for your team"}
                         </Label>
                         <Textarea
                           value={noteText}
                           onChange={(e) => setNoteText(e.target.value)}
-                          placeholder={isRTL ? "اكتب ملاحظة سريعة أو التحيث الأهم عن العميل..." : "Write a quick note or the most important update about this lead..."}
-                          className="min-h-[80px] text-sm"
-                          rows={3}
+                          placeholder={isRTL ? "اكتب ملاحظة سريعة أو التحديث الأهم عن العميل..." : "Write a quick note or the most important update about this lead..."}
+                          className="min-h-[110px] text-sm"
+                          rows={4}
                         />
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-xs text-muted-foreground">
@@ -1405,7 +1412,7 @@ export default function LeadProfile() {
               </Card>
             </div>
 
-            <div className="space-y-4 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin overflow-hidden">
+            <div className="space-y-4 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin">
               <Collapsible open={dealOpen} onOpenChange={setDealOpen}>
                 <Card className="rounded-2xl border-border/70 shadow-sm">
                   <CardHeader className="pb-3">
@@ -2167,15 +2174,15 @@ function EmptyState({
   onAction?: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-4 text-center">
-      <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-background shadow-sm">
-        <Icon size={18} className="text-muted-foreground" />
+    <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-6 text-center">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-background shadow-sm">
+        <Icon size={24} className="text-muted-foreground" />
       </div>
-      <p className="text-xs font-semibold text-foreground">{title}</p>
-      <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">{description}</p>
+      <p className="text-sm font-semibold text-foreground">{title}</p>
+      <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">{description}</p>
       {actionLabel && onAction && (
-        <Button variant="outline" size="sm" className="mt-3 gap-1.5 rounded-xl text-xs" onClick={onAction}>
-          <Plus size={12} />
+        <Button variant="outline" className="mt-4 gap-2 rounded-xl" onClick={onAction}>
+          <Plus size={14} />
           {actionLabel}
         </Button>
       )}
@@ -2201,24 +2208,24 @@ function InfoRow({
   const linkValue = value?.startsWith("http") ? value : value ? `https://${value}` : undefined;
 
   return (
-    <div className="min-w-0 space-y-0.5">
-      <span className="block text-[11px] text-muted-foreground">{label}</span>
+    <div className="min-w-0 space-y-1">
+      <span className="block text-xs text-muted-foreground">{label}</span>
 
       {treatAsLink && value ? (
         <a
           href={linkValue}
           target="_blank"
           rel="noopener noreferrer"
-          className="group inline-flex max-w-full items-center gap-1.5 overflow-hidden rounded-lg border border-border/60 bg-muted/20 px-2 py-1 text-xs text-primary transition-colors hover:bg-muted/40"
+          className="group inline-flex max-w-full items-center gap-2 overflow-hidden rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-sm text-primary transition-colors hover:bg-muted/40"
         >
-          <Link2 size={12} className="shrink-0" />
+          <Link2 size={14} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate break-all">{value}</span>
-          <ExternalLink size={11} className="shrink-0 opacity-70 transition-opacity group-hover:opacity-100" />
+          <ExternalLink size={13} className="shrink-0 opacity-70 transition-opacity group-hover:opacity-100" />
         </a>
       ) : (
         <span
           className={[
-            "block min-w-0 text-xs text-foreground",
+            "block min-w-0 text-sm text-foreground",
             mono ? "font-mono" : "",
             multiline ? "break-words whitespace-pre-wrap" : "truncate break-all overflow-hidden",
           ].join(" ")}
