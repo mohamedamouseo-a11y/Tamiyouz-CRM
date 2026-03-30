@@ -764,7 +764,7 @@ export default function AuditLogPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[25, 50, 100].map((value) => (
+                    {[10, 15, 25, 50, 100, 200].map((value) => (
                       <SelectItem key={value} value={String(value)}>
                         {value}
                       </SelectItem>
@@ -1006,9 +1006,9 @@ export default function AuditLogPage() {
                                             </div>
 
                                             {showRaw ? (
-                                              <div className="rounded-2xl border border-border/50 bg-background p-3">
-                                                <ScrollArea className="max-h-56">
-                                                  <pre className="whitespace-pre-wrap break-all text-xs leading-6 text-muted-foreground">
+                                              <div className="rounded-2xl border border-border/50 bg-background p-3 overflow-hidden">
+                                                <ScrollArea className="max-h-56 w-full">
+                                                  <pre className="whitespace-pre-wrap break-words text-xs leading-6 text-muted-foreground overflow-hidden max-w-full">
                                                     {JSON.stringify(
                                                       {
                                                         details: parseMaybeJson(log.details),
@@ -1153,51 +1153,51 @@ export default function AuditLogPage() {
 
                 <ScrollArea className="flex-1">
                   <div className="space-y-6 px-5 py-5 sm:px-6">
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                      <Card className="border-border/60 shadow-none">
-                        <CardContent className="p-4">
+                    <div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
+                      <Card className="border-border/60 shadow-none overflow-hidden">
+                        <CardContent className="p-4 overflow-hidden">
                           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             {isRTL ? "المستخدم" : "User"}
                           </p>
-                          <p className="mt-1 text-sm font-semibold">{detailsLog.userName || (isRTL ? "غير معروف" : "Unknown")}</p>
-                          {detailsLog.userRole ? <p className="mt-1 text-xs text-muted-foreground">{detailsLog.userRole}</p> : null}
+                          <p className="mt-1 text-sm font-semibold truncate">{detailsLog.userName || (isRTL ? "غير معروف" : "Unknown")}</p>
+                          {detailsLog.userRole ? <p className="mt-1 text-xs text-muted-foreground truncate">{detailsLog.userRole}</p> : null}
                         </CardContent>
                       </Card>
-                      <Card className="border-border/60 shadow-none">
-                        <CardContent className="p-4">
+                      <Card className="border-border/60 shadow-none overflow-hidden">
+                        <CardContent className="p-4 overflow-hidden">
                           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             {isRTL ? "الكيان" : "Entity"}
                           </p>
-                          <p className="mt-1 text-sm font-semibold">{getEntityLabel(detailsLog.entityType, isRTL ? "ar" : "en")}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{getEntityDisplay(detailsLog, isRTL ? "ar" : "en")}</p>
+                          <p className="mt-1 text-sm font-semibold truncate">{getEntityLabel(detailsLog.entityType, isRTL ? "ar" : "en")}</p>
+                          <p className="mt-1 text-xs text-muted-foreground truncate">{getEntityDisplay(detailsLog, isRTL ? "ar" : "en")}</p>
                         </CardContent>
                       </Card>
-                      <Card className="border-border/60 shadow-none">
-                        <CardContent className="p-4">
+                      <Card className="border-border/60 shadow-none overflow-hidden">
+                        <CardContent className="p-4 overflow-hidden">
                           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             {isRTL ? "المعرف" : "Identifier"}
                           </p>
-                          <p className="mt-1 text-sm font-semibold">#{detailsLog.entityId ?? detailsLog.id}</p>
+                          <p className="mt-1 text-sm font-semibold truncate">#{detailsLog.entityId ?? detailsLog.id}</p>
                         </CardContent>
                       </Card>
-                      <Card className="border-border/60 shadow-none">
-                        <CardContent className="p-4">
+                      <Card className="border-border/60 shadow-none overflow-hidden">
+                        <CardContent className="p-4 overflow-hidden">
                           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             {isRTL ? "وقت العملية" : "Operation Time"}
                           </p>
-                          <p className="mt-1 text-sm font-semibold">{getTimeLabel(detailsLog.createdAt, isRTL ? "ar" : "en")}</p>
+                          <p className="mt-1 text-sm font-semibold truncate">{getTimeLabel(detailsLog.createdAt, isRTL ? "ar" : "en")}</p>
                         </CardContent>
                       </Card>
                     </div>
 
-                    <Card className="border-border/60 shadow-none">
+                    <Card className="border-border/60 shadow-none overflow-hidden">
                       <CardHeader className="pb-3">
                         <CardTitle className="text-base">
                           {isRTL ? "الوصف المختصر" : "Narrative Summary"}
                         </CardTitle>
                       </CardHeader>
-                      <CardContent>
-                        <p className="text-sm leading-7 text-foreground/90">
+                      <CardContent className="overflow-hidden">
+                        <p className="text-sm leading-7 text-foreground/90 break-words">
                           {(() => {
                             const sentence = getActionSentence(detailsLog, isRTL ? "ar" : "en");
                             return isRTL
@@ -1209,23 +1209,23 @@ export default function AuditLogPage() {
                     </Card>
 
                     {buildDiffRows(detailsLog).length > 0 ? (
-                      <Card className="border-border/60 shadow-none">
+                      <Card className="border-border/60 shadow-none overflow-hidden">
                         <CardHeader className="pb-3">
                           <CardTitle className="text-base">
                             {isRTL ? "قبل وبعد" : "Before → After"}
                           </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-3">
+                        <CardContent className="space-y-3 overflow-hidden">
                           {buildDiffRows(detailsLog).map((row) => (
-                            <div key={row.key} className="grid gap-3 rounded-2xl border border-border/60 bg-muted/20 p-4 lg:grid-cols-[180px_1fr_28px_1fr] lg:items-center">
-                              <div className="text-sm font-medium text-muted-foreground">
+                            <div key={row.key} className="grid gap-3 rounded-2xl border border-border/60 bg-muted/20 p-4 lg:grid-cols-[180px_1fr_28px_1fr] lg:items-center overflow-hidden">
+                              <div className="text-sm font-medium text-muted-foreground truncate">
                                 {humanizeKey(row.key, isRTL ? "ar" : "en")}
                               </div>
-                              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-950/40 dark:bg-red-950/20 dark:text-red-300">
+                              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-950/40 dark:bg-red-950/20 dark:text-red-300 break-words overflow-hidden">
                                 {formatValue(row.previous, isRTL ? "ar" : "en")}
                               </div>
                               <div className="hidden justify-center text-muted-foreground lg:flex">→</div>
-                              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-950/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+                              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-950/40 dark:bg-emerald-950/20 dark:text-emerald-300 break-words overflow-hidden">
                                 {formatValue(row.next, isRTL ? "ar" : "en")}
                               </div>
                             </div>
@@ -1233,7 +1233,7 @@ export default function AuditLogPage() {
                         </CardContent>
                       </Card>
                     ) : getSummaryObject(detailsLog) ? (
-                      <Card className="border-border/60 shadow-none">
+                      <Card className="border-border/60 shadow-none overflow-hidden">
                         <CardHeader className="pb-3">
                           <CardTitle className="text-base">
                             {detailsLog.action === "create" || detailsLog.action === "calendar_event_created"
@@ -1249,14 +1249,14 @@ export default function AuditLogPage() {
                                   : "Operation Details"}
                           </CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="overflow-hidden">
                           <div className="grid gap-3 md:grid-cols-2">
                             {Object.entries(getSummaryObject(detailsLog) as ObjectLike).map(([key, value]) => (
-                              <div key={key} className="rounded-2xl border border-border/60 bg-muted/20 p-4">
-                                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              <div key={key} className="rounded-2xl border border-border/60 bg-muted/20 p-4 overflow-hidden">
+                                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">
                                   {humanizeKey(key, isRTL ? "ar" : "en")}
                                 </p>
-                                <p className="mt-1 text-sm font-medium leading-7">
+                                <p className="mt-1 text-sm font-medium leading-7 break-words">
                                   {formatValue(value, isRTL ? "ar" : "en")}
                                 </p>
                               </div>
@@ -1266,16 +1266,16 @@ export default function AuditLogPage() {
                       </Card>
                     ) : null}
 
-                    <Card className="border-border/60 shadow-none">
+                    <Card className="border-border/60 shadow-none overflow-hidden">
                       <CardHeader className="pb-3">
                         <CardTitle className="text-base">
                           {isRTL ? "البيانات الخام" : "Raw Data"}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="rounded-2xl border border-border/60 bg-muted/20 p-3">
-                          <ScrollArea className="max-h-72">
-                            <pre className="whitespace-pre-wrap break-all text-xs leading-6 text-muted-foreground">
+                        <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 overflow-hidden">
+                          <ScrollArea className="max-h-72 w-full">
+                            <pre className="whitespace-pre-wrap break-words text-xs leading-6 text-muted-foreground overflow-hidden max-w-full">
                               {JSON.stringify(
                                 {
                                   details: parseMaybeJson(detailsLog.details),
