@@ -722,29 +722,7 @@ export const translations = {
 
 
 
-    // Reminders
-    remindersTab: "التذكيرات",
-    reminders: "التذكيرات",
-    addReminder: "إضافة تذكير",
-    reminderTitle: "عنوان التذكير",
-    reminderDescription: "الوصف",
-    reminderDate: "التاريخ",
-    reminderTime: "الوقت",
-    reminderPriority: "الأولوية",
-    priorityLow: "منخفضة",
-    priorityMedium: "متوسطة",
-    priorityHigh: "عالية",
-    reminderPending: "قيد الانتظار",
-    reminderDone: "مكتمل",
-    reminderCancelled: "ملغي",
-    markAsDone: "تم",
-    noReminders: "لا توجد تذكيرات",
-    todayTasks: "مهام اليوم",
-    todoList: "قائمة المهام",
-    allReminders: "كل التذكيرات",
-    upcomingReminders: "التذكيرات القادمة",
-    overdueReminders: "تذكيرات متأخرة",
-    completedReminders: "تذكيرات مكتملة",
+    // Reminders    remindersTab: "التذكيرات",    reminders: "التذكيرات",    addReminder: "إضافة تذكير",    reminderTitle: "عنوان التذكير",    reminderDescription: "الوصف",    reminderDate: "التاريخ",    reminderTime: "الوقت",    reminderPriority: "الأولوية",    priorityLow: "منخفضة",    priorityMedium: "متوسطة",    priorityHigh: "عالية",    reminderPending: "قيد الانتظار",    reminderDone: "مكتمل",    reminderCancelled: "ملغي",    markAsDone: "تم",    noReminders: "لا توجد تذكيرات",    todayTasks: "مهام اليوم",    todoList: "قائمة المهام",    allReminders: "كل التذكيرات",    upcomingReminders: "التذكيرات القادمة",    overdueReminders: "تذكيرات متأخرة",    completedReminders: "تذكيرات مكتملة",
     // Support Center
     supportCenter: "مركز الدعم",
     supportAdmin: "إدارة الدعم",
@@ -1533,29 +1511,7 @@ export const translations = {
 
 
 
-    // Reminders
-    remindersTab: "Reminders",
-    reminders: "Reminders",
-    addReminder: "Add Reminder",
-    reminderTitle: "Reminder Title",
-    reminderDescription: "Description",
-    reminderDate: "Date",
-    reminderTime: "Time",
-    reminderPriority: "Priority",
-    priorityLow: "Low",
-    priorityMedium: "Medium",
-    priorityHigh: "High",
-    reminderPending: "Pending",
-    reminderDone: "Done",
-    reminderCancelled: "Cancelled",
-    markAsDone: "Done",
-    noReminders: "No reminders",
-    todayTasks: "Today Tasks",
-    todoList: "To Do List",
-    allReminders: "All Reminders",
-    upcomingReminders: "Upcoming Reminders",
-    overdueReminders: "Overdue Reminders",
-    completedReminders: "Completed Reminders",
+    // Reminders    remindersTab: "Reminders",    reminders: "Reminders",    addReminder: "Add Reminder",    reminderTitle: "Reminder Title",    reminderDescription: "Description",    reminderDate: "Date",    reminderTime: "Time",    reminderPriority: "Priority",    priorityLow: "Low",    priorityMedium: "Medium",    priorityHigh: "High",    reminderPending: "Pending",    reminderDone: "Done",    reminderCancelled: "Cancelled",    markAsDone: "Done",    noReminders: "No reminders",    todayTasks: "Today Tasks",    todoList: "To Do List",    allReminders: "All Reminders",    upcomingReminders: "Upcoming Reminders",    overdueReminders: "Overdue Reminders",    completedReminders: "Completed Reminders",
     // Support Center
     supportCenter: "Support Center",
     supportAdmin: "Support Admin",

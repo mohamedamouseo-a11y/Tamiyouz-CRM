@@ -808,7 +808,7 @@ export default function LeadProfile() {
               style={{ background: `linear-gradient(90deg, ${classConfig.color}, ${stageColor[lead.stage] ?? tokens.primaryColor})` }}
             />
             <div className="p-4 md:p-5">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 flex-1 space-y-3">
                   <div className="flex items-start gap-3">
                     <Link href="/leads">
@@ -851,7 +851,7 @@ export default function LeadProfile() {
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                           <Button
                             variant="outline"
                             className="gap-2 rounded-xl"
@@ -896,7 +896,7 @@ export default function LeadProfile() {
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-3 py-1.5">
                             <span
@@ -987,8 +987,8 @@ export default function LeadProfile() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[340px,minmax(0,1fr),360px]">
-            <div className="space-y-4 xl:sticky xl:top-28 xl:self-start">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[340px,minmax(0,1fr),360px]">
+            <div className="space-y-4 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin">
               <Card className="rounded-2xl border-border/70 shadow-sm">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold">{t("basicInfo")}</CardTitle>
@@ -996,7 +996,7 @@ export default function LeadProfile() {
                 <CardContent className="space-y-4">
                   {editMode ? (
                     <>
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-1">
                         <div>
                           <Label className="text-xs">{t("leadName")}</Label>
                           <Input {...register("name")} className="mt-1" />
@@ -1232,7 +1232,7 @@ export default function LeadProfile() {
                               </div>
                               {index !== stageList.length - 1 && (
                                 <div
-                                  className="mt-2 h-20 w-1 rounded-full xl:hidden"
+                                  className="mt-2 h-20 w-1 rounded-full lg:hidden"
                                   style={{ backgroundColor: isCompleted ? color : "#e5e7eb" }}
                                 />
                               )}
@@ -1240,7 +1240,7 @@ export default function LeadProfile() {
 
                             <div className="relative min-w-0 flex-1 pt-1">
                               <div
-                                className={`absolute ${isRTL ? "right-0" : "left-0"} top-6 hidden h-1 w-[calc(100%+1rem)] rounded-full xl:block`}
+                                className={`absolute ${isRTL ? "right-0" : "left-0"} top-6 hidden h-1 w-[calc(100%+1rem)] rounded-full lg:block`}
                                 style={{ backgroundColor: isCompleted ? color : isCurrent ? color : "#e5e7eb" }}
                               />
                               <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 shadow-sm">
@@ -1412,7 +1412,7 @@ export default function LeadProfile() {
               </Card>
             </div>
 
-            <div className="space-y-4 xl:sticky xl:top-28 xl:self-start">
+            <div className="space-y-4 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin">
               <Collapsible open={dealOpen} onOpenChange={setDealOpen}>
                 <Card className="rounded-2xl border-border/70 shadow-sm">
                   <CardHeader className="pb-3">
@@ -2236,3 +2236,4 @@ function InfoRow({
     </div>
   );
 }
+
