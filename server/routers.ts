@@ -188,6 +188,10 @@ import {
   getDb,
   getExchangeRates,
   upsertExchangeRate,
+  getActivityById,
+  getUserById,
+  getCampaignById,
+  getInternalNoteById,
 } from "./db";
 
 import { softDeleteFollowUp, restoreFollowUp, softDeleteClientTask, restoreClientTask, softDeleteObjective, restoreObjective, softDeleteDeliverable, restoreDeliverable, softDeleteUpsell, restoreUpsell, softDeleteCommunication, restoreCommunication } from "./db";
@@ -553,6 +557,7 @@ export const appRouter = router({
         if (input.id === ctx.user.id) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "You cannot delete your own account" });
         }
+        const existing = await getUserById(input.id);
         await deleteUser(input.id, ctx.user.id);
         await createAuditLog({
           userId: ctx.user.id,
@@ -561,6 +566,9 @@ export const appRouter = router({
           action: "soft_delete",
           entityType: "users",
           entityId: input.id,
+          entityName: existing?.name ?? "Unknown",
+          details: { deletedUser: existing?.name, email: existing?.email, role: existing?.role },
+          previousValue: existing ? { name: existing.name, email: existing.email, role: existing.role, phone: (existing as any).phone } : null,
         });
         return { success: true };
       }),
@@ -719,14 +727,13 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         // SalesAgent can only delete their own leads
+        const lead = await getLeadById(input.id);
         if (ctx.user.role === "SalesAgent") {
-          const lead = await getLeadById(input.id);
           if (!lead || lead.ownerId !== ctx.user.id) {
             throw new TRPCError({ code: "FORBIDDEN", message: "You can only delete leads assigned to you" });
           }
         }
         await deleteLead(input.id, ctx.user.id);
-        const lead = await getLeadById(input.id);
         await createAuditLog({
           userId: ctx.user.id,
           userName: ctx.user.name,
@@ -735,6 +742,8 @@ export const appRouter = router({
           entityType: "leads",
           entityId: input.id,
           entityName: lead?.name ?? "Unknown",
+          details: { deletedLead: lead?.name, phone: lead?.phone, stage: lead?.stage, country: lead?.country },
+          previousValue: lead ? { name: lead.name, phone: lead.phone, email: lead.email, stage: lead.stage, country: lead.country, campaignName: lead.campaignName } : null,
         });
         return { success: true };
       }),
@@ -937,6 +946,7 @@ export const appRouter = router({
     delete: notMediaBuyerProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
+        const existing = await getActivityById(input.id);
         await deleteActivity(input.id, ctx.user.id);
         await createAuditLog({
           userId: ctx.user.id,
@@ -945,6 +955,9 @@ export const appRouter = router({
           action: "soft_delete",
           entityType: "activities",
           entityId: input.id,
+          entityName: existing ? `${existing.type} #${input.id}` : `#${input.id}`,
+          details: { type: existing?.type, outcome: existing?.outcome, notes: existing?.notes, leadId: existing?.leadId },
+          previousValue: existing ? { type: existing.type, outcome: existing.outcome, notes: existing.notes, activityTime: existing.activityTime, leadId: existing.leadId } : null,
         });
         return { success: true };
       }),
@@ -1081,6 +1094,7 @@ export const appRouter = router({
     delete: mediaBuyerOrAdminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
+        const existing = await getCampaignById(input.id);
         await deleteCampaign(input.id, ctx.user.id);
         await createAuditLog({
           userId: ctx.user.id,
@@ -1089,6 +1103,9 @@ export const appRouter = router({
           action: "soft_delete",
           entityType: "campaigns",
           entityId: input.id,
+          entityName: existing?.name ?? `Campaign #${input.id}`,
+          details: { deletedCampaign: existing?.name, platform: (existing as any)?.platform, status: (existing as any)?.status },
+          previousValue: existing ? { name: existing.name, platform: (existing as any).platform, status: (existing as any).status, budget: (existing as any).budget } : null,
         });
         return { success: true };
       }),
@@ -1388,6 +1405,7 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
+        const existing = await getInternalNoteById(input.id);
         await deleteInternalNote(input.id, ctx.user.id);
         await createAuditLog({
           userId: ctx.user.id,
@@ -1396,6 +1414,9 @@ export const appRouter = router({
           action: "soft_delete",
           entityType: "internalNotes",
           entityId: input.id,
+          entityName: `Note #${input.id}`,
+          details: { content: existing?.content?.substring(0, 200), leadId: existing?.leadId },
+          previousValue: existing ? { content: existing.content, leadId: existing.leadId } : null,
         });
         return { success: true };
       }),
@@ -1794,6 +1815,14 @@ attachments: router({
         if (input.password !== DELETION_PASSWORD) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Incorrect deletion password" });
         }
+        // Capture entity data before permanent deletion
+        let entityData: any = null;
+        let entityName = `#${input.id}`;
+        if (input.entityType === "leads") { entityData = await getLeadById(input.id); entityName = entityData?.name ?? entityName; }
+        else if (input.entityType === "users") { entityData = await getUserById(input.id); entityName = entityData?.name ?? entityName; }
+        else if (input.entityType === "campaigns") { entityData = await getCampaignById(input.id); entityName = entityData?.name ?? entityName; }
+        else if (input.entityType === "activities") { entityData = await getActivityById(input.id); entityName = entityData?.type ? `${entityData.type} #${input.id}` : entityName; }
+        else if (input.entityType === "internalNotes") { entityData = await getInternalNoteById(input.id); entityName = `Note #${input.id}`; }
         const result = await permanentDeleteEntity(input.entityType, input.id);
         if (!result.success) {
           throw new TRPCError({ code: "BAD_REQUEST", message: result.reason ?? "Cannot delete" });
@@ -1805,7 +1834,9 @@ attachments: router({
           action: "permanent_delete",
           entityType: input.entityType,
           entityId: input.id,
-          details: { reason: "Password-verified permanent deletion" },
+          entityName,
+          details: { reason: "Password-verified permanent deletion", entityData: entityData ? JSON.stringify(entityData).substring(0, 500) : null },
+          previousValue: entityData,
         });
         return { success: true };
       }),

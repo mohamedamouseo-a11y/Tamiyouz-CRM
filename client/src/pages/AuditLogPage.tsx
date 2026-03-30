@@ -49,6 +49,8 @@ const actionLabels: Record<string, { en: string; ar: string; color: string }> = 
   calendar_event_created: { en: "Calendar Created", ar: "إنشاء موعد", color: "bg-green-100 text-green-800 border-green-200" },
   calendar_event_updated: { en: "Calendar Updated", ar: "تعديل موعد", color: "bg-blue-100 text-blue-800 border-blue-200" },
   calendar_event_deleted: { en: "Calendar Deleted", ar: "حذف موعد", color: "bg-red-100 text-red-800 border-red-200" },
+  update: { en: "Updated", ar: "تحديث", color: "bg-blue-100 text-blue-800 border-blue-200" },
+  create: { en: "Created", ar: "إنشاء", color: "bg-green-100 text-green-800 border-green-200" },
 };
 
 const entityLabels: Record<string, { en: string; ar: string }> = {
@@ -67,6 +69,9 @@ const entityLabels: Record<string, { en: string; ar: string }> = {
   deliverables: { en: "Deliverable", ar: "مخرج" },
   upsell_opportunities: { en: "Upsell", ar: "فرصة بيع" },
   client_communications: { en: "Channel", ar: "قناة تواصل" },
+  support_request: { en: "Support Request", ar: "طلب دعم" },
+  support_request_reply: { en: "Support Reply", ar: "رد دعم" },
+  support_request_status: { en: "Support Status", ar: "حالة الدعم" },
 };
 
 const actionIcons: Record<string, React.ReactNode> = {
@@ -260,10 +265,29 @@ export default function AuditLogPage() {
                           <TableCell className="text-sm">
                             {log.entityName || `#${log.entityId}`}
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground max-w-[200px]">
+                          <TableCell className="text-xs text-muted-foreground max-w-[250px]">
                             <div className="flex items-center gap-1">
                               <span className="truncate">
-                                {log.details ? JSON.stringify(log.details).substring(0, 50) + "..." : "-"}
+                                {(() => {
+                                  // Show details summary
+                                  if (log.details) {
+                                    const d = typeof log.details === "string" ? (() => { try { return JSON.parse(log.details); } catch { return null; } })() : log.details;
+                                    if (d && typeof d === "object") {
+                                      const entries = Object.entries(d).filter(([_, v]) => v != null && v !== "");
+                                      return entries.slice(0, 3).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(", ").substring(0, 80) + (entries.length > 3 ? "..." : "");
+                                    }
+                                    return JSON.stringify(log.details).substring(0, 80);
+                                  }
+                                  // For delete actions without details, show previousValue summary
+                                  if ((log.action === "soft_delete" || log.action === "permanent_delete") && log.previousValue) {
+                                    const pv = typeof log.previousValue === "string" ? (() => { try { return JSON.parse(log.previousValue); } catch { return null; } })() : log.previousValue;
+                                    if (pv && typeof pv === "object") {
+                                      const entries = Object.entries(pv).filter(([_, v]) => v != null && v !== "");
+                                      return entries.slice(0, 3).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(", ").substring(0, 80) + (entries.length > 3 ? "..." : "");
+                                    }
+                                  }
+                                  return "-";
+                                })()}
                               </span>
                               {(log.previousValue || log.newValue || log.details) && (
                                 <Button
