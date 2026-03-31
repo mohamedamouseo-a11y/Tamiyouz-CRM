@@ -308,6 +308,7 @@ export const leads = mysqlTable("leads", {
 	country: varchar({ length: 100 }).default('Saudi Arabia'),
 	businessProfile: text(),
 	leadQuality: mysqlEnum(['Hot','Warm','Cold','Bad','Unknown']).default('Unknown').notNull(),
+	fitStatus: mysqlEnum("fit_status", ["Fit","Not Fit","Pending"]).default("Pending").notNull(),
 	campaignName: varchar({ length: 255 }),
 	adCreative: varchar({ length: 255 }),
 	ownerId: int(),
