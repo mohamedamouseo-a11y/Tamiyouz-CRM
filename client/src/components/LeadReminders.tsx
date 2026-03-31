@@ -101,14 +101,14 @@ export default function LeadReminders({ leadId }: { leadId: number }) {
       </div>
 
       {showForm && (
-        <div className="border rounded-lg p-2.5 space-y-2 bg-muted/30">
+        <div className="border rounded-lg p-2 space-y-1.5 bg-muted/30 overflow-hidden">
           <div>
             <Label className="text-xs">{t("reminderTitle" as any)}</Label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={isRTL ? "مثال: متابعة العميل" : "e.g. Follow up with client"}
-              className="h-7 text-xs mt-1"
+              className="h-6 text-[11px] mt-0.5"
             />
           </div>
           <div>
@@ -117,23 +117,23 @@ export default function LeadReminders({ leadId }: { leadId: number }) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={isRTL ? "تفاصيل إضافية..." : "Additional details..."}
-              className="text-xs mt-1 min-h-[40px]"
-              rows={2}
+              className="text-[11px] mt-0.5 min-h-[32px]"
+              rows={1}
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             <div>
               <Label className="text-[10px]">{t("reminderDate" as any)}</Label>
-              <Input type="date" value={reminderDate} onChange={(e) => setReminderDate(e.target.value)} className="h-7 text-xs mt-0.5" />
+              <Input type="date" value={reminderDate} onChange={(e) => setReminderDate(e.target.value)} className="h-6 text-[10px] mt-0.5 px-1" />
             </div>
             <div>
               <Label className="text-[10px]">{t("reminderTime" as any)}</Label>
-              <Input type="time" value={reminderTime} onChange={(e) => setReminderTime(e.target.value)} className="h-7 text-xs mt-0.5" />
+              <Input type="time" value={reminderTime} onChange={(e) => setReminderTime(e.target.value)} className="h-6 text-[10px] mt-0.5 px-1" />
             </div>
             <div>
               <Label className="text-[10px]">{t("reminderPriority" as any)}</Label>
               <Select value={priority} onValueChange={(v: any) => setPriority(v)}>
-                <SelectTrigger className="h-7 text-xs mt-0.5"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-6 text-[10px] mt-0.5 px-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Low">{t("priorityLow" as any)}</SelectItem>
                   <SelectItem value="Medium">{t("priorityMedium" as any)}</SelectItem>
@@ -142,7 +142,7 @@ export default function LeadReminders({ leadId }: { leadId: number }) {
               </Select>
             </div>
           </div>
-          <Button size="sm" onClick={handleSubmit} disabled={createMutation.isPending} className="w-full h-7 text-xs">
+          <Button size="sm" onClick={handleSubmit} disabled={createMutation.isPending} className="w-full h-6 text-xs">
             {createMutation.isPending ? "..." : t("addReminder" as any)}
           </Button>
         </div>

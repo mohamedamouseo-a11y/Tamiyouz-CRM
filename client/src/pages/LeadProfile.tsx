@@ -740,7 +740,10 @@ export default function LeadProfile() {
   ].filter(Boolean) as Array<{ key: string; icon: any; title: string; description: string; className: string }>;
 
   const stageList = useMemo(
-    () => stages ?? STAGES_FALLBACK.map((stageName) => ({ name: stageName, nameAr: stageName })),
+    () => {
+      const list = stages ?? STAGES_FALLBACK.map((stageName) => ({ name: stageName, nameAr: stageName, color: "#6366f1" }));
+      return list.filter((s: any) => s.isActive === undefined || s.isActive === 1 || s.isActive === true);
+    },
     [stages]
   );
 
@@ -1216,7 +1219,7 @@ export default function LeadProfile() {
                         const state = getStageState(stage, lead.stage, stageNames);
                         const isCompleted = state === "completed";
                         const isCurrent = state === "current";
-                        const color = isCompleted ? "#22c55e" : isCurrent ? stageColor[stage] ?? tokens.primaryColor : "#cbd5e1";
+                        const color = isCompleted ? "#22c55e" : isCurrent ? (stageItem.color ?? stageColor[stage] ?? tokens.primaryColor) : "#cbd5e1";
                         const stageDate = stageTimelineDates[stage];
 
                         return (
@@ -1563,7 +1566,7 @@ export default function LeadProfile() {
                     {isRTL ? "التذكيرات" : "Reminders"}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-4 pb-3 pt-0">
+                <CardContent className="px-3 pb-3 pt-0 overflow-hidden">
                   <LeadReminders leadId={leadId} />
                 </CardContent>
               </Card>
