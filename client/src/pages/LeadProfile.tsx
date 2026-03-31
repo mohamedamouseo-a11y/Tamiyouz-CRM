@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useThemeTokens } from "@/contexts/ThemeTokenContext";
@@ -949,8 +950,26 @@ export default function LeadProfile() {
 
 
           <div className="lead-profile-grid grid gap-4">
-            {/* ═══════════ RIGHT COLUMN — Info (stacked, no tabs) ═══════════ */}
-            <div className="space-y-3 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin overflow-hidden">
+            {/* ═══════════ LEFT COLUMN — Tabs (Info / Stages & Notes / Reminders) ═══════════ */}
+            <div className="min-w-0">
+              <Tabs defaultValue="info" className="w-full">
+                <TabsList className="w-full mb-4">
+                  <TabsTrigger value="info" className="flex-1 gap-1.5 text-xs">
+                    <Users size={14} />
+                    {isRTL ? "المعلومات" : "Info"}
+                  </TabsTrigger>
+                  <TabsTrigger value="stages" className="flex-1 gap-1.5 text-xs">
+                    <Activity size={14} />
+                    {isRTL ? "المراحل والملاحظات" : "Stages & Notes"}
+                  </TabsTrigger>
+                  <TabsTrigger value="reminders" className="flex-1 gap-1.5 text-xs">
+                    <CalendarClock size={14} />
+                    {isRTL ? "التذكيرات" : "Reminders"}
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* ── Tab: Info ── */}
+                <TabsContent value="info">
               <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
                 <CardContent className="p-4 space-y-4">
                   {editMode ? (
@@ -1145,10 +1164,11 @@ export default function LeadProfile() {
                   )}
                 </CardContent>
               </Card>
-            </div>
+                </TabsContent>
 
-            {/* ═══════════ MIDDLE COLUMN — Stage Journey + Workspace ═══════════ */}
-            <div className="min-w-0 space-y-4">
+                {/* ── Tab: Stages & Notes ── */}
+                <TabsContent value="stages">
+                  <div className="space-y-4">
               <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
                 <CardHeader className="pb-2 pt-3 px-4">
                   <CardTitle className="text-sm font-semibold">{t("stageJourney" as any)}</CardTitle>
@@ -1312,9 +1332,27 @@ export default function LeadProfile() {
                   )}
                 </CardContent>
               </Card>
+                  </div>
+                </TabsContent>
+
+                {/* ── Tab: Reminders ── */}
+                <TabsContent value="reminders">
+                  <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
+                    <CardHeader className="pb-1 pt-3 px-4">
+                      <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <CalendarClock size={13} className="text-primary" />
+                        {isRTL ? "التذكيرات" : "Reminders"}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-3 pb-3 pt-0 overflow-hidden">
+                      <LeadReminders leadId={leadId} />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             </div>
 
-            {/* ═══════════ LEFT COLUMN — Actions (stacked cards, no tabs) ═══════════ */}
+            {/* ═══════════ RIGHT COLUMN — Sidebar (Deal / Team / Attachments / Transfers) ═══════════ */}
             <div className="space-y-3 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin overflow-hidden">
 
               {/* ── Deal Section ── */}
@@ -1496,19 +1534,6 @@ export default function LeadProfile() {
                       {isRTL ? "تعيين متعاون" : "Assign"}
                     </Button>
                   )}
-                </CardContent>
-              </Card>
-
-              {/* ── Reminders ── */}
-              <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
-                <CardHeader className="pb-1 pt-3 px-4">
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <CalendarClock size={13} className="text-primary" />
-                    {isRTL ? "التذكيرات" : "Reminders"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-3 pb-3 pt-0 overflow-hidden">
-                  <LeadReminders leadId={leadId} />
                 </CardContent>
               </Card>
 

@@ -500,17 +500,17 @@ button:not(:disabled):hover,
 }
 
 
-/* Lead Profile 3-column grid layout */
+/* Lead Profile 2-column grid layout */
 .lead-profile-grid {
   grid-template-columns: 1fr;
 }
 @media (min-width: 1024px) {
   .lead-profile-grid {
-    grid-template-columns: 260px minmax(0, 1fr) 260px;
+    grid-template-columns: minmax(0, 1fr) 300px;
   }
 }
 @media (min-width: 1440px) {
   .lead-profile-grid {
-    grid-template-columns: 280px minmax(0, 1fr) 280px;
+    grid-template-columns: minmax(0, 1fr) 320px;
   }
 }
