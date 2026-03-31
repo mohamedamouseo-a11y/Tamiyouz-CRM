@@ -17,7 +17,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -1210,45 +1209,43 @@ export default function LeadProfile() {
                 <CardHeader className="pb-2 pt-3 px-4">
                   <CardTitle className="text-sm font-semibold">{t("stageJourney" as any)}</CardTitle>
                 </CardHeader>
-                <CardContent className="px-4 pb-3 pt-0">
-                  <ScrollArea className="w-full whitespace-nowrap">
-                    <div className="inline-flex min-w-full items-center gap-0 pb-2">
-                      {stageList.map((stageItem: any, index: number) => {
-                        const stage = stageItem.name ?? stageItem;
-                        const stageNames = stageList.map((s: any) => s.name ?? s);
-                        const state = getStageState(stage, lead.stage, stageNames);
-                        const isCompleted = state === "completed";
-                        const isCurrent = state === "current";
-                        const color = isCompleted ? "#22c55e" : isCurrent ? (stageItem.color ?? stageColor[stage] ?? tokens.primaryColor) : "#cbd5e1";
-                        const stageDate = stageTimelineDates[stage];
+                <CardContent className="px-2 pb-2 pt-0">
+                  <div className="flex flex-wrap items-start justify-center gap-0 pb-1">
+                    {stageList.map((stageItem: any, index: number) => {
+                      const stage = stageItem.name ?? stageItem;
+                      const stageNames = stageList.map((s: any) => s.name ?? s);
+                      const state = getStageState(stage, lead.stage, stageNames);
+                      const isCompleted = state === "completed";
+                      const isCurrent = state === "current";
+                      const color = isCompleted ? "#22c55e" : isCurrent ? (stageItem.color ?? stageColor[stage] ?? tokens.primaryColor) : "#cbd5e1";
+                      const stageDate = stageTimelineDates[stage];
 
-                        return (
-                          <div key={stage} className="flex items-center">
-                            <div className="flex flex-col items-center gap-1 min-w-[80px]">
-                              <div
-                                className={`flex h-7 w-7 items-center justify-center rounded-full border-[2.5px] bg-background text-[10px] font-bold transition-all ${isCurrent ? 'ring-2 ring-offset-1' : ''}`}
-                                style={{ borderColor: color, color, ...(isCurrent ? { ringColor: `${color}40` } : {}) }}
-                              >
-                                {isCompleted ? <CheckCircle size={13} style={{ color }} /> : index + 1}
-                              </div>
-                              <p className="text-[10px] font-medium text-foreground text-center whitespace-normal leading-tight max-w-[75px]">
-                                {isRTL && stageItem.nameAr ? stageItem.nameAr : (t(stage as any) || stage)}
-                              </p>
-                              <p className="text-[9px] text-muted-foreground">
-                                {stageDate ? format(new Date(stageDate), "dd/MM") : ""}
-                              </p>
+                      return (
+                        <div key={stage} className="flex items-center">
+                          <div className="flex flex-col items-center gap-0.5" style={{ width: `${Math.max(45, Math.floor(100 / stageList.length) - 2)}px` }}>
+                            <div
+                              className={`flex h-5 w-5 items-center justify-center rounded-full border-2 bg-background text-[8px] font-bold transition-all ${isCurrent ? 'ring-1 ring-offset-1' : ''}`}
+                              style={{ borderColor: color, color, ...(isCurrent ? { ringColor: `${color}40` } : {}) }}
+                            >
+                              {isCompleted ? <CheckCircle size={10} style={{ color }} /> : index + 1}
                             </div>
-                            {index !== stageList.length - 1 && (
-                              <div
-                                className="h-[2.5px] w-5 rounded-full mx-0.5 shrink-0"
-                                style={{ backgroundColor: isCompleted ? "#22c55e" : "#e5e7eb" }}
-                              />
-                            )}
+                            <p className="text-[8px] font-medium text-foreground text-center whitespace-normal leading-tight max-w-[55px]">
+                              {isRTL && stageItem.nameAr ? stageItem.nameAr : (t(stage as any) || stage)}
+                            </p>
+                            <p className="text-[7px] text-muted-foreground">
+                              {stageDate ? format(new Date(stageDate), "dd/MM") : ""}
+                            </p>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
+                          {index !== stageList.length - 1 && (
+                            <div
+                              className="h-[2px] w-2 rounded-full shrink-0"
+                              style={{ backgroundColor: isCompleted ? "#22c55e" : "#e5e7eb" }}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </CardContent>
               </Card>
 
