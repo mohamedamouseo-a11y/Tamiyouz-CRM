@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1001,35 +1003,42 @@ export default function LeadProfile() {
             </div>
           </div>
 
-
-          <div className="lead-profile-grid grid gap-4">
-            {/* ═══════════ RIGHT COLUMN — Info (stacked, no tabs) ═══════════ */}
-            <div className="space-y-3 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin overflow-hidden">
-              <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
-                <CardContent className="p-4 space-y-4">
+          <div className="lead-profile-grid grid gap-6">
+            <div className="space-y-4 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin overflow-hidden">
+              <Card className="rounded-2xl border-border/70 shadow-sm">
+                <Tabs defaultValue="basic" className="w-full">
+                  <CardHeader className="pb-2 pt-3">
+                    <TabsList className="w-full">
+                      <TabsTrigger value="basic" className="flex-1 text-xs">{t("basicInfo")}</TabsTrigger>
+                      <TabsTrigger value="form" className="flex-1 text-xs">{t("formDataTab" as any)}</TabsTrigger>
+                      <TabsTrigger value="sales" className="flex-1 text-xs">{t("salesInfo")}</TabsTrigger>
+                    </TabsList>
+                  </CardHeader>
+                  <TabsContent value="basic">
+                <CardContent className="space-y-3 pt-0">
                   {editMode ? (
                     <>
-                      <div className="grid grid-cols-1 gap-3">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-1">
                         <div>
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("leadName")}</Label>
-                          <Input {...register("name")} className="mt-1 h-8 text-xs" />
+                          <Label className="text-xs">{t("leadName")}</Label>
+                          <Input {...register("name")} className="mt-1" />
                         </div>
                         <div>
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("phone")}</Label>
-                          <Input {...register("phone")} className="mt-1 h-8 text-xs" dir="ltr" />
+                          <Label className="text-xs">{t("phone")}</Label>
+                          <Input {...register("phone")} className="mt-1" dir="ltr" />
                         </div>
                         <div>
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("country")}</Label>
-                          <Input {...register("country")} className="mt-1 h-8 text-xs" />
+                          <Label className="text-xs">{t("country")}</Label>
+                          <Input {...register("country")} className="mt-1" />
                         </div>
                         <div>
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("businessProfile")}</Label>
-                          <Input {...register("businessProfile")} className="mt-1 h-8 text-xs" dir="ltr" />
+                          <Label className="text-xs">{t("businessProfile")}</Label>
+                          <Input {...register("businessProfile")} className="mt-1" dir="ltr" />
                         </div>
                         <div>
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("leadQuality")}</Label>
+                          <Label className="text-xs">{t("leadQuality")}</Label>
                           <Select defaultValue={lead.leadQuality} onValueChange={(v) => setValue("leadQuality", v as any)}>
-                            <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {["Hot", "Warm", "Cold", "Bad", "Unknown"].map((q) => (
                                 <SelectItem key={q} value={q}>{t(q as any)}</SelectItem>
@@ -1038,9 +1047,9 @@ export default function LeadProfile() {
                           </Select>
                         </div>
                         <div>
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{isRTL ? "حالة الملاءمة" : "Fit Status"}</Label>
+                          <Label className="text-xs">{isRTL ? "حالة الملاءمة" : "Fit Status"}</Label>
                           <Select defaultValue={(lead as any).fitStatus ?? "Pending"} onValueChange={(v) => setValue("fitStatus", v as any)}>
-                            <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Fit">{isRTL ? "مناسب" : "Fit"}</SelectItem>
                               <SelectItem value="Not Fit">{isRTL ? "غير مناسب" : "Not Fit"}</SelectItem>
@@ -1049,9 +1058,9 @@ export default function LeadProfile() {
                           </Select>
                         </div>
                         <div>
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("stage")}</Label>
+                          <Label className="text-xs">{t("stage")}</Label>
                           <Select defaultValue={lead.stage} onValueChange={(v) => setValue("stage", v)}>
-                            <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {stageList.map((stageItem: any) => (
                                 <SelectItem key={stageItem.name} value={stageItem.name}>
@@ -1063,12 +1072,12 @@ export default function LeadProfile() {
                         </div>
                         {["Admin", "SalesManager", "admin"].includes(user?.role ?? "") && (
                           <div>
-                            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("owner")}</Label>
+                            <Label className="text-xs">{t("owner")}</Label>
                             <Select
                               defaultValue={lead.ownerId ? String(lead.ownerId) : undefined}
                               onValueChange={(v) => setValue("ownerId", v === "none" ? undefined : Number(v))}
                             >
-                              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                              <SelectTrigger className="mt-1"><SelectValue placeholder="—" /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="none">—</SelectItem>
                                 {users?.filter((u: any) => u.role === "SalesAgent").map((u: any) => (
@@ -1079,9 +1088,9 @@ export default function LeadProfile() {
                           </div>
                         )}
                         <div>
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("campaign")}</Label>
+                          <Label className="text-xs">{t("campaign")}</Label>
                           <Select defaultValue={lead.campaignName ?? "none"} onValueChange={(v) => setValue("campaignName", v === "none" ? "" : v)}>
-                            <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="none">—</SelectItem>
                               {campaigns?.map((campaign: any) => (
@@ -1091,123 +1100,134 @@ export default function LeadProfile() {
                           </Select>
                         </div>
                       </div>
+
                       <div>
-                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("notes")}</Label>
-                        <Textarea {...register("notes")} className="mt-1 text-xs" rows={2} />
+                        <Label className="text-xs">{t("notes")}</Label>
+                        <Textarea {...register("notes")} className="mt-1 text-sm" rows={3} />
                       </div>
+
                       {(user?.role === "MediaBuyer" || user?.role === "Admin" || user?.role === "admin") && (
                         <div>
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("mediaBuyerNotes")}</Label>
+                          <Label className="text-xs">{t("mediaBuyerNotes")}</Label>
                           {user?.role !== "MediaBuyer" ? (
-                            <Textarea {...register("mediaBuyerNotes")} className="mt-1 text-xs" rows={2} />
+                            <Textarea {...register("mediaBuyerNotes")} className="mt-1 text-sm" rows={2} />
                           ) : (
-                            <p className="mt-1 rounded-lg bg-muted/30 p-2 text-xs text-foreground">{lead.mediaBuyerNotes ?? "—"}</p>
+                            <p className="mt-1 rounded-xl bg-muted/30 p-3 text-sm text-foreground">{lead.mediaBuyerNotes ?? "—"}</p>
                           )}
                         </div>
                       )}
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      <InfoRow label={t("leadName")} value={lead.name} />
+                      <InfoRow label={t("phone")} value={lead.phone} mono />
+                      <InfoRow label={t("country")} value={lead.country} />
+                      <InfoRow label={t("businessProfile")} value={lead.businessProfile} isLink />
+                      <InfoRow label={t("campaign")} value={lead.campaignName} />
+                      <InfoRow label={t("adCreative")} value={lead.adCreative} />
+                      <InfoRow label={t("owner")} value={(lead as any).ownerName ?? (!lead.ownerId ? t("ownerUnassigned" as any) : undefined)} />
+                      <InfoRow
+                        label={t("lastContact" as any)}
+                        value={lastActivityDate ? `${t("sincePrefix" as any)} ${relativeTimeLabel(lastActivityDate, t, isRTL)}` : t("noContactYet" as any)}
+                      />
+                      <InfoRow label={isRTL ? "حالة الملاءمة" : "Fit Status"} value={isRTL ? fitConfig.labelAr : fitConfig.label} />
+                      <InfoRow label={t("notes")} value={lead.notes} multiline />
+                      {(user?.role === "MediaBuyer" || user?.role === "Admin" || user?.role === "admin") && (
+                        <InfoRow label={t("mediaBuyerNotes")} value={lead.mediaBuyerNotes} multiline />
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+                  </TabsContent>
+
+                  <TabsContent value="form">
+                <CardContent className="pt-0">
+                  {(() => {
+                    const customData = (lead as any).customFieldsData;
+                    const sourceData = (lead as any).sourceMetadata;
+                    if (!customData || Object.keys(customData).length === 0) {
+                      return (
+                        <EmptyState
+                          icon={FileText}
+                          title={isRTL ? "لا توجد بيانات نموذج" : "No form data yet"}
+                          description={isRTL ? "لم تصل أي حقول إضافية من النموذج لهذا العميل حتى الآن." : "No extra form fields were captured for this lead yet."}
+                        />
+                      );
+                    }
+
+                    const cleanLabel = (key: string) =>
+                      key.replace(/_/g, " ").replace(/؟/g, "؟").replace(/\s+/g, " ").trim();
+
+                    return (
+                      <div className="space-y-3">
+                        {Object.entries(customData)
+                          .filter(([key]) => key !== "inbox_url")
+                          .map(([key, value]) => (
+                            <InfoRow key={key} label={cleanLabel(key)} value={String(value ?? "")} multiline />
+                          ))}
+
+                        {customData.inbox_url && (
+                          <InfoRow label="Inbox URL" value={customData.inbox_url} isLink />
+                        )}
+
+                        {sourceData && (
+                          <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+                            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              {t("sourceInfo" as any)}
+                            </p>
+                            <div className="grid grid-cols-1 gap-3">
+                              {sourceData.provider && <InfoRow label={t("provider" as any)} value={sourceData.provider} />}
+                              {sourceData.synced_via && <InfoRow label={t("syncMethod" as any)} value={sourceData.synced_via} />}
+                              {sourceData.campaign_id && <InfoRow label="Campaign ID" value={sourceData.campaign_id} mono />}
+                              {sourceData.form_id && <InfoRow label="Form ID" value={sourceData.form_id} mono />}
+                              {sourceData.ad_id && <InfoRow label="Ad ID" value={sourceData.ad_id} mono />}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+                  </TabsContent>
+
+                  <TabsContent value="sales">
+                <CardContent className="space-y-3 pt-0">
+                  {editMode ? (
+                    <>
                       <div>
-                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("serviceIntroduced")}</Label>
-                        <Input {...register("serviceIntroduced")} className="mt-1 h-8 text-xs" />
+                        <Label className="text-xs">{t("serviceIntroduced")}</Label>
+                        <Input {...register("serviceIntroduced")} className="mt-1" />
                       </div>
                       <div>
-                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("adCreative")}</Label>
-                        <Input {...register("adCreative")} className="mt-1 h-8 text-xs" />
+                        <Label className="text-xs">{t("adCreative")}</Label>
+                        <Input {...register("adCreative")} className="mt-1" />
                       </div>
                     </>
                   ) : (
                     <>
-                      {/* Basic Info */}
-                      <div className="space-y-2.5">
-                        <InfoRow label={t("leadName")} value={lead.name} />
-                        <InfoRow label={t("phone")} value={lead.phone} mono />
-                        <InfoRow label={t("country")} value={lead.country} />
-                        <InfoRow label={t("businessProfile")} value={lead.businessProfile} isLink />
-                        <InfoRow label={t("campaign")} value={lead.campaignName} />
-                        <InfoRow label={t("adCreative")} value={lead.adCreative} />
-                        <InfoRow label={t("owner")} value={(lead as any).ownerName ?? (!lead.ownerId ? t("ownerUnassigned" as any) : undefined)} />
-                        <InfoRow
-                          label={t("lastContact" as any)}
-                          value={lastActivityDate ? `${t("sincePrefix" as any)} ${relativeTimeLabel(lastActivityDate, t, isRTL)}` : t("noContactYet" as any)}
-                        />
-                        <InfoRow label={isRTL ? "حالة الملاءمة" : "Fit Status"} value={isRTL ? fitConfig.labelAr : fitConfig.label} />
-                        <InfoRow label={t("notes")} value={lead.notes} multiline />
-                        {(user?.role === "MediaBuyer" || user?.role === "Admin" || user?.role === "admin") && (
-                          <InfoRow label={t("mediaBuyerNotes")} value={lead.mediaBuyerNotes} multiline />
-                        )}
-                      </div>
-
-                      {/* Divider */}
-                      <div className="border-t border-border/40" />
-
-                      {/* Form Data */}
-                      {(() => {
-                        const customData = (lead as any).customFieldsData;
-                        const sourceData = (lead as any).sourceMetadata;
-                        if (!customData || Object.keys(customData).length === 0) return null;
-
-                        const cleanLabel = (key: string) =>
-                          key.replace(/_/g, " ").replace(/؟/g, "؟").replace(/\s+/g, " ").trim();
-
-                        return (
-                          <div className="space-y-2.5">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              {isRTL ? "بيانات النموذج" : "Form Data"}
-                            </p>
-                            {Object.entries(customData)
-                              .filter(([key]) => key !== "inbox_url")
-                              .map(([key, value]) => (
-                                <InfoRow key={key} label={cleanLabel(key)} value={String(value ?? "")} multiline />
-                              ))}
-                            {customData.inbox_url && (
-                              <InfoRow label="Inbox URL" value={customData.inbox_url} isLink />
-                            )}
-                            {sourceData && (
-                              <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 space-y-2">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                  {t("sourceInfo" as any)}
-                                </p>
-                                {sourceData.provider && <InfoRow label={t("provider" as any)} value={sourceData.provider} />}
-                                {sourceData.synced_via && <InfoRow label={t("syncMethod" as any)} value={sourceData.synced_via} />}
-                                {sourceData.campaign_id && <InfoRow label="Campaign ID" value={sourceData.campaign_id} mono />}
-                                {sourceData.form_id && <InfoRow label="Form ID" value={sourceData.form_id} mono />}
-                                {sourceData.ad_id && <InfoRow label="Ad ID" value={sourceData.ad_id} mono />}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-
-                      {/* Divider */}
-                      <div className="border-t border-border/40" />
-
-                      {/* Sales Info */}
-                      <div className="space-y-2.5">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                          {isRTL ? "معلومات المبيعات" : "Sales Info"}
-                        </p>
-                        <InfoRow label={t("serviceIntroduced")} value={lead.serviceIntroduced} />
-                        <InfoRow label={t("adCreative")} value={lead.adCreative} />
-                        {lead.priceOfferSent && (
-                          <div className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-[11px] font-medium text-green-700">
-                            <CheckCircle size={12} />
-                            {t("priceOfferSent")}
-                          </div>
-                        )}
-                        {lead.priceOfferLink && <InfoRow label={t("priceOfferLink")} value={lead.priceOfferLink} isLink />}
-                      </div>
+                      <InfoRow label={t("serviceIntroduced")} value={lead.serviceIntroduced} />
+                      <InfoRow label={t("adCreative")} value={lead.adCreative} />
                     </>
                   )}
+                  {lead.priceOfferSent && (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700">
+                      <CheckCircle size={14} />
+                      {t("priceOfferSent")}
+                    </div>
+                  )}
+                  {lead.priceOfferLink && <InfoRow label={t("priceOfferLink")} value={lead.priceOfferLink} isLink />}
                 </CardContent>
+                  </TabsContent>
+                </Tabs>
               </Card>
             </div>
 
-            {/* ═══════════ MIDDLE COLUMN — Stage Journey + Workspace ═══════════ */}
             <div className="min-w-0 space-y-4">
-              <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
-                <CardHeader className="pb-2 pt-3 px-4">
+              <Card className="rounded-2xl border-border/70 shadow-sm">
+                <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold">{t("stageJourney" as any)}</CardTitle>
                 </CardHeader>
-                <CardContent className="px-4 pb-3 pt-0">
+                <CardContent className="pt-0">
                   <ScrollArea className="w-full whitespace-nowrap">
                     <div className="inline-flex min-w-full items-center gap-0 pb-2">
                       {stageList.map((stageItem: any, index: number) => {
@@ -1221,23 +1241,23 @@ export default function LeadProfile() {
 
                         return (
                           <div key={stage} className="flex items-center">
-                            <div className="flex flex-col items-center gap-1 min-w-[80px]">
+                            <div className="flex flex-col items-center gap-1 min-w-[90px]">
                               <div
-                                className={`flex h-7 w-7 items-center justify-center rounded-full border-[2.5px] bg-background text-[10px] font-bold transition-all ${isCurrent ? 'ring-2 ring-offset-1' : ''}`}
+                                className={`flex h-8 w-8 items-center justify-center rounded-full border-[3px] bg-background text-xs font-bold transition-all ${isCurrent ? 'ring-2 ring-offset-1' : ''}`}
                                 style={{ borderColor: color, color, ...(isCurrent ? { ringColor: `${color}40` } : {}) }}
                               >
-                                {isCompleted ? <CheckCircle size={13} style={{ color }} /> : index + 1}
+                                {isCompleted ? <CheckCircle size={14} style={{ color }} /> : index + 1}
                               </div>
-                              <p className="text-[10px] font-medium text-foreground text-center whitespace-normal leading-tight max-w-[75px]">
+                              <p className="text-[11px] font-medium text-foreground text-center whitespace-normal leading-tight max-w-[85px]">
                                 {isRTL && stageItem.nameAr ? stageItem.nameAr : (t(stage as any) || stage)}
                               </p>
-                              <p className="text-[9px] text-muted-foreground">
+                              <p className="text-[10px] text-muted-foreground">
                                 {stageDate ? format(new Date(stageDate), "dd/MM") : ""}
                               </p>
                             </div>
                             {index !== stageList.length - 1 && (
                               <div
-                                className="h-[2.5px] w-5 rounded-full mx-0.5 shrink-0"
+                                className="h-[3px] w-6 rounded-full mx-0.5 shrink-0"
                                 style={{ backgroundColor: isCompleted ? "#22c55e" : "#e5e7eb" }}
                               />
                             )}
@@ -1249,84 +1269,103 @@ export default function LeadProfile() {
                 </CardContent>
               </Card>
 
-              <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
-                <CardHeader className="pb-2 pt-3 px-4">
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <CardTitle className="text-sm font-semibold">
-                      {isRTL ? "المساحة العملية" : "Lead Workspace"}
-                    </CardTitle>
-                    <div className="inline-flex rounded-lg border border-border/40 bg-muted/30 p-0.5">
+              <Card className="rounded-2xl border-border/70 shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <CardTitle className="text-sm font-semibold">
+                        {isRTL ? "المساحة العملية" : "Lead workspace"}
+                      </CardTitle>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {isRTL
+                          ? "سجّل ملاحظاتك وأنشطتك في مكان واحد بترتيب زمني واضح."
+                          : "Log notes and activities in one unified chronological feed."}
+                      </p>
+                    </div>
+
+                    <div className="inline-flex rounded-xl border border-border/60 bg-muted/30 p-1">
                       <Button
                         type="button"
                         size="sm"
                         variant={composerMode === "note" ? "default" : "ghost"}
-                        className="rounded-md h-7 text-xs px-2.5"
+                        className="rounded-lg"
                         style={composerMode === "note" ? { background: tokens.primaryColor, color: "white" } : {}}
                         onClick={() => setComposerMode("note")}
                       >
-                        <MessageSquare size={12} className="me-1" />
-                        {isRTL ? "ملاحظة" : "Note"}
+                        <MessageSquare size={14} className="me-1" />
+                        {isRTL ? "إضافة ملاحظة" : "Add note"}
                       </Button>
                       <Button
                         type="button"
                         size="sm"
                         variant={composerMode === "activity" ? "default" : "ghost"}
-                        className="rounded-md h-7 text-xs px-2.5"
+                        className="rounded-lg"
                         style={composerMode === "activity" ? { background: tokens.primaryColor, color: "white" } : {}}
                         onClick={() => setComposerMode("activity")}
                       >
-                        <Activity size={12} className="me-1" />
-                        {isRTL ? "نشاط" : "Activity"}
+                        <Activity size={14} className="me-1" />
+                        {isRTL ? "تسجيل نشاط" : "Log activity"}
                       </Button>
                     </div>
                   </div>
                 </CardHeader>
 
-                <CardContent className="px-4 pb-4 pt-0 space-y-4">
-                  <div className="rounded-xl border border-border/40 bg-muted/20 p-3">
+                <CardContent className="space-y-6">
+                  <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
                     {composerMode === "note" ? (
                       <div className="space-y-2">
+                        <Label className="text-xs font-medium text-muted-foreground">
+                          {isRTL ? "ملاحظة داخلية للفريق" : "Internal note for your team"}
+                        </Label>
                         <Textarea
                           value={noteText}
                           onChange={(e) => setNoteText(e.target.value)}
-                          placeholder={isRTL ? "اكتب ملاحظة سريعة..." : "Write a quick note..."}
-                          className="min-h-[60px] text-xs"
-                          rows={2}
+                          placeholder={isRTL ? "اكتب ملاحظة سريعة أو التحيث الأهم عن العميل..." : "Write a quick note or the most important update about this lead..."}
+                          className="min-h-[80px] text-sm"
+                          rows={3}
                         />
-                        <div className="flex items-center justify-end">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs text-muted-foreground">
+                            {isRTL ? "ستظهر هذه الملاحظة مباشرة داخل الخط الزمني." : "This note will appear directly in the activity feed."}
+                          </p>
                           <Button
                             size="sm"
                             style={{ background: tokens.primaryColor }}
-                            className="gap-1.5 rounded-lg text-white h-7 text-xs"
+                            className="gap-2 rounded-xl text-white"
                             onClick={onAddNote}
                             disabled={createNote.isPending || !noteText.trim()}
                           >
-                            {createNote.isPending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-                            {isRTL ? "حفظ" : "Save"}
+                            {createNote.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                            {isRTL ? "حفظ الملاحظة" : "Save note"}
                           </Button>
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            <Activity size={14} />
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                            <Activity size={20} />
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold text-foreground">
-                              {isRTL ? "سجّل آخر تواصل مع العميل" : "Log the latest touchpoint"}
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="text-sm font-semibold text-foreground">
+                              {isRTL ? "سجّل آخر تواصل أو خطوة تمت مع العميل" : "Log the latest touchpoint or action taken"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {isRTL
+                                ? "استخدم النموذج الكامل حتى تحفظ نوع النشاط والنتيجة والوقت بدقة."
+                                : "Use the full activity form to save the type, outcome, and timestamp accurately."}
                             </p>
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg h-7 text-xs" onClick={() => setShowActivity(true)}>
-                            <Plus size={12} />
+                          <Button variant="outline" className="gap-2 rounded-xl" onClick={() => setShowActivity(true)}>
+                            <Plus size={14} />
                             {t("newActivity")}
                           </Button>
                           {lastActivityDate && (
-                            <div className="inline-flex items-center gap-1.5 rounded-lg border border-border/40 bg-background px-2 py-1 text-[10px] text-muted-foreground">
-                              <Clock size={11} />
-                              {isRTL ? "آخر نشاط:" : "Latest:"} {relativeTimeLabel(lastActivityDate, t, isRTL)}
+                            <div className="inline-flex items-center gap-2 rounded-xl border border-border/60 bg-background px-3 py-2 text-xs text-muted-foreground">
+                              <Clock size={13} />
+                              {isRTL ? "آخر نشاط:" : "Latest activity:"} {relativeTimeLabel(lastActivityDate, t, isRTL)}
                             </div>
                           )}
                         </div>
@@ -1338,14 +1377,14 @@ export default function LeadProfile() {
                     <EmptyState
                       icon={Activity}
                       title={isRTL ? "لا يوجد سجل نشاط بعد" : "No activity feed yet"}
-                      description={isRTL ? "ابدأ بإضافة ملاحظة أو تسجيل أول نشاط." : "Start by adding a note or logging the first activity."}
+                      description={isRTL ? "ابدأ بإضافة ملاحظة أو تسجيل أول نشاط حتى يتكوّن التاريخ الكامل لهذا العميل." : "Start by adding a note or logging the first activity to build this lead’s history."}
                       actionLabel={composerMode === "note" ? (isRTL ? "أضف أول ملاحظة" : "Add first note") : t("newActivity")}
                       onAction={composerMode === "note" ? undefined : () => setShowActivity(true)}
                     />
                   ) : (
                     <div className="relative">
                       <div className={`absolute ${isRTL ? "right-[18px]" : "left-[18px]"} top-0 h-full w-px bg-border/70`} />
-                      <div className="space-y-4">
+                      <div className="space-y-5">
                         {feedItems.map((item, index) => (
                           <FeedItemCard
                             key={item.id}
@@ -1370,369 +1409,345 @@ export default function LeadProfile() {
               </Card>
             </div>
 
-            {/* ═══════════ LEFT COLUMN — Actions (stacked cards, no tabs) ═══════════ */}
-            <div className="space-y-3 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:scrollbar-thin overflow-hidden">
+            <div className="lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] overflow-hidden">
+              <Card className="rounded-2xl border-border/70 shadow-sm h-full flex flex-col">
+                <Tabs defaultValue="deals" className="w-full flex flex-col h-full">
+                  <CardHeader className="pb-2 pt-3 shrink-0">
+                    <TabsList className="w-full">
+                      <TabsTrigger value="deals" className="flex-1 text-xs gap-1"><CreditCard size={12} />{t("dealInfo")}</TabsTrigger>
+                      <TabsTrigger value="reminders" className="flex-1 text-xs gap-1"><CalendarClock size={12} />{isRTL ? "تذكيرات" : "Reminders"}</TabsTrigger>
+                      <TabsTrigger value="history" className="flex-1 text-xs gap-1"><ArrowRightLeft size={12} />{isRTL ? "سجل" : "History"}</TabsTrigger>
+                    </TabsList>
+                  </CardHeader>
 
-              {/* ── Deal Section ── */}
-              <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
-                <CardHeader className="pb-1 pt-3 px-4">
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <CreditCard size={13} className="text-blue-600" />
-                    {isRTL ? "الصفقة" : "Deal"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-4 pb-3 pt-0 space-y-2.5">
-                  {!deal ? (
-                    <EmptyState
-                      icon={CreditCard}
-                      title={isRTL ? "لا توجد صفقة" : "No deal yet"}
-                      description={isRTL ? "أنشئ أول صفقة لهذا العميل." : "Create the first deal for this lead."}
-                      actionLabel={t("createDeal")}
-                      onAction={canEdit ? () => setShowDeal(true) : undefined}
-                    />
-                  ) : (
-                    <div className="space-y-2.5">
-                      <div className="rounded-xl border border-blue-200/50 bg-blue-50/30 p-3 dark:border-blue-800/30 dark:bg-blue-950/20">
-                        <div className="flex items-center justify-between gap-2">
-                          <div>
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("dealValue")}</p>
-                            <p className="mt-0.5 text-xl font-bold text-foreground">
-                              {deal.valueSar ? `${Number(deal.valueSar).toLocaleString()} ${(deal as any).currency || "SAR"}` : "—"}
-                            </p>
-                          </div>
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                              deal.status === "Won"
-                                ? "bg-green-100 text-green-700"
-                                : deal.status === "Lost"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-yellow-100 text-yellow-700"
-                            }`}
-                          >
-                            {deal.status === "Won" ? <CheckCircle size={10} /> : deal.status === "Lost" ? <XCircle size={10} /> : <Clock size={10} />}
-                            {t(deal.status as any)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <InfoRow label={t("dealType")} value={t(deal.dealType as any)} />
-                        {deal.closedAt && <InfoRow label={t("closedAt")} value={format(new Date(deal.closedAt), "dd/MM/yyyy")} />}
-                        {deal.lossReason && <InfoRow label={t("lossReason")} value={deal.lossReason} multiline />}
-                        {deal.notes && <InfoRow label={t("notes")} value={deal.notes} multiline />}
-                      </div>
-
-                      {canEdit && (
-                        <div className="rounded-lg border border-border/40 p-2">
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("dealStatus")}</Label>
-                          <Select defaultValue={deal.status} onValueChange={(v) => updateDeal.mutate({ id: deal.id, status: v as any })}>
-                            <SelectTrigger className="mt-1 h-7 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Pending">{t("Pending")}</SelectItem>
-                              <SelectItem value="Won">{t("Won")}</SelectItem>
-                              <SelectItem value="Lost">{t("Lost")}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {tamaraStatus?.enabled && deal.status === "Pending" && (
-                        <Button
-                          size="sm"
-                          className="w-full gap-1.5 rounded-lg text-white font-medium h-7 text-xs"
-                          style={{ background: "linear-gradient(135deg, #c084fc 0%, #f472b6 50%, #fb923c 100%)" }}
-                          onClick={handleTamaraPayment}
-                          disabled={tamaraLoading}
-                        >
-                          {tamaraLoading ? <Loader2 size={12} className="animate-spin" /> : <ExternalLink size={12} />}
-                          {isRTL ? "ادفع عبر تمارا" : "Pay with Tamara"}
-                        </Button>
-                      )}
-
-                      {((deal as any).currency === "EGP" ? paymobStatus?.eg : paymobStatus?.sa) && deal.status === "Pending" && (
-                        <Button
-                          size="sm"
-                          className="w-full gap-1.5 rounded-lg text-white font-medium h-7 text-xs"
-                          style={{ background: "linear-gradient(135deg, #3b82f6 0%, #10b981 100%)" }}
-                          onClick={handlePaymobPayment}
-                          disabled={paymobLoading}
-                        >
-                          {paymobLoading ? <Loader2 size={12} className="animate-spin" /> : <ExternalLink size={12} />}
-                          {isRTL ? "ادفع عبر Paymob" : "Pay with Paymob"}
-                        </Button>
-                      )}
-
-                      {canEdit && deal.status !== "Won" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="w-full gap-1.5 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 h-7 text-xs"
-                          onClick={() => {
-                            if (confirm(isRTL ? "هل أنت متأكد من إلغاء هذه الصفقة؟" : "Are you sure you want to cancel this deal?")) {
-                              cancelDeal.mutate({ id: deal.id, leadId });
-                            }
-                          }}
-                          disabled={cancelDeal.isPending}
-                        >
-                          {cancelDeal.isPending ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                          {isRTL ? "إلغاء الصفقة" : "Cancel Deal"}
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* ── Team & Stakeholders ── */}
-              <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
-                <CardHeader className="pb-1 pt-3 px-4">
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Users size={13} className="text-purple-600" />
-                    {isRTL ? "الفريق والمتعاونون" : "Team & Stakeholders"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-4 pb-3 pt-0 space-y-2">
-                  {(leadAssignments as any[])?.length ? (
-                    <div className="space-y-1.5">
-                      {(leadAssignments as any[])?.map((a: any) => {
-                        const roleLabels: Record<string, string> = {
-                          owner: isRTL ? "المالك" : "Owner",
-                          collaborator: isRTL ? "متعاون" : "Collaborator",
-                          observer: isRTL ? "مراقب" : "Observer",
-                          client_success: "Client Success",
-                          account_manager: "Account Manager",
-                        };
-                        const roleColors: Record<string, string> = {
-                          owner: "bg-blue-100 text-blue-800 border-blue-300",
-                          collaborator: "bg-purple-100 text-purple-800 border-purple-300",
-                          observer: "bg-gray-100 text-gray-600 border-gray-300",
-                          client_success: "bg-amber-100 text-amber-800 border-amber-300",
-                          account_manager: "bg-green-100 text-green-800 border-green-300",
-                        };
-
-                        return (
-                          <div key={a.id} className="flex items-center justify-between gap-2 rounded-lg border border-border/40 bg-muted/20 p-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-medium text-foreground">{a.userName}</p>
-                              <Badge variant="outline" className={`mt-0.5 border text-[10px] h-5 ${roleColors[a.role] ?? "bg-gray-100"}`}>
-                                {roleLabels[a.role] ?? a.role}
-                              </Badge>
-                            </div>
-                            {a.role !== "owner" && canEdit && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 rounded-md text-muted-foreground hover:text-destructive"
-                                onClick={() => removeAssignment.mutate({ assignmentId: a.id })}
-                              >
-                                <XCircle size={12} />
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      icon={Users}
-                      title={isRTL ? "لا يوجد متعاونون" : "No collaborators"}
-                      description={isRTL ? "أضف شخصًا من الفريق." : "Assign teammates to this lead."}
-                      actionLabel={isRTL ? "تعيين" : "Assign"}
-                      onAction={canEdit ? () => setShowAssign(true) : undefined}
-                    />
-                  )}
-                  {canEdit && (leadAssignments as any[])?.length > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full gap-1.5 rounded-lg h-7 text-xs"
-                      onClick={() => setShowAssign(true)}
-                    >
-                      <UserPlus size={12} />
-                      {isRTL ? "تعيين متعاون" : "Assign"}
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* ── Reminders ── */}
-              <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
-                <CardHeader className="pb-1 pt-3 px-4">
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <CalendarClock size={13} className="text-primary" />
-                    {isRTL ? "التذكيرات" : "Reminders"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-4 pb-3 pt-0">
-                  <LeadReminders leadId={leadId} />
-                </CardContent>
-              </Card>
-
-              {/* ── Attachments ── */}
-              <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
-                <CardHeader className="pb-1 pt-3 px-4">
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Paperclip size={13} />
-                    {t("attachments" as any)}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-4 pb-3 pt-0 space-y-2.5">
-                  {canEdit && (
-                    <form onSubmit={attachmentHandleSubmit(onAddAttachment)} className="space-y-2 rounded-lg border border-dashed border-border/50 p-2.5">
-                      <div>
-                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("attachmentName" as any)}</Label>
-                        <Input {...attachmentRegister("fileName")} className="mt-0.5 h-7 text-xs" />
-                      </div>
-                      <div>
-                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("attachmentUrl" as any)}</Label>
-                        <div className="relative mt-0.5">
-                          <Link2 size={12} className={`absolute ${isRTL ? "right-2" : "left-2"} top-1/2 -translate-y-1/2 text-muted-foreground`} />
-                          <Input
-                            id="attachment-url-input"
-                            {...attachmentRegister("fileUrl", { required: true })}
-                            className={`h-7 text-xs ${isRTL ? "pr-7" : "pl-7"}`}
-                            placeholder="https://..."
-                            dir="ltr"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("attachmentType" as any)}</Label>
-                          <Input {...attachmentRegister("fileType")} className="mt-0.5 h-7 text-xs" />
-                        </div>
-                        <div>
-                          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("attachmentSize" as any)}</Label>
-                          <Input {...attachmentRegister("fileSize")} type="number" min="0" className="mt-0.5 h-7 text-xs" dir="ltr" />
-                        </div>
-                      </div>
-                      <Button
-                        type="submit"
-                        size="sm"
-                        style={{ background: tokens.primaryColor }}
-                        className="gap-1.5 rounded-lg text-white h-7 text-xs"
-                        disabled={createAttachment.isPending}
-                      >
-                        {createAttachment.isPending ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                        {t("addAttachment" as any)}
-                      </Button>
-                    </form>
-                  )}
-
-                  {!attachments?.length ? (
-                    <EmptyState
-                      icon={FolderOpen}
-                      title={isRTL ? "لا توجد مرفقات" : "No attachments"}
-                      description={isRTL ? "أضف أول ملف مرتبط بالعميل." : "Add the first file for this lead."}
-                      actionLabel={isRTL ? "أضف مرفقًا" : "Add attachment"}
-                      onAction={() => {
-                        const target = document.getElementById("attachment-url-input");
-                        target?.focus();
-                      }}
-                    />
-                  ) : (
-                    <div className="space-y-1.5">
-                      {attachments.map((attachment: any) => {
-                        const attachmentMeta = getAttachmentMeta(attachment.fileName, attachment.fileType, attachment.fileUrl, t);
-                        const AttachmentIcon = attachmentMeta.icon;
-
-                        return (
-                          <div key={attachment.id} className="rounded-lg border border-border/40 bg-muted/20 p-2">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex min-w-0 flex-1 items-start gap-2">
-                                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border/40 bg-background">
-                                  <AttachmentIcon size={13} />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-xs font-medium text-foreground">{attachment.fileName}</p>
-                                  <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-muted-foreground">
-                                    <span>{attachmentMeta.label}</span>
-                                    <span>·</span>
-                                    <span>{formatAttachmentSize(attachment.fileSize)}</span>
-                                    <span>·</span>
-                                    <span>{format(new Date(attachment.createdAt), "dd/MM")}</span>
-                                  </div>
-                                  <a
-                                    href={attachment.fileUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="mt-1 inline-flex max-w-full items-center gap-1 truncate text-[10px] text-primary hover:underline"
-                                  >
-                                    <ExternalLink size={10} />
-                                    <span className="truncate" dir="ltr">{attachment.fileUrl}</span>
-                                  </a>
-                                </div>
+                  {/* ── Tab 1: Deals + Team ── */}
+                  <TabsContent value="deals" className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
+                    <CardContent className="space-y-4">
+                      {!deal ? (
+                        <EmptyState
+                          icon={CreditCard}
+                          title={isRTL ? "لا توجد صفقة بعد" : "No deal yet"}
+                          description={isRTL ? "أنشئ أول صفقة لهذا العميل وابدأ تتبّع القيمة والمرحلة ووسائل الدفع من مكان واحد." : "Create the first deal for this lead and start tracking value, status, and payment options from one place."}
+                          actionLabel={t("createDeal")}
+                          onAction={canEdit ? () => setShowDeal(true) : undefined}
+                        />
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("dealValue")}</p>
+                                <p className="mt-1 text-2xl font-bold text-foreground">
+                                  {deal.valueSar ? `${Number(deal.valueSar).toLocaleString()} ${(deal as any).currency || "SAR"}` : "—"}
+                                </p>
                               </div>
-                              <div className="flex items-center gap-0.5">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 rounded-md"
-                                  onClick={() => window.open(attachment.fileUrl, "_blank", "noopener,noreferrer")}
-                                >
-                                  <Download size={12} />
-                                </Button>
-                                {canEdit && (
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
+                                  deal.status === "Won"
+                                    ? "bg-green-100 text-green-700"
+                                    : deal.status === "Lost"
+                                      ? "bg-red-100 text-red-700"
+                                      : "bg-yellow-100 text-yellow-700"
+                                }`}
+                              >
+                                {deal.status === "Won" ? <CheckCircle size={11} /> : deal.status === "Lost" ? <XCircle size={11} /> : <Clock size={11} />}
+                                {t(deal.status as any)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-3">
+                            <InfoRow label={t("dealType")} value={t(deal.dealType as any)} />
+                            {deal.closedAt && <InfoRow label={t("closedAt")} value={format(new Date(deal.closedAt), "dd/MM/yyyy")} />}
+                            {deal.lossReason && <InfoRow label={t("lossReason")} value={deal.lossReason} multiline />}
+                            {deal.notes && <InfoRow label={t("notes")} value={deal.notes} multiline />}
+                          </div>
+
+                          {canEdit && (
+                            <div className="rounded-2xl border border-border/60 p-3">
+                              <Label className="text-xs">{t("dealStatus")}</Label>
+                              <Select defaultValue={deal.status} onValueChange={(v) => updateDeal.mutate({ id: deal.id, status: v as any })}>
+                                <SelectTrigger className="mt-2 h-10">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Pending">{t("Pending")}</SelectItem>
+                                  <SelectItem value="Won">{t("Won")}</SelectItem>
+                                  <SelectItem value="Lost">{t("Lost")}</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {tamaraStatus?.enabled && deal.status === "Pending" && (
+                            <Button
+                              size="sm"
+                              className="w-full gap-2 rounded-xl text-white font-medium"
+                              style={{ background: "linear-gradient(135deg, #c084fc 0%, #f472b6 50%, #fb923c 100%)" }}
+                              onClick={handleTamaraPayment}
+                              disabled={tamaraLoading}
+                            >
+                              {tamaraLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                              {isRTL ? "ادفع عبر تمارا" : "Pay with Tamara"}
+                            </Button>
+                          )}
+
+                          {((deal as any).currency === "EGP" ? paymobStatus?.eg : paymobStatus?.sa) && deal.status === "Pending" && (
+                            <Button
+                              size="sm"
+                              className="w-full gap-2 rounded-xl text-white font-medium"
+                              style={{ background: "linear-gradient(135deg, #3b82f6 0%, #10b981 100%)" }}
+                              onClick={handlePaymobPayment}
+                              disabled={paymobLoading}
+                            >
+                              {paymobLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                              {isRTL ? "ادفع عبر Paymob" : "Pay with Paymob"}
+                            </Button>
+                          )}
+
+                          {canEdit && deal.status !== "Won" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full gap-2 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => {
+                                if (confirm(isRTL ? "هل أنت متأكد من إلغاء هذه الصفقة؟" : "Are you sure you want to cancel this deal?")) {
+                                  cancelDeal.mutate({ id: deal.id, leadId });
+                                }
+                              }}
+                              disabled={cancelDeal.isPending}
+                            >
+                              {cancelDeal.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                              {isRTL ? "إلغاء الصفقة" : "Cancel Deal"}
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+
+                    {/* ── Team section inside Tab 1 ── */}
+                    <CardContent className="border-t border-border/60 pt-4 space-y-3">
+                      <h4 className="text-xs font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+                        <Users size={14} className="text-purple-600" />
+                        {isRTL ? "الفريق والمتعاونون" : "Team & Collaborators"}
+                      </h4>
+                      {(leadAssignments as any[])?.length ? (
+                        <div className="space-y-2">
+                          {(leadAssignments as any[])?.map((a: any) => {
+                            const roleLabels: Record<string, string> = {
+                              owner: isRTL ? "المالك" : "Owner",
+                              collaborator: isRTL ? "متعاون" : "Collaborator",
+                              observer: isRTL ? "مراقب" : "Observer",
+                              client_success: "Client Success",
+                              account_manager: "Account Manager",
+                            };
+                            const roleColors: Record<string, string> = {
+                              owner: "bg-blue-100 text-blue-800 border-blue-300",
+                              collaborator: "bg-purple-100 text-purple-800 border-purple-300",
+                              observer: "bg-gray-100 text-gray-600 border-gray-300",
+                              client_success: "bg-amber-100 text-amber-800 border-amber-300",
+                              account_manager: "bg-green-100 text-green-800 border-green-300",
+                            };
+
+                            return (
+                              <div key={a.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/20 p-3">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-medium text-foreground">{a.userName}</p>
+                                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                                    <Badge variant="outline" className={`border ${roleColors[a.role] ?? "bg-gray-100"}`}>
+                                      {roleLabels[a.role] ?? a.role}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                {a.role !== "owner" && canEdit && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6 rounded-md text-muted-foreground hover:text-destructive"
-                                    onClick={() => deleteAttachment.mutate({ id: attachment.id })}
+                                    className="h-8 w-8 rounded-xl text-muted-foreground hover:text-destructive"
+                                    onClick={() => removeAssignment.mutate({ assignmentId: a.id })}
                                   >
-                                    <Trash2 size={12} />
+                                    <XCircle size={14} />
                                   </Button>
                                 )}
                               </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <EmptyState
+                          icon={Users}
+                          title={isRTL ? "لا يوجد متعاونون" : "No collaborators yet"}
+                          description={isRTL ? "أضف شخصًا من الفريق لمتابعة هذا العميل أو عرضه فقط." : "Assign teammates to collaborate on or observe this lead."}
+                          actionLabel={isRTL ? "تعيين متعاون" : "Assign collaborator"}
+                          onAction={canEdit ? () => setShowAssign(true) : undefined}
+                        />
+                      )}
+                    </CardContent>
+                  </TabsContent>
+
+                  {/* ── Tab 2: Reminders + Attachments ── */}
+                  <TabsContent value="reminders" className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
+                    <CardContent className="space-y-4">
+                      <LeadReminders leadId={leadId} />
+                    </CardContent>
+
+                    {/* ── Attachments section inside Tab 2 ── */}
+                    <CardContent className="border-t border-border/60 pt-4 space-y-4">
+                      <h4 className="text-xs font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+                        <Paperclip size={14} />
+                        {t("attachments" as any)}
+                      </h4>
+                      {canEdit && (
+                        <form onSubmit={attachmentHandleSubmit(onAddAttachment)} className="space-y-3 rounded-2xl border border-dashed border-border/70 p-3">
+                          <div>
+                            <Label className="text-xs">{t("attachmentName" as any)}</Label>
+                            <Input {...attachmentRegister("fileName")} className="mt-1" />
+                          </div>
+                          <div>
+                            <Label className="text-xs">{t("attachmentUrl" as any)}</Label>
+                            <div className="relative mt-1">
+                              <Link2 size={14} className={`absolute ${isRTL ? "right-3" : "left-3"} top-1/2 -translate-y-1/2 text-muted-foreground`} />
+                              <Input
+                                id="attachment-url-input"
+                                {...attachmentRegister("fileUrl", { required: true })}
+                                className={isRTL ? "pr-9" : "pl-9"}
+                                placeholder="https://..."
+                                dir="ltr"
+                              />
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* ── Transfer History ── */}
-              <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
-                <CardHeader className="pb-1 pt-3 px-4">
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <ArrowRightLeft size={13} className="text-blue-600" />
-                    {isRTL ? "سجل التسليم" : "Handover History"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-4 pb-3 pt-0 space-y-1.5">
-                  {!(transfers as any)?.length ? (
-                    <EmptyState
-                      icon={ArrowRightLeft}
-                      title={isRTL ? "لا يوجد سجل" : "No history"}
-                      description={isRTL ? "سيظهر هنا تاريخ نقل العميل." : "Lead handover events will appear here."}
-                    />
-                  ) : (
-                    <div className="space-y-1.5">
-                      {(transfers as any).map((tr: any) => (
-                        <div key={tr.id} className="rounded-lg border border-blue-200/50 bg-blue-50/30 p-2 dark:border-blue-800/30 dark:bg-blue-950/20">
-                          <div className="flex items-center gap-1.5 text-[11px]">
-                            <span className="font-medium text-blue-700 dark:text-blue-300">{tr.fromUserName}</span>
-                            <ArrowRight size={10} className="text-blue-500" />
-                            <span className="font-medium text-blue-700 dark:text-blue-300">{tr.toUserName}</span>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs">{t("attachmentType" as any)}</Label>
+                              <Input {...attachmentRegister("fileType")} className="mt-1" />
+                            </div>
+                            <div>
+                              <Label className="text-xs">{t("attachmentSize" as any)}</Label>
+                              <Input {...attachmentRegister("fileSize")} type="number" min="0" className="mt-1" dir="ltr" />
+                            </div>
                           </div>
-                          {tr.reason && <p className="mt-1 text-[10px] text-muted-foreground"><span className="font-medium">{t("transferReason" as any)}:</span> {tr.reason}</p>}
-                          {tr.notes && <p className="mt-0.5 text-[10px] text-muted-foreground"><span className="font-medium">{t("transferNotes" as any)}:</span> {tr.notes}</p>}
-                          <p className="mt-1 text-[10px] text-muted-foreground">
-                            <Clock size={9} className="me-0.5 inline" />
-                            {format(new Date(tr.createdAt), "dd/MM/yyyy HH:mm")}
-                          </p>
+                          <Button
+                            type="submit"
+                            size="sm"
+                            style={{ background: tokens.primaryColor }}
+                            className="gap-2 rounded-xl text-white"
+                            disabled={createAttachment.isPending}
+                          >
+                            {createAttachment.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                            {t("addAttachment" as any)}
+                          </Button>
+                        </form>
+                      )}
+
+                      {!attachments?.length ? (
+                        <EmptyState
+                          icon={FolderOpen}
+                          title={isRTL ? "لا توجد مرفقات" : "No attachments yet"}
+                          description={isRTL ? "ارفع أو أضف أول ملف مرتبط بالعميل حتى يكون كل شيء محفوظًا في مكان واحد." : "Add the first file or URL attachment so everything stays organized in one place."}
+                          actionLabel={isRTL ? "أضف مرفقًا" : "Add attachment"}
+                          onAction={() => {
+                            const target = document.getElementById("attachment-url-input");
+                            target?.focus();
+                          }}
+                        />
+                      ) : (
+                        <div className="space-y-3">
+                          {attachments.map((attachment: any) => {
+                            const attachmentMeta = getAttachmentMeta(attachment.fileName, attachment.fileType, attachment.fileUrl, t);
+                            const AttachmentIcon = attachmentMeta.icon;
+
+                            return (
+                              <div key={attachment.id} className="rounded-2xl border border-border/60 bg-muted/20 p-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-background">
+                                      <AttachmentIcon size={16} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-sm font-medium text-foreground">{attachment.fileName}</p>
+                                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                        <span>{attachmentMeta.label}</span>
+                                        <span>•</span>
+                                        <span>{formatAttachmentSize(attachment.fileSize)}</span>
+                                        <span>•</span>
+                                        <span>{format(new Date(attachment.createdAt), "dd/MM/yyyy")}</span>
+                                      </div>
+                                      <a
+                                        href={attachment.fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="mt-2 inline-flex max-w-full items-center gap-1.5 truncate text-xs text-primary hover:underline"
+                                      >
+                                        <ExternalLink size={12} />
+                                        <span className="truncate" dir="ltr">{attachment.fileUrl}</span>
+                                      </a>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 rounded-xl"
+                                      onClick={() => window.open(attachment.fileUrl, "_blank", "noopener,noreferrer")}
+                                    >
+                                      <Download size={14} />
+                                    </Button>
+                                    {canEdit && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 rounded-xl text-muted-foreground hover:text-destructive"
+                                        onClick={() => deleteAttachment.mutate({ id: attachment.id })}
+                                      >
+                                        <Trash2 size={14} />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
+                      )}
+                    </CardContent>
+                  </TabsContent>
+
+                  {/* ── Tab 3: Transfer History ── */}
+                  <TabsContent value="history" className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
+                    <CardContent className="space-y-3">
+                      {!(transfers as any)?.length ? (
+                        <EmptyState
+                          icon={ArrowRightLeft}
+                          title={isRTL ? "لا يوجد سجل تسليم" : "No handover history"}
+                          description={isRTL ? "سيظهر هنا تاريخ نقل العميل بين أعضاء الفريق." : "Lead handover events between teammates will appear here."}
+                        />
+                      ) : (
+                        <div className="space-y-3">
+                          {(transfers as any).map((tr: any) => (
+                            <div key={tr.id} className="rounded-2xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950/30">
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="font-medium text-blue-700 dark:text-blue-300">{tr.fromUserName}</span>
+                                <ArrowRight size={12} className="text-blue-500" />
+                                <span className="font-medium text-blue-700 dark:text-blue-300">{tr.toUserName}</span>
+                              </div>
+                              {tr.reason && <p className="mt-2 text-xs text-muted-foreground"><span className="font-medium">{t("transferReason" as any)}:</span> {tr.reason}</p>}
+                              {tr.notes && <p className="mt-1 text-xs text-muted-foreground"><span className="font-medium">{t("transferNotes" as any)}:</span> {tr.notes}</p>}
+                              <p className="mt-2 text-xs text-muted-foreground">
+                                <Clock size={10} className="me-1 inline" />
+                                {format(new Date(tr.createdAt), "dd/MM/yyyy HH:mm")}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </TabsContent>
+                </Tabs>
               </Card>
             </div>
           </div>
         </div>
       </div>
-
 
       <Dialog open={showActivity} onOpenChange={setShowActivity}>
         <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
