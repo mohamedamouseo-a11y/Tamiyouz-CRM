@@ -581,6 +581,7 @@ export const appRouter = router({
         z.object({
           stage: z.string().optional(),
           leadQuality: z.string().optional(),
+          fitStatus: z.string().optional(),
           campaignName: z.string().optional(),
           dateFrom: z.date().optional(),
           dateTo: z.date().optional(),
@@ -758,6 +759,7 @@ export const appRouter = router({
           filters: z.object({
             stage: z.string().optional(),
             leadQuality: z.string().optional(),
+          fitStatus: z.string().optional(),
             campaignName: z.string().optional(),
             dateFrom: z.date().optional(),
             dateTo: z.date().optional(),
