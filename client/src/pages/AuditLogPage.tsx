@@ -1286,12 +1286,12 @@ export default function AuditLogPage() {
                                 2
                               )}
                             </pre>
-                          </div>
+                          </ScrollArea>
                         </div>
                       </CardContent>
                     </Card>
                   </div>
-                </ScrollArea>
+                </div>
 
                 {canUndoLog(detailsLog) ? (
                   <div className="border-t border-border/60 px-5 py-4 sm:px-6">
