@@ -221,6 +221,7 @@ export interface LeadFilters {
   assignedUserId?: number;
   stage?: string;
   leadQuality?: string;
+  fitStatus?: string;
   campaignName?: string;
   dateFrom?: Date;
   dateTo?: Date;
@@ -258,6 +259,7 @@ export async function getLeads(filters: LeadFilters = {}) {
   }
   if (filters.stage) conditions.push(eq(leads.stage, filters.stage));
   if (filters.leadQuality) conditions.push(eq(leads.leadQuality, filters.leadQuality as any));
+  if (filters.fitStatus) conditions.push(eq(leads.fitStatus, filters.fitStatus as any));
   if (filters.campaignName) conditions.push(eq(leads.campaignName, filters.campaignName));
   // Filter by contactTime (date when client was contacted)
   if (filters.dateFrom) {
@@ -482,6 +484,7 @@ export async function getLeadsCount(filters: LeadFilters = {}): Promise<number> 
   }
   if (filters.stage) conditions.push(eq(leads.stage, filters.stage));
   if (filters.leadQuality) conditions.push(eq(leads.leadQuality, filters.leadQuality as any));
+  if (filters.fitStatus) conditions.push(eq(leads.fitStatus, filters.fitStatus as any));
   if (filters.campaignName) conditions.push(eq(leads.campaignName, filters.campaignName));
   if (filters.dateFrom) {
     conditions.push(gte(leads.contactTime, filters.dateFrom));
@@ -1844,6 +1847,7 @@ export interface LeadExportFilters {
   limit?: number;
   stage?: string;
   leadQuality?: string;
+  fitStatus?: string;
   campaignName?: string;
   dateFrom?: Date;
   dateTo?: Date;
