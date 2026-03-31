@@ -968,6 +968,10 @@ export default function LeadProfile() {
                     <Users size={14} />
                     {isRTL ? "المعلومات" : "Info"}
                   </TabsTrigger>
+                  <TabsTrigger value="formdata" className="flex-1 gap-1.5 text-xs">
+                    <FileText size={14} />
+                    {isRTL ? "بيانات النموذج" : "Form Data"}
+                  </TabsTrigger>
                   <TabsTrigger value="stages" className="flex-1 gap-1.5 text-xs">
                     <Activity size={14} />
                     {isRTL ? "المراحل والملاحظات" : "Stages & Notes"}
@@ -1111,49 +1115,7 @@ export default function LeadProfile() {
                         )}
                       </div>
 
-                      {/* Divider */}
-                      <div className="border-t border-border/40" />
 
-                      {/* Form Data */}
-                      {(() => {
-                        const customData = (lead as any).customFieldsData;
-                        const sourceData = (lead as any).sourceMetadata;
-                        if (!customData || Object.keys(customData).length === 0) return null;
-
-                        const cleanLabel = (key: string) =>
-                          key.replace(/_/g, " ").replace(/؟/g, "؟").replace(/\s+/g, " ").trim();
-
-                        return (
-                          <div className="space-y-2.5">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              {isRTL ? "بيانات النموذج" : "Form Data"}
-                            </p>
-                            {Object.entries(customData)
-                              .filter(([key]) => key !== "inbox_url")
-                              .map(([key, value]) => (
-                                <InfoRow key={key} label={cleanLabel(key)} value={String(value ?? "")} multiline />
-                              ))}
-                            {customData.inbox_url && (
-                              <InfoRow label="Inbox URL" value={customData.inbox_url} isLink />
-                            )}
-                            {sourceData && (
-                              <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 space-y-2">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                  {t("sourceInfo" as any)}
-                                </p>
-                                {sourceData.provider && <InfoRow label={t("provider" as any)} value={sourceData.provider} />}
-                                {sourceData.synced_via && <InfoRow label={t("syncMethod" as any)} value={sourceData.synced_via} />}
-                                {sourceData.campaign_id && <InfoRow label="Campaign ID" value={sourceData.campaign_id} mono />}
-                                {sourceData.form_id && <InfoRow label="Form ID" value={sourceData.form_id} mono />}
-                                {sourceData.ad_id && <InfoRow label="Ad ID" value={sourceData.ad_id} mono />}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-
-                      {/* Divider */}
-                      <div className="border-t border-border/40" />
 
                       {/* Sales Info */}
                       <div className="space-y-2.5">
@@ -1174,6 +1136,58 @@ export default function LeadProfile() {
                   )}
                 </CardContent>
               </Card>
+                </TabsContent>
+
+                {/* ── Tab: Form Data ── */}
+                <TabsContent value="formdata">
+                  <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
+                    <CardContent className="p-4 space-y-4">
+                      {(() => {
+                        const customData = (lead as any).customFieldsData;
+                        const sourceData = (lead as any).sourceMetadata;
+                        if (!customData || Object.keys(customData).length === 0) return (
+                          <div className="flex flex-col items-center justify-center py-8 text-center">
+                            <FileText size={32} className="text-muted-foreground/40 mb-2" />
+                            <p className="text-sm text-muted-foreground">{isRTL ? "لا توجد بيانات نموذج" : "No form data available"}</p>
+                          </div>
+                        );
+
+                        const cleanLabel = (key: string) =>
+                          key.replace(/_/g, " ").replace(/؟/g, "؟").replace(/\s+/g, " ").trim();
+
+                        return (
+                          <div className="space-y-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              {isRTL ? "بيانات النموذج" : "Form Data"}
+                            </p>
+                            {Object.entries(customData)
+                              .filter(([key]) => key !== "inbox_url")
+                              .map(([key, value]) => (
+                                <InfoRow key={key} label={cleanLabel(key)} value={String(value ?? "")} multiline />
+                              ))}
+                            {customData.inbox_url && (
+                              <InfoRow label="Inbox URL" value={customData.inbox_url} isLink />
+                            )}
+                            {sourceData && (
+                              <>
+                                <div className="border-t border-border/40" />
+                                <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5 space-y-2">
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                    {t("sourceInfo" as any)}
+                                  </p>
+                                  {sourceData.provider && <InfoRow label={t("provider" as any)} value={sourceData.provider} />}
+                                  {sourceData.synced_via && <InfoRow label={t("syncMethod" as any)} value={sourceData.synced_via} />}
+                                  {sourceData.campaign_id && <InfoRow label="Campaign ID" value={sourceData.campaign_id} mono />}
+                                  {sourceData.form_id && <InfoRow label="Form ID" value={sourceData.form_id} mono />}
+                                  {sourceData.ad_id && <InfoRow label="Ad ID" value={sourceData.ad_id} mono />}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </CardContent>
+                  </Card>
                 </TabsContent>
 
                 {/* ── Tab: Stages & Notes ── */}
