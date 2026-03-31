@@ -328,6 +328,7 @@ export default function LeadProfile() {
   const [attachmentsOpen, setAttachmentsOpen] = useState(true);
   const [transfersOpen, setTransfersOpen] = useState(false);
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<{ id: number; type: string; outcome?: string; notes?: string; activityTime?: string } | null>(null);
 
   const { data: lead, isLoading, refetch } = trpc.leads.byId.useQuery({ id: leadId }, { enabled: Number.isFinite(leadId) });
   const { data: activities, refetch: refetchActivities } = trpc.activities.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
@@ -380,6 +381,15 @@ export default function LeadProfile() {
       toast.success(t("success"));
       refetchActivities();
     },
+  });
+
+  const updateActivityMutation = trpc.activities.update.useMutation({
+    onSuccess: () => {
+      toast.success(t("success"));
+      setEditingActivity(null);
+      refetchActivities();
+    },
+    onError: (e) => toast.error(e.message),
   });
 
   const createDeal = trpc.deals.create.useMutation({
@@ -1322,6 +1332,7 @@ export default function LeadProfile() {
                             }
                             onDeleteActivity={(activityId: number) => deleteActivity.mutate({ id: activityId })}
                             onDeleteNote={(noteId: number) => deleteNote.mutate({ id: noteId })}
+                            onEditActivity={(activity) => setEditingActivity(activity)}
                             canEdit={canEdit}
                             userId={user?.id}
                             userRole={user?.role}
@@ -1949,6 +1960,80 @@ export default function LeadProfile() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Edit Activity Dialog ── */}
+      <Dialog open={!!editingActivity} onOpenChange={(open) => { if (!open) setEditingActivity(null); }}>
+        <DialogContent className="max-w-md" dir={isRTL ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit size={18} className="text-blue-600" />
+              {isRTL ? "تعديل النشاط" : "Edit Activity"}
+            </DialogTitle>
+          </DialogHeader>
+          {editingActivity && (
+            <div className="space-y-4">
+              <div>
+                <Label>{t("activityType")}</Label>
+                <Select value={editingActivity.type} onValueChange={(v) => setEditingActivity({ ...editingActivity, type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ACTIVITY_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>{t(type as any)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>{t("outcome")}</Label>
+                <Select value={editingActivity.outcome ?? ""} onValueChange={(v) => setEditingActivity({ ...editingActivity, outcome: v || undefined })}>
+                  <SelectTrigger><SelectValue placeholder={t("selectOption")} /></SelectTrigger>
+                  <SelectContent>
+                    {OUTCOMES.map((outcome) => (
+                      <SelectItem key={outcome} value={outcome}>{t(outcome as any)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>{t("activityTime")}</Label>
+                <Input
+                  type="datetime-local"
+                  value={editingActivity.activityTime ? new Date(editingActivity.activityTime).toISOString().slice(0, 16) : ""}
+                  onChange={(e) => setEditingActivity({ ...editingActivity, activityTime: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
+                />
+              </div>
+              <div>
+                <Label>{t("notes")}</Label>
+                <Textarea
+                  value={editingActivity.notes ?? ""}
+                  onChange={(e) => setEditingActivity({ ...editingActivity, notes: e.target.value })}
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditingActivity(null)}>{t("cancel")}</Button>
+                <Button
+                  style={{ background: tokens.primaryColor }}
+                  className="text-white"
+                  disabled={updateActivityMutation.isPending}
+                  onClick={() => {
+                    if (!editingActivity) return;
+                    updateActivityMutation.mutate({
+                      id: editingActivity.id,
+                      type: editingActivity.type as any,
+                      outcome: editingActivity.outcome as any,
+                      notes: editingActivity.notes || undefined,
+                      activityTime: editingActivity.activityTime ? new Date(editingActivity.activityTime) : undefined,
+                    });
+                  }}
+                >
+                  {updateActivityMutation.isPending ? t("loading") : t("save")}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </CRMLayout>
   );
 }
@@ -1960,6 +2045,7 @@ function FeedItemCard({
   isFirstInDay,
   onDeleteActivity,
   onDeleteNote,
+  onEditActivity,
   canEdit,
   userId,
   userRole,
@@ -1970,6 +2056,7 @@ function FeedItemCard({
   isFirstInDay: boolean;
   onDeleteActivity: (id: number) => void;
   onDeleteNote: (id: number) => void;
+  onEditActivity: (activity: { id: number; type: string; outcome?: string; notes?: string; activityTime?: string }) => void;
   canEdit: boolean;
   userId?: number;
   userRole?: string;
@@ -2035,14 +2122,32 @@ function FeedItemCard({
           </div>
 
           {canDeleteThis && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:text-destructive"
-              onClick={() => (isNote ? onDeleteNote(item.itemId) : onDeleteActivity(item.itemId))}
-            >
-              <Trash2 size={14} />
-            </Button>
+            <div className="flex shrink-0 gap-1">
+              {!isNote && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-xl text-muted-foreground hover:text-blue-600"
+                  onClick={() => onEditActivity({
+                    id: item.itemId,
+                    type: item.data.type,
+                    outcome: item.data.outcome,
+                    notes: item.data.notes,
+                    activityTime: item.data.activityTime,
+                  })}
+                >
+                  <Edit size={14} />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-xl text-muted-foreground hover:text-destructive"
+                onClick={() => (isNote ? onDeleteNote(item.itemId) : onDeleteActivity(item.itemId))}
+              >
+                <Trash2 size={14} />
+              </Button>
+            </div>
           )}
         </div>
       </div>
