@@ -2135,13 +2135,12 @@ function FeedItemCard({
             )}
           </div>
 
-          {canDeleteThis && (
-            <div className="flex shrink-0 gap-1">
-              {!isNote && (
+          <div className="flex shrink-0 gap-1">
+              {!isNote && canEdit && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-xl text-muted-foreground hover:text-blue-600"
+                  className="h-8 w-8 rounded-xl text-blue-500 hover:text-blue-700 hover:bg-blue-50"
                   onClick={() => onEditActivity({
                     id: item.itemId,
                     type: item.data.type,
@@ -2153,16 +2152,17 @@ function FeedItemCard({
                   <Edit size={14} />
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-xl text-muted-foreground hover:text-destructive"
-                onClick={() => (isNote ? onDeleteNote(item.itemId) : onDeleteActivity(item.itemId))}
-              >
-                <Trash2 size={14} />
-              </Button>
+              {canDeleteThis && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-xl text-muted-foreground hover:text-destructive"
+                  onClick={() => (isNote ? onDeleteNote(item.itemId) : onDeleteActivity(item.itemId))}
+                >
+                  <Trash2 size={14} />
+                </Button>
+              )}
             </div>
-          )}
         </div>
       </div>
     </div>

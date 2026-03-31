@@ -1125,10 +1125,10 @@ export default function AuditLogPage() {
         <Dialog open={!!detailsLog} onOpenChange={(open) => !open && setDetailsLog(null)}>
           <DialogContent
             dir={isRTL ? "rtl" : "ltr"}
-            className="h-[90vh] w-[96vw] max-w-4xl overflow-hidden border-border/60 p-0 sm:h-[88vh]"
+            className="h-[90vh] w-[96vw] max-w-4xl overflow-hidden border-border/60 p-0 sm:h-[88vh] flex flex-col"
           >
             {detailsLog ? (
-              <div className="flex h-full flex-col bg-background">
+              <div className="flex h-full min-h-0 flex-col bg-background overflow-hidden">
                 <DialogHeader className="border-b border-border/60 px-5 py-4 sm:px-6">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-2 text-left">
@@ -1151,7 +1151,7 @@ export default function AuditLogPage() {
                   </div>
                 </DialogHeader>
 
-                <ScrollArea className="flex-1">
+                <div className="flex-1 min-h-0 overflow-y-auto">
                   <div className="space-y-6 px-5 py-5 sm:px-6">
                     <div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
                       <Card className="border-border/60 shadow-none overflow-hidden">
@@ -1217,7 +1217,7 @@ export default function AuditLogPage() {
                         </CardHeader>
                         <CardContent className="space-y-3 overflow-hidden">
                           {buildDiffRows(detailsLog).map((row) => (
-                            <div key={row.key} className="grid gap-3 rounded-2xl border border-border/60 bg-muted/20 p-4 lg:grid-cols-[180px_1fr_28px_1fr] lg:items-center overflow-hidden">
+                            <div key={row.key} className="grid gap-3 rounded-2xl border border-border/60 bg-muted/20 p-4 lg:grid-cols-[180px_1fr_28px_1fr] lg:items-center overflow-hidden break-words">
                               <div className="text-sm font-medium text-muted-foreground truncate">
                                 {humanizeKey(row.key, isRTL ? "ar" : "en")}
                               </div>
@@ -1286,7 +1286,7 @@ export default function AuditLogPage() {
                                 2
                               )}
                             </pre>
-                          </ScrollArea>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
