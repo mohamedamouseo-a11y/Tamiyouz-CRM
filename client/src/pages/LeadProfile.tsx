@@ -1,7 +1,6 @@
 import LeadReminders from "@/components/LeadReminders";
 import CRMLayout from "@/components/CRMLayout";
 import LeadQualityBadge from "@/components/LeadQualityBadge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
@@ -55,7 +54,6 @@ import {
   Plus,
   Save,
   Send,
-  ShieldAlert,
   Trash2,
   UserPlus,
   Users,
@@ -699,44 +697,6 @@ export default function LeadProfile() {
     return map;
   }, [lead?.createdAt, lead?.stage, lead?.updatedAt, stageChanges]);
 
-  const smartAlerts = [
-    daysSinceLastContact >= 3
-      ? {
-          key: "inactive",
-          icon: AlertTriangle,
-          title: t("smartAlerts"),
-          description: `${t("noContactWithLeadSince" as any)} ${relativeTimeLabel(lastActivityDate ?? leadCreatedAt, t, isRTL)}`,
-          className: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100",
-        }
-      : null,
-    isSlaBreached
-      ? {
-          key: "sla",
-          icon: AlertTriangle,
-          title: "SLA",
-          description: `${t("slaExceeded" as any)}${slaReferenceDate ? ` · ${t("slaExceededSince" as any)} ${relativeTimeLabel(slaReferenceDate, t, isRTL)}` : ""}`,
-          className: "border-red-200 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100",
-        }
-      : null,
-    !lead?.ownerId
-      ? {
-          key: "owner",
-          icon: ShieldAlert,
-          title: t("owner"),
-          description: t("unassignedLeadAlert" as any),
-          className: "border-slate-200 bg-slate-50 text-slate-900 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-100",
-        }
-      : null,
-    pendingDealNeedsAttention
-      ? {
-          key: "deal",
-          icon: Clock,
-          title: t("deal"),
-          description: t("pendingDealAlert" as any),
-          className: "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100",
-        }
-      : null,
-  ].filter(Boolean) as Array<{ key: string; icon: any; title: string; description: string; className: string }>;
 
   const stageList = useMemo(
     () => {
@@ -788,22 +748,6 @@ export default function LeadProfile() {
             </BreadcrumbList>
           </Breadcrumb>
 
-          {smartAlerts.length > 0 && (
-            <div className="space-y-3">
-              {smartAlerts.map((alert) => {
-                const AlertIcon = alert.icon;
-                return (
-                  <Alert key={alert.key} className={alert.className}>
-                    <AlertTitle className="flex items-center gap-2">
-                      <AlertIcon size={16} />
-                      {alert.title}
-                    </AlertTitle>
-                    <AlertDescription>{alert.description}</AlertDescription>
-                  </Alert>
-                );
-              })}
-            </div>
-          )}
 
           <div className="sticky top-0 z-30 rounded-2xl border border-border/70 bg-background/90 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/75">
             <div
