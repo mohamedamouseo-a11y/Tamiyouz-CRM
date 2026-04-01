@@ -3007,9 +3007,17 @@ export async function getAMDashboardStats(userId: number, userRole?: string) {
         .where(and(inArray(contracts.clientId, clientIds), isNull(contracts.deletedAt)))
     : [];
 
-  const renewedContracts = contractRows.filter((c) => c.contractRenewalStatus === "Renewed" || c.contractRenewalStatus === "Won").length;
+  // Auto-mark expired contracts: if endDate is in the past and status is still Active, treat as expired
+  const now = new Date();
+  for (const c of contractRows) {
+    if (c.status === "Active" && c.endDate && new Date(c.endDate) < now) {
+      (c as any).status = "Expired";
+    }
+  }
+  // Renewal rate: only count "Renewed" as renewed (not "Won" which means new business)
+  const renewedContracts = contractRows.filter((c) => c.contractRenewalStatus === "Renewed").length;
   const renewalBase = contractRows.filter(
-    (c) => c.status === "Expired" || c.contractRenewalStatus === "Renewed" || c.contractRenewalStatus === "Won",
+    (c) => c.status === "Expired" || c.contractRenewalStatus === "Renewed",
   ).length;
   const renewalRate = renewalBase > 0 ? round((renewedContracts / renewalBase) * 100) : 0;
 
@@ -3068,11 +3076,25 @@ export async function getAMDashboardStats(userId: number, userRole?: string) {
     .orderBy(desc(followUps.followUpDate), desc(followUps.createdAt))
     .limit(10);
 
+  // Calculate upsell value from upsell_opportunities table
+  const upsellRows = clientIds.length
+    ? await db
+        .select({ potentialValue: upsellOpportunities.potentialValue })
+        .from(upsellOpportunities)
+        .where(
+          and(
+            inArray(upsellOpportunities.clientId, clientIds),
+            eq(upsellOpportunities.status, "Won" as any),
+          )
+        )
+    : [];
+  const totalUpsellValue = round(upsellRows.reduce((sum, r) => sum + toNumber(r.potentialValue), 0));
+
   return {
     kpis: {
       myActiveClients: activeClients.length,
       myRenewalRate: renewalRate,
-      myUpsellValue: 0,
+      myUpsellValue: totalUpsellValue,
       avgHealthScore: averageHealthScore,
     },
     charts: {
@@ -3134,9 +3156,17 @@ export async function getAMLeadDashboardStats() {
   const activeClientIds = new Set(activeClients.map((c) => c.id));
   const teamContracts = allContracts.filter((c) => activeClientIds.has(c.clientId));
 
-  const renewedContracts = teamContracts.filter((c) => c.contractRenewalStatus === "Renewed" || c.contractRenewalStatus === "Won").length;
+  // Auto-mark expired contracts: if endDate is in the past and status is still Active, treat as expired
+  const nowLead = new Date();
+  for (const c of teamContracts) {
+    if (c.status === "Active" && c.endDate && new Date(c.endDate) < nowLead) {
+      (c as any).status = "Expired";
+    }
+  }
+  // Only count "Renewed" as renewed (not "Won" which means new business)
+  const renewedContracts = teamContracts.filter((c) => c.contractRenewalStatus === "Renewed").length;
   const renewalBase = teamContracts.filter(
-    (c) => c.status === "Expired" || c.contractRenewalStatus === "Renewed" || c.contractRenewalStatus === "Won",
+    (c) => c.status === "Expired" || c.contractRenewalStatus === "Renewed",
   ).length;
   const teamRenewalRate = renewalBase > 0 ? round((renewedContracts / renewalBase) * 100) : 0;
 
@@ -3182,8 +3212,8 @@ export async function getAMLeadDashboardStats() {
     if (!managerId) continue;
     const manager = performanceMap.get(managerId);
     if (!manager) continue;
-    if (contract.contractRenewalStatus === "Renewed" || contract.contractRenewalStatus === "Won") manager.renewed += 1;
-    if (contract.status === "Expired" || contract.contractRenewalStatus === "Renewed" || contract.contractRenewalStatus === "Won") manager.base += 1;
+    if (contract.contractRenewalStatus === "Renewed") manager.renewed += 1;
+    if (contract.status === "Expired" || contract.contractRenewalStatus === "Renewed") manager.base += 1;
   }
 
   const teamPerformance = Array.from(performanceMap.values())
