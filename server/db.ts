@@ -1219,6 +1219,7 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
   const teamBreakdownRows = (teamBreakdownQuery as any)[0] ?? [];
   const revenueBreakdown = Array.isArray(teamBreakdownRows) ? teamBreakdownRows.map((r: any) => ({ currency: r.currency || "SAR", total: Number(r.total || 0) })) : [];
 
+  console.log("[DEBUG getTeamStats] totalLeads:", Number(totalLeads[0]?.count ?? 0), "from:", from, "to:", to, "agentPerformance leadSum:", processedAgents.reduce((a:any,c:any) => a + c.totalLeads, 0), "actSum:", processedAgents.reduce((a:any,c:any) => a + c.totalActivities, 0));
   return {
     totalLeads: Number(totalLeads[0]?.count ?? 0),
     wonDeals,
