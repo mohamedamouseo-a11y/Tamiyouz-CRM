@@ -1078,8 +1078,8 @@ export async function getAgentStats(userId: number, dateFrom?: Date, dateTo?: Da
     db.select({ count: sql<number>`count(*)` }).from(leads).where(and(...leadConditions)),
     db.select({ count: sql<number>`count(*)` }).from(activities).where(and(...activityConditions)),
     isMediaBuyer
-      ? db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(d.valueBase), 0) as totalValue FROM deals d JOIN leads l ON l.id = d.leadId WHERE d.deletedAt IS NULL AND l.deletedAt IS NULL AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to}`)
-      : db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(d.valueBase), 0) as totalValue FROM deals d JOIN leads l ON l.id = d.leadId WHERE d.deletedAt IS NULL AND l.ownerId = ${userId} AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to}`),
+      ? db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(d.valueBase), 0) as totalValue FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.deletedAt IS NULL AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to}`)
+      : db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(d.valueBase), 0) as totalValue FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.ownerId = ${userId} AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to}`),
     isMediaBuyer
       ? db.select({ count: sql<number>`count(*)` }).from(leads).where(and(eq(leads.slaBreached, true), isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to)))
       : db.select({ count: sql<number>`count(*)` }).from(leads).where(and(eq(leads.ownerId, userId), eq(leads.slaBreached, true), isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to))),
@@ -1088,8 +1088,8 @@ export async function getAgentStats(userId: number, dateFrom?: Date, dateTo?: Da
   
   // Revenue breakdown by currency
   const revenueBreakdownQuery = isMediaBuyer
-    ? db.execute(sql`SELECT COALESCE(d.currency, 'SAR') as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE d.deletedAt IS NULL AND l.deletedAt IS NULL AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to} GROUP BY d.currency`)
-    : db.execute(sql`SELECT COALESCE(d.currency, 'SAR') as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE d.deletedAt IS NULL AND l.ownerId = ${userId} AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to} GROUP BY d.currency`);
+    ? db.execute(sql`SELECT COALESCE(d.currency, 'SAR') as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.deletedAt IS NULL AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to} GROUP BY d.currency`)
+    : db.execute(sql`SELECT COALESCE(d.currency, 'SAR') as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.ownerId = ${userId} AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to} GROUP BY d.currency`);
   const breakdownRows = (await revenueBreakdownQuery as any)[0] ?? [];
   const revenueBreakdown = Array.isArray(breakdownRows) ? breakdownRows.map((r: any) => ({ currency: r.currency || "SAR", total: Number(r.total || 0) })) : [];
   
@@ -1136,7 +1136,7 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
     db.select({ count: sql<number>`count(*)` }).from(leads).where(and(isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to))),
     db.execute(sql`
       SELECT status, COUNT(*) as count, COALESCE(SUM(valueBase), 0) as totalValue
-      FROM deals WHERE deletedAt IS NULL AND createdAt BETWEEN ${from} AND ${to} GROUP BY status
+      FROM deals WHERE createdAt BETWEEN ${from} AND ${to} GROUP BY status
     `),
     db.execute(sql`
       SELECT stage, COUNT(*) as count FROM leads
@@ -1176,7 +1176,7 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
           COALESCE(SUM(d.valueBase), 0) as revenue
         FROM deals d
         JOIN leads l2 ON l2.id = d.leadId AND l2.deletedAt IS NULL
-        WHERE d.deletedAt IS NULL AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to}
+        WHERE d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to}
         GROUP BY l2.ownerId
       ) dc ON dc.ownerId = u.id
       WHERE u.role = 'SalesAgent' AND u.deletedAt IS NULL
@@ -1215,7 +1215,7 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
   const slaBreachedCount = await db.select({ count: sql<number>`count(*)` }).from(leads).where(and(eq(leads.slaBreached, true), isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to)));
 
   // Revenue breakdown by currency for team
-  const teamBreakdownQuery = await db.execute(sql`SELECT COALESCE(d.currency, 'SAR') as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE d.deletedAt IS NULL AND l.deletedAt IS NULL AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to} GROUP BY d.currency`);
+  const teamBreakdownQuery = await db.execute(sql`SELECT COALESCE(d.currency, 'SAR') as currency, COALESCE(SUM(CAST(d.valueSar AS DECIMAL(15,2))), 0) as total FROM deals d JOIN leads l ON l.id = d.leadId WHERE l.deletedAt IS NULL AND d.status = 'Won' AND d.createdAt BETWEEN ${from} AND ${to} GROUP BY d.currency`);
   const teamBreakdownRows = (teamBreakdownQuery as any)[0] ?? [];
   const revenueBreakdown = Array.isArray(teamBreakdownRows) ? teamBreakdownRows.map((r: any) => ({ currency: r.currency || "SAR", total: Number(r.total || 0) })) : [];
 
@@ -1804,7 +1804,7 @@ export async function getReportData(dateFrom?: Date, dateTo?: Date) {
   const wonDealsResult = await db
     .select({ count: sql<number>`count(*)`, total: sql<number>`COALESCE(SUM(valueBase), 0)` })
     .from(deals)
-    .where(and(eq(deals.status, "Won"), isNull(deals.deletedAt), gte(deals.createdAt, from), lte(deals.createdAt, to)));
+    .where(and(eq(deals.status, "Won"), gte(deals.createdAt, from), lte(deals.createdAt, to)));
   const wonDeals = Number(wonDealsResult[0]?.count ?? 0);
   const wonValue = Number(wonDealsResult[0]?.total ?? 0);
 
@@ -1812,7 +1812,7 @@ export async function getReportData(dateFrom?: Date, dateTo?: Date) {
   const lostDealsResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(deals)
-    .where(and(eq(deals.status, "Lost"), isNull(deals.deletedAt), gte(deals.createdAt, from), lte(deals.createdAt, to)));
+    .where(and(eq(deals.status, "Lost"), gte(deals.createdAt, from), lte(deals.createdAt, to)));
   const lostDeals = Number(lostDealsResult[0]?.count ?? 0);
 
   // Per-agent stats
@@ -1825,7 +1825,7 @@ export async function getReportData(dateFrom?: Date, dateTo?: Date) {
     FROM users u
     LEFT JOIN leads l ON l.ownerId = u.id AND l.createdAt BETWEEN ${from} AND ${to}
     LEFT JOIN activities a ON a.userId = u.id AND a.createdAt BETWEEN ${from} AND ${to}
-    LEFT JOIN deals d ON d.leadId = l.id AND d.deletedAt IS NULL
+    LEFT JOIN deals d ON d.leadId = l.id
     WHERE u.role = 'SalesAgent' AND u.isActive = true
     GROUP BY u.id, u.name, u.email
     ORDER BY totalLeads DESC
