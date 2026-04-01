@@ -1065,6 +1065,7 @@ export async function getAgentStats(userId: number, dateFrom?: Date, dateTo?: Da
   const db = await getDb();
   if (!db) return null;
   const from = dateFrom ?? new Date(0);
+  if (dateFrom) { from.setHours(0, 0, 0, 0); }
   const to = dateTo ?? new Date();
   if (dateTo) { to.setHours(23, 59, 59, 999); }
   const isMediaBuyer = role === "MediaBuyer";
@@ -1130,9 +1131,10 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
   const db = await getDb();
   if (!db) return null;
   const from = dateFrom ?? new Date(0);
+  if (dateFrom) { from.setHours(0, 0, 0, 0); }
   const to = dateTo ?? new Date();
   if (dateTo) { to.setHours(23, 59, 59, 999); }
-  const [totalLeads, totalDeals, stageBreakdown, agentPerformance] = await Promise.all([
+  const [totalLeads, totalDeals, stageBreakdown, agentPerformance, totalActivitiesResult] = await Promise.all([
     db.select({ count: sql<number>`count(*)` }).from(leads).where(and(isNull(leads.deletedAt), gte(leads.createdAt, from), lte(leads.createdAt, to))),
     db.execute(sql`
       SELECT status, COUNT(*) as count, COALESCE(SUM(valueBase), 0) as totalValue
@@ -1182,6 +1184,7 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
       WHERE u.role = 'SalesAgent' AND u.deletedAt IS NULL
       ORDER BY wonDeals DESC
     `),
+    db.select({ count: sql<number>`count(*)` }).from(activities).where(and(gte(activities.createdAt, from), lte(activities.createdAt, to))),
   ]);
 
   // Process agent performance
@@ -1219,9 +1222,9 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
   const teamBreakdownRows = (teamBreakdownQuery as any)[0] ?? [];
   const revenueBreakdown = Array.isArray(teamBreakdownRows) ? teamBreakdownRows.map((r: any) => ({ currency: r.currency || "SAR", total: Number(r.total || 0) })) : [];
 
-  console.log("[DEBUG getTeamStats] totalLeads:", Number(totalLeads[0]?.count ?? 0), "from:", from, "to:", to, "agentPerformance leadSum:", processedAgents.reduce((a:any,c:any) => a + c.totalLeads, 0), "actSum:", processedAgents.reduce((a:any,c:any) => a + c.totalActivities, 0));
   return {
     totalLeads: Number(totalLeads[0]?.count ?? 0),
+    totalActivities: Number(totalActivitiesResult[0]?.count ?? 0),
     wonDeals,
     totalRevenue,
     revenueBreakdown,
@@ -1259,9 +1262,10 @@ export async function getSalesFunnelData(dateFrom?: Date, dateTo?: Date, userRol
   const db = await getDb();
   if (!db) return null;
   const from = dateFrom ?? new Date(0);
+  if (dateFrom) { from.setHours(0, 0, 0, 0); }
   const to = dateTo ?? new Date();
   if (dateTo) { to.setHours(23, 59, 59, 999); }
-  const isAgent = userRole === 'SalesAgent';
+  const isAgent = userRole === "SalesAgent";
   const agentId = userId ?? 0;
 
   // 1. Funnel stages — count leads in each pipeline stage
@@ -1447,6 +1451,7 @@ export async function getTaskSlaDashboardData(dateFrom?: Date, dateTo?: Date, us
   const db = await getDb();
   if (!db) return null;
   const from = dateFrom ?? new Date(0);
+  if (dateFrom) { from.setHours(0, 0, 0, 0); }
   const to = dateTo ?? new Date();
   if (dateTo) { to.setHours(23, 59, 59, 999); }
   const isAgent = userRole === 'SalesAgent';

@@ -83,7 +83,7 @@ export default function AgentDashboard() {
     },
     {
       title: t("totalActivities"),
-      value: isAdmin ? (teamStats?.agentPerformance?.reduce((acc: any, curr: any) => acc + curr.totalActivities, 0) ?? 0) : (stats?.totalActivities ?? 0),
+      value: isAdmin ? (teamStats?.totalActivities ?? 0) : (stats?.totalActivities ?? 0),
       icon: <Activity size={20} />,
       color: "#6366f1",
       href: "/leads?activities=true",
