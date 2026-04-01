@@ -437,6 +437,7 @@ export const users = mysqlTable("users", {
 	lastSignedIn: timestamp({ mode: 'string' }).default(sql`(now())`).notNull(),
 	passwordHash: varchar({ length: 255 }),
 	isActive: tinyint().default(1).notNull(),
+	inactivatedAt: timestamp({ mode: 'string' }),
 	teamId: int(),
 	deletedAt: timestamp({ mode: 'string' }),
 	deletedBy: int(),

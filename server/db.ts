@@ -1145,7 +1145,7 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
       WHERE deletedAt IS NULL AND createdAt BETWEEN ${from} AND ${to} GROUP BY stage
     `),
     db.execute(sql`
-      SELECT u.id, u.name,
+      SELECT u.id, u.name, u.isActive, u.inactivatedAt,
         COALESCE(lc.leadCount, 0) as leadCount,
         COALESCE(ac.activityCount, 0) as activityCount,
         COALESCE(dc.wonDeals, 0) as wonDeals,
@@ -1182,6 +1182,7 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
         GROUP BY l2.ownerId
       ) dc ON dc.ownerId = u.id
       WHERE u.role = 'SalesAgent' AND u.deletedAt IS NULL
+        AND (u.isActive = 1 OR (u.isActive = 0 AND u.inactivatedAt IS NOT NULL AND u.inactivatedAt >= ${from}))
       ORDER BY wonDeals DESC
     `),
     db.select({ count: sql<number>`count(*)` }).from(activities).where(and(gte(activities.createdAt, from), lte(activities.createdAt, to))),
@@ -1196,6 +1197,8 @@ export async function getTeamStats(dateFrom?: Date, dateTo?: Date) {
     return {
       agentId: a.id,
       agentName: a.name,
+      isActive: Number(a.isActive ?? 1) === 1,
+      inactivatedAt: a.inactivatedAt ?? null,
       totalLeads: Number(a.leadCount ?? 0),
       totalActivities: Number(a.activityCount ?? 0),
       wonDeals: Number(a.wonDeals ?? 0),
