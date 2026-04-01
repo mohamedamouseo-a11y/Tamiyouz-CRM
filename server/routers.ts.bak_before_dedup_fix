@@ -1012,14 +1012,6 @@ export const appRouter = router({
             throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
           }
         }
-        // ── DUPLICATE SUBMISSION PREVENTION ──
-        const existingDeal = await getDealByLead(input.leadId);
-        if (existingDeal && existingDeal.deletedAt === null) {
-          const dealAge = Date.now() - new Date(existingDeal.createdAt).getTime();
-          if (dealAge < 60000 && existingDeal.valueSar === (input.valueSar ?? null)) {
-            return { id: existingDeal.id };
-          }
-        }
         const id = await createDeal(input as any);
         return { id };
       }),
