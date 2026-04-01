@@ -283,7 +283,12 @@ export default function TeamDashboard() {
                   ) : (
                     (stats?.agentPerformance ?? []).map((agent: any) => (
                       <tr key={agent.agentId} className="border-b border-border hover:bg-muted/30 transition-colors duration-200">
-                        <td className="px-4 py-3 font-medium">{agent.agentName}</td>
+                        <td className="px-4 py-3 font-medium">
+                          <span>{agent.agentName}</span>
+                          {!agent.isActive && (
+                            <span className="ml-2 text-xs bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded-full">Inactive</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3">{agent.totalLeads}</td>
                         <td className="px-4 py-3">{agent.totalActivities}</td>
                         <td className="px-4 py-3">
