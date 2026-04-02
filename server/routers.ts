@@ -197,6 +197,7 @@ import {
 import { softDeleteFollowUp, restoreFollowUp, softDeleteClientTask, restoreClientTask, softDeleteObjective, restoreObjective, softDeleteDeliverable, restoreDeliverable, softDeleteUpsell, restoreUpsell, softDeleteCommunication, restoreCommunication } from "./db";
 import { buildReportEmail } from "./emailReports";
 import { createLeadSourcesRouter } from "./leadSourcesRouter";
+import { createLandingPageIntegrationsRouter } from "./landingPageIntegrationsRouter";
 import {
   createBackupProcedure,
   getBackupsProcedure,
@@ -1731,6 +1732,7 @@ attachments: router({
 
   // ─── Lead Sources (Google Sheets Integration) ─────────────────────────────
   leadSources: createLeadSourcesRouter(adminProcedure),
+  landingPageIntegrations: createLandingPageIntegrationsRouter(adminProcedure),
 
   // ─── Backup & Restore ─────────────────────────────────────────────────────
   admin: router({

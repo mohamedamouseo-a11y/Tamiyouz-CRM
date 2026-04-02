@@ -17,6 +17,7 @@ import NotificationSettingsContent from "@/components/NotificationSettingsConten
 import NotificationsTab from "@/components/NotificationsTab";
 import MeetingNotificationSettings from "@/components/MeetingNotificationSettings";
 import LeadSourcesTab from "@/components/LeadSourcesTab";
+import LandingPageIntegrationsTab from "@/components/LandingPageIntegrationsTab";
 import BackupTab from "@/components/BackupTab";
 import MetaSettingsTab from "@/components/MetaSettingsTab";
 import TikTokSettingsTab from "@/components/tiktok/TikTokSettingsTab";
@@ -400,6 +401,9 @@ export default function AdminSettings() {
             </TabsTrigger>}
             {isAdmin && <TabsTrigger value="leadSources" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               <FileSpreadsheet size={13} />{isRTL ? "مصادر العملاء" : "Lead Sources"}
+            </TabsTrigger>}
+            {isAdmin && <TabsTrigger value="landingPageIntegrations" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
+              <FileSpreadsheet size={13} />{isRTL ? "ربط الصفحات" : "Landing Pages"}
             </TabsTrigger>}
             {isAdmin && <TabsTrigger value="backup" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               <Archive size={13} />{isRTL ? "النسخ الاحتياطية" : "Backup"}
@@ -851,6 +855,10 @@ export default function AdminSettings() {
           {/* ── Lead Sources Tab ── */}
           {isAdmin && <TabsContent value="leadSources" className="mt-4">
             <LeadSourcesTab />
+          </TabsContent>}
+          {/* ── Landing Page Integrations Tab ── */}
+          {isAdmin && <TabsContent value="landingPageIntegrations" className="mt-4">
+            <LandingPageIntegrationsTab />
           </TabsContent>}
 
           {/* ── Backup & Restore Tab ── */}

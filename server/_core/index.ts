@@ -25,6 +25,7 @@ import { handleTamaraWebhook, verifyTamaraWebhookRequest } from "../services/tam
 import { handlePaymobWebhook } from "../services/paymobService";
 import { startRakanAdvisoryEngine } from "../services/rakanAdvisoryEngine";
 import { developerHubRouter } from "../routes/developerHub";
+import { createPublicLeadIntakeRouter } from "../routes/publicLeadIntake";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -69,6 +70,8 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Developer Hub routes (Super Admin only)
   app.use("/api", developerHubRouter);
+  // Landing Page Public Lead Intake
+  app.use("/api/public", createPublicLeadIntakeRouter());
   // Real-time Chat
   setupChat(server);
 
