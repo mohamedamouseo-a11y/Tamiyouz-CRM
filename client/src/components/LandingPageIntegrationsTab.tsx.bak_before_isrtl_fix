@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,14 +109,13 @@ function draftToPayload(draft: typeof defaultDraft) {
 }
 
 export default function LandingPageIntegrationsTab() {
-  const { isRTL } = useLanguage();
   const [draft, setDraft] = useState(defaultDraft);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const listQuery = trpc.landingPageIntegrations.list.useQuery();
   const createMutation = trpc.landingPageIntegrations.create.useMutation({
     onSuccess: () => {
-      toast.success(isRTL ? "تم إنشاء الـ integration" : "Integration created successfully");
+      toast.success("تم إنشاء الـ integration");
       listQuery.refetch();
       setDraft(defaultDraft);
     },
@@ -125,14 +123,14 @@ export default function LandingPageIntegrationsTab() {
   });
   const updateMutation = trpc.landingPageIntegrations.update.useMutation({
     onSuccess: () => {
-      toast.success(isRTL ? "تم تحديث الـ integration" : "Integration updated successfully");
+      toast.success("تم تحديث الـ integration");
       listQuery.refetch();
     },
     onError: (error) => toast.error(error.message),
   });
   const deleteMutation = trpc.landingPageIntegrations.delete.useMutation({
     onSuccess: () => {
-      toast.success(isRTL ? "تم حذف الـ integration" : "Integration deleted successfully");
+      toast.success("تم حذف الـ integration");
       listQuery.refetch();
       setSelectedId(null);
     },
@@ -150,9 +148,9 @@ export default function LandingPageIntegrationsTab() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>{isRTL ? "ربط صفحات الهبوط" : "Landing Page Integrations"}</span>
+            <span>Landing Page Integrations</span>
             <Button size="sm" variant="outline" onClick={() => { setSelectedId(null); setDraft(defaultDraft); }}>
-              <Plus className="h-4 w-4 mr-2" /> {isRTL ? "جديد" : "New"}
+              <Plus className="h-4 w-4 mr-2" /> جديد
             </Button>
           </CardTitle>
         </CardHeader>
@@ -198,7 +196,7 @@ export default function LandingPageIntegrationsTab() {
                     </div>
                     <div className="flex gap-2">
                       <Badge variant={item.status === "Active" ? "default" : "secondary"}>{item.status}</Badge>
-                      {item.isEnabled ? <Badge variant="outline">{isRTL ? "مفعّل" : "Enabled"}</Badge> : <Badge variant="destructive">{isRTL ? "معطّل" : "Off"}</Badge>}
+                      {item.isEnabled ? <Badge variant="outline">Enabled</Badge> : <Badge variant="destructive">Off</Badge>}
                     </div>
                   </div>
                   <div className="mt-2 text-xs text-muted-foreground line-clamp-2">{item.endpointPath}</div>
@@ -211,61 +209,61 @@ export default function LandingPageIntegrationsTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{selectedId ? (isRTL ? "تعديل Integration" : "Edit Integration") : (isRTL ? "إنشاء Integration" : "Create Integration")}</CardTitle>
+          <CardTitle>{selectedId ? "Edit Integration" : "Create Integration"}</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid grid-cols-5 w-full">
-              <TabsTrigger value="basic">{isRTL ? "أساسي" : "Basic"}</TabsTrigger>
-              <TabsTrigger value="mapping">{isRTL ? "الربط" : "Mapping"}</TabsTrigger>
-              <TabsTrigger value="security">{isRTL ? "الأمان" : "Security"}</TabsTrigger>
-              <TabsTrigger value="notifications">{isRTL ? "الإشعارات" : "Notifications"}</TabsTrigger>
-              <TabsTrigger value="logs">{isRTL ? "السجلات" : "Logs"}</TabsTrigger>
+              <TabsTrigger value="basic">Basic</TabsTrigger>
+              <TabsTrigger value="mapping">Mapping</TabsTrigger>
+              <TabsTrigger value="security">Security</TabsTrigger>
+              <TabsTrigger value="notifications">Notifications</TabsTrigger>
+              <TabsTrigger value="logs">Logs</TabsTrigger>
             </TabsList>
 
             <TabsContent value="basic" className="space-y-4 mt-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>{isRTL ? "اسم الـ Integration" : "Integration Name"}</Label><Input value={draft.name} onChange={(e) => setDraft(s => ({ ...s, name: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>Integration Name</Label><Input value={draft.name} onChange={(e) => setDraft(s => ({ ...s, name: e.target.value }))} /></div>
                 <div className="space-y-2"><Label>Slug</Label><Input value={draft.slug} onChange={(e) => setDraft(s => ({ ...s, slug: e.target.value }))} /></div>
-                <div className="space-y-2"><Label>{isRTL ? "مسار الـ Endpoint" : "Endpoint Path"}</Label><Input value={draft.endpointPath} onChange={(e) => setDraft(s => ({ ...s, endpointPath: e.target.value }))} /></div>
-                <div className="space-y-2"><Label>{isRTL ? "النطاقات المسموحة" : "Allowed Domains"}</Label><Input value={draft.allowedDomainsText} onChange={(e) => setDraft(s => ({ ...s, allowedDomainsText: e.target.value }))} placeholder="tamiyouzalrowad.com, campaign.example.com" /></div>
-                <div className="space-y-2"><Label>{isRTL ? "اسم المصدر" : "Source Name"}</Label><Input value={draft.sourceName} onChange={(e) => setDraft(s => ({ ...s, sourceName: e.target.value }))} /></div>
-                <div className="space-y-2"><Label>{isRTL ? "عنوان الصفحة الافتراضي" : "Default Page Title"}</Label><Input value={draft.defaultPageTitle} onChange={(e) => setDraft(s => ({ ...s, defaultPageTitle: e.target.value }))} /></div>
-                <div className="space-y-2"><Label>{isRTL ? "الحالة" : "Status"}</Label><Select value={draft.status} onValueChange={(value) => setDraft(s => ({ ...s, status: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Draft">Draft</SelectItem><SelectItem value="Active">Active</SelectItem><SelectItem value="Disabled">Disabled</SelectItem></SelectContent></Select></div>
-                <div className="space-y-2"><Label>{isRTL ? "المرحلة الافتراضية" : "Default Stage"}</Label><Input value={draft.defaultStage} onChange={(e) => setDraft(s => ({ ...s, defaultStage: e.target.value }))} /></div>
-                <div className="space-y-2"><Label>{isRTL ? "قاعدة التعيين" : "Assignment Rule"}</Label><Select value={draft.assignmentRule} onValueChange={(value) => setDraft(s => ({ ...s, assignmentRule: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="round_robin">Round Robin</SelectItem><SelectItem value="fixed_owner">Fixed Owner</SelectItem><SelectItem value="by_campaign">By Campaign</SelectItem></SelectContent></Select></div>
-                <div className="space-y-2"><Label>{isRTL ? "معرّف المالك الثابت" : "Fixed Owner ID"}</Label><Input value={draft.fixedOwnerId} onChange={(e) => setDraft(s => ({ ...s, fixedOwnerId: e.target.value }))} /></div>
-                <div className="space-y-2"><Label>{isRTL ? "قاعدة منع التكرار" : "Dedup Rule"}</Label><Select value={draft.dedupRule} onValueChange={(value) => setDraft(s => ({ ...s, dedupRule: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="phone">{isRTL ? "الهاتف" : "Phone"}</SelectItem><SelectItem value="external_id">External ID</SelectItem><SelectItem value="phone_and_source">{isRTL ? "الهاتف + المصدر" : "Phone + Source"}</SelectItem></SelectContent></Select></div>
-                <div className="space-y-2"><Label>{isRTL ? "وضع الإسناد" : "Attribution Mode"}</Label><Select value={draft.attributionMode} onValueChange={(value) => setDraft(s => ({ ...s, attributionMode: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="first_touch">First Touch</SelectItem><SelectItem value="last_touch">Last Touch</SelectItem><SelectItem value="both">{isRTL ? "الاثنين" : "Both"}</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label>Endpoint Path</Label><Input value={draft.endpointPath} onChange={(e) => setDraft(s => ({ ...s, endpointPath: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>Allowed Domains</Label><Input value={draft.allowedDomainsText} onChange={(e) => setDraft(s => ({ ...s, allowedDomainsText: e.target.value }))} placeholder="tamiyouzalrowad.com, campaign.example.com" /></div>
+                <div className="space-y-2"><Label>Source Name</Label><Input value={draft.sourceName} onChange={(e) => setDraft(s => ({ ...s, sourceName: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>Default Page Title</Label><Input value={draft.defaultPageTitle} onChange={(e) => setDraft(s => ({ ...s, defaultPageTitle: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>Status</Label><Select value={draft.status} onValueChange={(value) => setDraft(s => ({ ...s, status: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Draft">Draft</SelectItem><SelectItem value="Active">Active</SelectItem><SelectItem value="Disabled">Disabled</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label>Default Stage</Label><Input value={draft.defaultStage} onChange={(e) => setDraft(s => ({ ...s, defaultStage: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>Assignment Rule</Label><Select value={draft.assignmentRule} onValueChange={(value) => setDraft(s => ({ ...s, assignmentRule: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="round_robin">Round Robin</SelectItem><SelectItem value="fixed_owner">Fixed Owner</SelectItem><SelectItem value="by_campaign">By Campaign</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label>Fixed Owner ID</Label><Input value={draft.fixedOwnerId} onChange={(e) => setDraft(s => ({ ...s, fixedOwnerId: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>Dedup Rule</Label><Select value={draft.dedupRule} onValueChange={(value) => setDraft(s => ({ ...s, dedupRule: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="phone">Phone</SelectItem><SelectItem value="external_id">External ID</SelectItem><SelectItem value="phone_and_source">Phone + Source</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label>Attribution Mode</Label><Select value={draft.attributionMode} onValueChange={(value) => setDraft(s => ({ ...s, attributionMode: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="first_touch">First Touch</SelectItem><SelectItem value="last_touch">Last Touch</SelectItem><SelectItem value="both">Both</SelectItem></SelectContent></Select></div>
               </div>
-              <div className="flex items-center gap-3"><Switch checked={draft.isEnabled} onCheckedChange={(value) => setDraft(s => ({ ...s, isEnabled: value }))} /><Label>{isRTL ? "الـ Integration مفعّل" : "Integration Enabled"}</Label></div>
-              <div className="space-y-2"><Label>{isRTL ? "رسالة النجاح" : "Success Message"}</Label><Textarea rows={3} value={draft.successMessage} onChange={(e) => setDraft(s => ({ ...s, successMessage: e.target.value }))} /></div>
-              <div className="space-y-2"><Label>{isRTL ? "رابط إعادة التوجيه (اختياري)" : "Redirect URL (optional)"}</Label><Input value={draft.redirectUrl} onChange={(e) => setDraft(s => ({ ...s, redirectUrl: e.target.value }))} /></div>
-              <div className="space-y-2"><Label>{isRTL ? "الوسوم (مفصولة بفاصلة)" : "Tags (comma separated)"}</Label><Input value={draft.tagsText} onChange={(e) => setDraft(s => ({ ...s, tagsText: e.target.value }))} /></div>
+              <div className="flex items-center gap-3"><Switch checked={draft.isEnabled} onCheckedChange={(value) => setDraft(s => ({ ...s, isEnabled: value }))} /><Label>Integration Enabled</Label></div>
+              <div className="space-y-2"><Label>Success Message</Label><Textarea rows={3} value={draft.successMessage} onChange={(e) => setDraft(s => ({ ...s, successMessage: e.target.value }))} /></div>
+              <div className="space-y-2"><Label>Redirect URL (optional)</Label><Input value={draft.redirectUrl} onChange={(e) => setDraft(s => ({ ...s, redirectUrl: e.target.value }))} /></div>
+              <div className="space-y-2"><Label>Tags (comma separated)</Label><Input value={draft.tagsText} onChange={(e) => setDraft(s => ({ ...s, tagsText: e.target.value }))} /></div>
             </TabsContent>
 
             <TabsContent value="mapping" className="space-y-4 mt-4">
-              <div className="space-y-2"><Label>{isRTL ? "ربط الحقول JSON" : "Field Mapping JSON"}</Label><Textarea rows={20} className="font-mono text-xs" value={draft.fieldMappingText} onChange={(e) => setDraft(s => ({ ...s, fieldMappingText: e.target.value }))} /></div>
-              <div className="space-y-2"><Label>{isRTL ? "قواعد التقييم JSON" : "Scoring Rules JSON"}</Label><Textarea rows={10} className="font-mono text-xs" value={draft.scoringRulesText} onChange={(e) => setDraft(s => ({ ...s, scoringRulesText: e.target.value }))} /></div>
+              <div className="space-y-2"><Label>Field Mapping JSON</Label><Textarea rows={20} className="font-mono text-xs" value={draft.fieldMappingText} onChange={(e) => setDraft(s => ({ ...s, fieldMappingText: e.target.value }))} /></div>
+              <div className="space-y-2"><Label>Scoring Rules JSON</Label><Textarea rows={10} className="font-mono text-xs" value={draft.scoringRulesText} onChange={(e) => setDraft(s => ({ ...s, scoringRulesText: e.target.value }))} /></div>
             </TabsContent>
 
             <TabsContent value="security" className="space-y-4 mt-4">
-              <div className="space-y-2"><Label>{isRTL ? "إعدادات الأمان JSON" : "Security Config JSON"}</Label><Textarea rows={18} className="font-mono text-xs" value={draft.securityConfigText} onChange={(e) => setDraft(s => ({ ...s, securityConfigText: e.target.value }))} /></div>
+              <div className="space-y-2"><Label>Security Config JSON</Label><Textarea rows={18} className="font-mono text-xs" value={draft.securityConfigText} onChange={(e) => setDraft(s => ({ ...s, securityConfigText: e.target.value }))} /></div>
             </TabsContent>
 
             <TabsContent value="notifications" className="space-y-4 mt-4">
               <div className="rounded-xl border p-3 bg-muted/30 text-sm text-muted-foreground">
-                {isRTL ? "يدعم أكثر من email للإشعار، ويدعم Slack webhook لكل landing page بشكل مستقل." : "Supports multiple email recipients for notifications, and independent Slack webhook per landing page."}
+                يدعم أكثر من email للإشعار، ويدعم Slack webhook لكل landing page بشكل مستقل.
               </div>
-              <div className="space-y-2"><Label>{isRTL ? "إعدادات الإشعارات JSON" : "Notification Config JSON"}</Label><Textarea rows={18} className="font-mono text-xs" value={draft.notificationConfigText} onChange={(e) => setDraft(s => ({ ...s, notificationConfigText: e.target.value }))} /></div>
+              <div className="space-y-2"><Label>Notification Config JSON</Label><Textarea rows={18} className="font-mono text-xs" value={draft.notificationConfigText} onChange={(e) => setDraft(s => ({ ...s, notificationConfigText: e.target.value }))} /></div>
             </TabsContent>
 
             <TabsContent value="logs" className="space-y-4 mt-4">
               {!selectedId ? (
-                <div className="text-sm text-muted-foreground">{isRTL ? "اختر integration أولًا لعرض السجلات." : "Select an integration first to view logs."}</div>
+                <div className="text-sm text-muted-foreground">اختر integration أولًا لعرض logs.</div>
               ) : (
                 <div className="space-y-3">
-                  <Button variant="outline" size="sm" onClick={() => logsQuery.refetch()}><RefreshCcw className="h-4 w-4 mr-2" /> {isRTL ? "تحديث السجلات" : "Refresh Logs"}</Button>
+                  <Button variant="outline" size="sm" onClick={() => logsQuery.refetch()}><RefreshCcw className="h-4 w-4 mr-2" /> Refresh Logs</Button>
                   <ScrollArea className="h-[420px] border rounded-xl p-3">
                     <div className="space-y-3">
                       {(logsQuery.data || []).map((log: any) => (
@@ -288,11 +286,11 @@ export default function LandingPageIntegrationsTab() {
 
           <div className="flex flex-wrap gap-3 mt-6">
             <Button onClick={() => selectedId ? updateMutation.mutate({ id: selectedId, data: draftToPayload(draft) }) : createMutation.mutate(draftToPayload(draft))}>
-              {selectedId ? (isRTL ? "حفظ التغييرات" : "Save Changes") : (isRTL ? "إنشاء Integration" : "Create Integration")}
+              {selectedId ? "Save Changes" : "Create Integration"}
             </Button>
             {selectedId ? (
               <Button variant="destructive" onClick={() => deleteMutation.mutate({ id: selectedId })}>
-                <Trash2 className="h-4 w-4 mr-2" /> {isRTL ? "حذف" : "Delete"}
+                <Trash2 className="h-4 w-4 mr-2" /> Delete
               </Button>
             ) : null}
           </div>
