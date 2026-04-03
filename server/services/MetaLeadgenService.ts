@@ -200,6 +200,35 @@ async function assignByCampaign(campaignName?: string | null) {
   return owner?.id ?? null;
 }
 
+/**
+ * Auto-create a campaign record when a lead arrives from a campaign
+ * that doesn't yet exist in the campaigns table.
+ */
+async function ensureCampaignExists(campaignName?: string | null): Promise<void> {
+  if (!campaignName) return;
+  try {
+    const db = await getDb();
+    const [existing] = await db
+      .select({ id: campaigns.id })
+      .from(campaigns)
+      .where(and(eq(campaigns.name, campaignName), isNull(campaigns.deletedAt)))
+      .limit(1);
+    if (existing) return; // already exists
+    await db.insert(campaigns).values({
+      name: campaignName,
+      platform: "Meta",
+      roundRobinEnabled: 1,
+      roundRobinIndex: 0,
+      isActive: 1,
+    } as any);
+    console.log(`[MetaLeadgen] Auto-created campaign: ${campaignName}`);
+  } catch (err: any) {
+    if (!err?.message?.includes("Duplicate")) {
+      console.error(`[MetaLeadgen] Failed to auto-create campaign "${campaignName}":`, err.message);
+    }
+  }
+}
+
 async function assignOwner(config: LeadgenConfigRow, campaignName?: string | null) {
   if (config.assignmentRule === "fixed_owner") {
     return config.fixedOwnerId ?? null;
@@ -425,6 +454,9 @@ export class MetaLeadgenService {
             continue;
           }
 
+          // Auto-create campaign if it doesn't exist
+          await ensureCampaignExists(graphLead.campaign_name ?? null);
+
           const ownerId = await assignOwner(config, graphLead.campaign_name ?? null);
 
           // Convert Meta's ISO date to MySQL-compatible format
@@ -595,6 +627,9 @@ export class MetaLeadgenService {
                 skipped += 1;
                 continue;
               }
+
+              // Auto-create campaign if it doesn't exist
+              await ensureCampaignExists(graphLead.campaign_name ?? null);
 
               const ownerId = await assignOwner(config, graphLead.campaign_name ?? null);
 
