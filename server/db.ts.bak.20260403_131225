@@ -4339,13 +4339,13 @@ export async function getCrmStatsByCampaign(dateFrom?: string, dateTo?: string):
   const hasDateFilter = dateFrom && dateTo;
   const leadRows = hasDateFilter
     ? await db.execute(sql`
-        SELECT l.id, l.campaignName, l.leadQuality, l.fit_status as fitStatus, l.stage
+        SELECT l.id, l.campaignName, l.leadQuality, l.fitStatus, l.stage
         FROM leads l
         WHERE l.deletedAt IS NULL AND l.createdAt >= ${dateFrom} AND l.createdAt <= ${dateTo}
         ORDER BY l.campaignName
       `)
     : await db.execute(sql`
-        SELECT l.id, l.campaignName, l.leadQuality, l.fit_status as fitStatus, l.stage
+        SELECT l.id, l.campaignName, l.leadQuality, l.fitStatus, l.stage
         FROM leads l
         WHERE l.deletedAt IS NULL
         ORDER BY l.campaignName
