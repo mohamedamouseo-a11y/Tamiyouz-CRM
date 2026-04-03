@@ -185,12 +185,7 @@ export async function intakeLandingPageLead(slug: string, rawPayload: unknown, c
     throw new Error(antiSpamError);
   }
 
-  // Turnstile verification
-  const turnstileError = await verifyTurnstileToken((payload as any).cf_turnstile_response, context.ipAddress);
-  if (turnstileError) {
-    await logLandingPageSubmission({ integrationId: integration.id, status: "blocked", payloadJson: payload, origin: context.origin, ipAddress: context.ipAddress, userAgent: context.userAgent, errorMessage: turnstileError });
-    throw new Error(turnstileError);
-  }
+  // Turnstile verification disabled – relying on honeypot + minimum submit time + origin validation
 
   const phone = normalizePhone(payload.phone || "");
   const existingLead = phone ? await getLeadByPhone(phone) : null;
