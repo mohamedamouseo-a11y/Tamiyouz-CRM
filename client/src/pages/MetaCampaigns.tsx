@@ -905,7 +905,7 @@ export default function MetaCampaigns() {
               ) : (
                 <>
                   <div className="overflow-x-auto">
-                    <Table>
+                    <Table className="min-w-[1400px]">
                       <TableHeader>
                         <TableRow className="bg-muted/30 hover:bg-muted/30 text-xs">
                           {visibleColumns.includes("name") && <SortableHeader field="name">{isRTL ? "الحملة" : "Campaign"}</SortableHeader>}
@@ -944,10 +944,10 @@ export default function MetaCampaigns() {
                                 onClick={() => openDrawer(c)}
                               >
                                 {visibleColumns.includes("name") && (
-                                  <TableCell className="font-medium max-w-[200px] py-1.5 text-xs" rowSpan={showCrmRow && crm ? 1 : 1}>
-                                    <div className="flex items-center gap-1.5">
+                                  <TableCell className="font-medium min-w-[250px] max-w-[300px] py-1.5 text-xs" rowSpan={showCrmRow && crm ? 1 : 1}>
+                                    <div className="flex items-center gap-1.5 overflow-hidden">
                                       <Badge variant="outline" className="text-[9px] px-1 py-0 bg-blue-50 text-blue-600 border-blue-200 shrink-0">Meta</Badge>
-                                      <div>
+                                      <div className="min-w-0 flex-1">
                                         <div className="truncate font-semibold">{c.campaignName}</div>
                                         <div className="text-[10px] text-muted-foreground truncate">{c.campaignId}</div>
                                       </div>
@@ -955,11 +955,11 @@ export default function MetaCampaigns() {
                                   </TableCell>
                                 )}
                                 {visibleColumns.includes("status") && (
-                                  <TableCell>{getStatusBadge(c.status)}</TableCell>
+                                  <TableCell className="whitespace-nowrap">{getStatusBadge(c.status)}</TableCell>
                                 )}
                                 {visibleColumns.includes("objective") && (
-                                  <TableCell>
-                                    <Badge variant="outline" className="text-xs font-normal">
+                                  <TableCell className="whitespace-nowrap">
+                                    <Badge variant="outline" className="text-xs font-normal whitespace-nowrap">
                                       <Target size={10} className="mr-1" />
                                       {c.objective || "—"}
                                     </Badge>
@@ -992,7 +992,7 @@ export default function MetaCampaigns() {
                                   </TableCell>
                                 )}
                                 {visibleColumns.includes("spend") && (
-                                  <TableCell className="text-xs font-semibold py-1.5">{fmt.currency(ci.spend)}</TableCell>
+                                  <TableCell className="text-xs font-semibold py-1.5 whitespace-nowrap">{fmt.currency(ci.spend)}</TableCell>
                                 )}
                                 {visibleColumns.includes("impressions") && (
                                   <TableCell className="text-xs py-1.5">{fmt.number(ci.impressions)}</TableCell>
@@ -1004,13 +1004,13 @@ export default function MetaCampaigns() {
                                   <TableCell className="text-xs py-1.5">{fmt.percent(ci.ctr)}</TableCell>
                                 )}
                                 {visibleColumns.includes("cpc") && (
-                                  <TableCell className="text-xs py-1.5">{fmt.currency(ci.cpc)}</TableCell>
+                                  <TableCell className="text-xs py-1.5 whitespace-nowrap">{fmt.currency(ci.cpc)}</TableCell>
                                 )}
                                 {visibleColumns.includes("cpm") && (
                                   <TableCell className="text-xs py-1.5">{fmt.currency(ci.cpm)}</TableCell>
                                 )}
                                 {visibleColumns.includes("cpl") && (
-                                  <TableCell className="text-xs font-semibold py-1.5">
+                                  <TableCell className="text-xs font-semibold py-1.5 whitespace-nowrap">
                                     {ci.cpl ? fmt.currency(ci.cpl) : (ci.costPerMessage ? fmt.currency(ci.costPerMessage) : "—")}
                                   </TableCell>
                                 )}
