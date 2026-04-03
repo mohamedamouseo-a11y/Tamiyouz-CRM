@@ -64,7 +64,7 @@ const ALL_COLUMNS: { key: string; labelEn: string; labelAr: string }[] = [
   { key: "action", labelEn: "Action", labelAr: "إجراء" },
 ];
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE_OPTIONS = [10, 15, 25, 50];
 
 export default function MetaCampaigns() {
   const { isRTL, t } = useLanguage();
@@ -87,6 +87,7 @@ export default function MetaCampaigns() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(VISIBLE_COLUMNS_DEFAULT);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -282,8 +283,8 @@ export default function MetaCampaigns() {
     return result;
   }, [campaigns, searchQuery, statusFilter, objectiveFilter, sortField, sortDir, insights]);
 
-  const totalPages = Math.ceil(filteredCampaigns.length / PAGE_SIZE);
-  const paginatedCampaigns = filteredCampaigns.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages = Math.ceil(filteredCampaigns.length / pageSize);
+  const paginatedCampaigns = filteredCampaigns.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   // ─── Unique objectives for filter ──────────────────────────────────────
   const uniqueObjectives = useMemo(() => {
@@ -751,7 +752,7 @@ export default function MetaCampaigns() {
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableRow className="bg-muted/30 hover:bg-muted/30 text-xs">
                           {visibleColumns.includes("name") && <SortableHeader field="name">{isRTL ? "الحملة" : "Campaign"}</SortableHeader>}
                           {visibleColumns.includes("status") && <SortableHeader field="status">{isRTL ? "الحالة" : "Status"}</SortableHeader>}
                           {visibleColumns.includes("objective") && <SortableHeader field="objective">{isRTL ? "الهدف" : "Objective"}</SortableHeader>}
@@ -776,11 +777,11 @@ export default function MetaCampaigns() {
                           return (
                             <TableRow
                               key={c.id}
-                              className="cursor-pointer hover:bg-primary/5 transition-colors group"
+                              className="cursor-pointer hover:bg-primary/5 transition-colors group h-10"
                               onClick={() => openDrawer(c)}
                             >
                               {visibleColumns.includes("name") && (
-                                <TableCell className="font-medium max-w-[220px]">
+                                <TableCell className="font-medium max-w-[200px] py-1.5 text-xs">
                                   <div className="truncate">{c.campaignName}</div>
                                   <div className="text-[10px] text-muted-foreground truncate">{c.campaignId}</div>
                                 </TableCell>
@@ -823,25 +824,25 @@ export default function MetaCampaigns() {
                                 </TableCell>
                               )}
                               {visibleColumns.includes("spend") && (
-                                <TableCell className="text-sm font-semibold">{fmt.currency(ci.spend)}</TableCell>
+                                <TableCell className="text-xs font-semibold py-1.5">{fmt.currency(ci.spend)}</TableCell>
                               )}
                               {visibleColumns.includes("impressions") && (
-                                <TableCell className="text-sm">{fmt.number(ci.impressions)}</TableCell>
+                                <TableCell className="text-xs py-1.5">{fmt.number(ci.impressions)}</TableCell>
                               )}
                               {visibleColumns.includes("clicks") && (
-                                <TableCell className="text-sm">{fmt.number(ci.clicks)}</TableCell>
+                                <TableCell className="text-xs py-1.5">{fmt.number(ci.clicks)}</TableCell>
                               )}
                               {visibleColumns.includes("ctr") && (
-                                <TableCell className="text-sm">{fmt.percent(ci.ctr)}</TableCell>
+                                <TableCell className="text-xs py-1.5">{fmt.percent(ci.ctr)}</TableCell>
                               )}
                               {visibleColumns.includes("cpc") && (
-                                <TableCell className="text-sm">{fmt.currency(ci.cpc)}</TableCell>
+                                <TableCell className="text-xs py-1.5">{fmt.currency(ci.cpc)}</TableCell>
                               )}
                               {visibleColumns.includes("cpm") && (
-                                <TableCell className="text-sm">{fmt.currency(ci.cpm)}</TableCell>
+                                <TableCell className="text-xs py-1.5">{fmt.currency(ci.cpm)}</TableCell>
                               )}
                               {visibleColumns.includes("cpl") && (
-                                <TableCell className="text-sm font-semibold">
+                                <TableCell className="text-xs font-semibold py-1.5">
                                   {ci.cpl ? fmt.currency(ci.cpl) : (ci.costPerMessage ? fmt.currency(ci.costPerMessage) : "—")}
                                 </TableCell>
                               )}
@@ -855,12 +856,12 @@ export default function MetaCampaigns() {
                                 </TableCell>
                               )}
                               {visibleColumns.includes("leads") && (
-                                <TableCell className="text-sm font-semibold text-emerald-600">
+                                <TableCell className="text-xs font-semibold text-emerald-600 py-1.5">
                                   {ci.leads && ci.leads !== "0" ? ci.leads : "—"}
                                 </TableCell>
                               )}
                               {visibleColumns.includes("messages") && (
-                                <TableCell className="text-sm">
+                                <TableCell className="text-xs py-1.5">
                                   {ci.messages && ci.messages !== "0" ? ci.messages : "—"}
                                 </TableCell>
                               )}
@@ -914,20 +915,39 @@ export default function MetaCampaigns() {
                   </div>
 
                   {/* ─── Pagination ──────────────────────────────────────── */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-5 py-3 border-t bg-muted/20">
+                  <div className="flex items-center justify-between px-5 py-2.5 border-t bg-muted/20">
+                    <div className="flex items-center gap-3">
                       <p className="text-xs text-muted-foreground">
                         {isRTL
-                          ? `صفحة ${currentPage} من ${totalPages}`
-                          : `Page ${currentPage} of ${totalPages}`}
+                          ? `عرض ${((currentPage - 1) * pageSize) + 1}–${Math.min(currentPage * pageSize, filteredCampaigns.length)} من ${filteredCampaigns.length}`
+                          : `Showing ${((currentPage - 1) * pageSize) + 1}–${Math.min(currentPage * pageSize, filteredCampaigns.length)} of ${filteredCampaigns.length}`}
                       </p>
+                      <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                        <SelectTrigger className="w-[70px] h-7 text-xs bg-transparent border-muted-foreground/20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAGE_SIZE_OPTIONS.map(size => (
+                            <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {totalPages > 1 && (
                       <div className="flex items-center gap-1">
                         <Button
-                          variant="outline" size="icon" className="h-8 w-8"
+                          variant="outline" size="icon" className="h-7 w-7"
+                          disabled={currentPage === 1}
+                          onClick={() => setCurrentPage(1)}
+                        >
+                          <ChevronLeft size={12} /><ChevronLeft size={12} className="-ml-2" />
+                        </Button>
+                        <Button
+                          variant="outline" size="icon" className="h-7 w-7"
                           disabled={currentPage === 1}
                           onClick={() => setCurrentPage(p => p - 1)}
                         >
-                          <ChevronLeft size={14} />
+                          <ChevronLeft size={12} />
                         </Button>
                         {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                           let page: number;
@@ -940,7 +960,7 @@ export default function MetaCampaigns() {
                               key={page}
                               variant={currentPage === page ? "default" : "outline"}
                               size="icon"
-                              className="h-8 w-8 text-xs"
+                              className="h-7 w-7 text-xs"
                               onClick={() => setCurrentPage(page)}
                             >
                               {page}
@@ -948,15 +968,22 @@ export default function MetaCampaigns() {
                           );
                         })}
                         <Button
-                          variant="outline" size="icon" className="h-8 w-8"
+                          variant="outline" size="icon" className="h-7 w-7"
                           disabled={currentPage === totalPages}
                           onClick={() => setCurrentPage(p => p + 1)}
                         >
-                          <ChevronRight size={14} />
+                          <ChevronRight size={12} />
+                        </Button>
+                        <Button
+                          variant="outline" size="icon" className="h-7 w-7"
+                          disabled={currentPage === totalPages}
+                          onClick={() => setCurrentPage(totalPages)}
+                        >
+                          <ChevronRight size={12} /><ChevronRight size={12} className="-ml-2" />
                         </Button>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </>
               )}
             </CardContent>
