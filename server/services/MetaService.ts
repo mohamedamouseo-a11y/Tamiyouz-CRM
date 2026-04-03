@@ -1,3 +1,4 @@
+import cron from "node-cron";
 import { getDb } from "../db";
 import { metaIntegrations, metaAdAccounts, metaCampaignSnapshots } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -368,4 +369,29 @@ export async function changeCampaignBudget(snapshotId: number, budgetType: "dail
   await db.update(metaCampaignSnapshots).set(updateData).where(eq(metaCampaignSnapshots.id, snapshotId));
 
   return { success: true };
+}
+
+// ─── Daily Auto Sync Scheduler ─────────────────────────────────────────────
+/**
+ * Start a cron job that auto-syncs Meta campaigns once daily at 06:00 AM.
+ * This ensures the Meta Campaigns dashboard stays up-to-date without manual sync.
+ */
+export function startMetaCampaignAutoSync(): void {
+  console.log("[MetaCampaignSync] Starting daily campaign auto-sync scheduler (06:00 AM)...");
+
+  cron.schedule("0 6 * * *", async () => {
+    try {
+      const activeAccount = await getActiveAdAccount();
+      if (!activeAccount) {
+        console.log("[MetaCampaignSync] No active ad account found, skipping auto-sync.");
+        return;
+      }
+      const count = await syncCampaigns(activeAccount.id);
+      console.log(`[MetaCampaignSync] Daily auto-sync complete: ${count} campaigns synced.`);
+    } catch (err: any) {
+      console.error("[MetaCampaignSync] Daily auto-sync error:", err.message);
+    }
+  });
+
+  console.log("[MetaCampaignSync] Daily campaign auto-sync scheduler started.");
 }

@@ -19,6 +19,7 @@ import { startNotificationEngine } from "../notificationEngine";
 import { startExchangeRateScheduler } from "../exchangeRateSync";
 import { backupService } from "../services/BackupService";
 import { MetaLeadgenService, startMetaLeadgenPolling } from "../services/MetaLeadgenService";
+import { startMetaCampaignAutoSync } from "../services/MetaService";
 import { restoreService } from "../services/RestoreService";
 import { promises as fs } from "fs";
 import { handleTamaraWebhook, verifyTamaraWebhookRequest } from "../services/tamaraService";
@@ -600,6 +601,8 @@ startServer().then(() => {
   });
   // Start Meta leadgen polling scheduler (fallback for webhook)
   startMetaLeadgenPolling();
+  // Start daily Meta campaign auto-sync scheduler
+  startMetaCampaignAutoSync();
   // Start notification engine
   startNotificationEngine();
   // Start Rakan advisory engine
