@@ -91,11 +91,11 @@ function mapMetaFields(
     else customFieldsData[metaField] = value;
   }
 
-  if (!crmLead.name) crmLead.name = getFieldValue(byName, ["full_name", "name", "first_name"]);
-  if (!crmLead.phone) crmLead.phone = getFieldValue(byName, ["phone_number", "phone", "mobile_number"]);
-  if (!crmLead.businessProfile) crmLead.businessProfile = getFieldValue(byName, ["company_name", "company", "business_name"]);
+  if (!crmLead.name) crmLead.name = getFieldValue(byName, ["full_name", "name", "first_name", "الاسم_بالكامل", "الاسم", "الإسم", "الاسم_الكامل"]);
+  if (!crmLead.phone) crmLead.phone = getFieldValue(byName, ["phone_number", "phone", "mobile_number", "رقم_الهاتف", "رقم_الجوال", "الهاتف", "الجوال", "رقم_التواصل"]);
+  if (!crmLead.businessProfile) crmLead.businessProfile = getFieldValue(byName, ["company_name", "company", "business_name", "اسم_الشركة", "اسم_النشاط", "النشاط_التجاري"]);
   if (!crmLead.notes) {
-    const email = getFieldValue(byName, ["email"]);
+    const email = getFieldValue(byName, ["email", "البريد_الإلكتروني", "الإيميل"]);
     crmLead.notes = email ? `Email: ${email}` : null;
   }
 
