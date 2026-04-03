@@ -1080,110 +1080,75 @@ export default function MetaCampaigns() {
                               {/* ─── Row 2: CRM Data ─── */}
                               {showCrmRow && (
                                 <TableRow className="bg-gradient-to-r from-slate-50/80 to-blue-50/40 dark:from-slate-900/30 dark:to-blue-900/10 border-b-2 border-muted/40 hover:bg-blue-50/60">
-                                  <TableCell colSpan={visibleColumns.filter(c => ALL_COLUMNS.some(ac => ac.key === c)).length + (visibleColumns.includes("action") ? 1 : 0)} className="py-2 px-3">
+                                  <TableCell colSpan={visibleColumns.filter(c => ALL_COLUMNS.some(ac => ac.key === c)).length + (visibleColumns.includes("action") ? 1 : 0)} className="py-3 px-4">
                                     {crm ? (
-                                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px]">
+                                      <div className="flex flex-wrap items-center gap-3 text-xs">
                                         {/* CRM Label */}
-                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-50 text-emerald-600 border-emerald-200 shrink-0">CRM</Badge>
+                                        <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-600 border-emerald-200 shrink-0 font-semibold">CRM</Badge>
 
-                                        {/* Lead Quality */}
-                                        <div className="flex items-center gap-1.5">
-                                          <Users size={11} className="text-slate-500" />
-                                          <span className="text-muted-foreground">{isRTL ? "عملاء:" : "Leads:"}</span>
-                                          <span className="font-bold">{crm.totalLeads}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-red-500 font-bold">{crm.hot}</span>
-                                          <Flame size={10} className="text-red-500" />
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-orange-500 font-bold">{crm.warm}</span>
-                                          <ThermometerSun size={10} className="text-orange-500" />
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-blue-500 font-bold">{crm.cold}</span>
-                                          <Snowflake size={10} className="text-blue-500" />
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-slate-400 font-bold">{crm.bad}</span>
-                                          <XCircle size={10} className="text-slate-400" />
+                                        {/* Lead Count & Quality Group */}
+                                        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-md px-2.5 py-1 border border-slate-200 dark:border-slate-700 shadow-sm">
+                                          <Users size={13} className="text-slate-500 shrink-0" />
+                                          <span className="text-muted-foreground whitespace-nowrap">{isRTL ? "عملاء" : "Leads"}</span>
+                                          <span className="font-bold text-sm">{crm.totalLeads}</span>
+                                          <span className="text-slate-300 dark:text-slate-600">|</span>
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="flex items-center gap-0.5"><Flame size={11} className="text-red-500" /><span className="text-red-500 font-bold">{crm.hot}</span></span>
+                                            <span className="flex items-center gap-0.5"><ThermometerSun size={11} className="text-orange-500" /><span className="text-orange-500 font-bold">{crm.warm}</span></span>
+                                            <span className="flex items-center gap-0.5"><Snowflake size={11} className="text-blue-500" /><span className="text-blue-500 font-bold">{crm.cold}</span></span>
+                                            <span className="flex items-center gap-0.5"><XCircle size={11} className="text-slate-400" /><span className="text-slate-400 font-bold">{crm.bad}</span></span>
+                                          </div>
                                         </div>
 
-                                        <Separator orientation="vertical" className="h-4" />
-
-                                        {/* Fit Status */}
-                                        <div className="flex items-center gap-1">
-                                          <CheckCircle size={10} className="text-emerald-500" />
-                                          <span className="text-emerald-600 font-bold">{crm.fitCount}</span>
-                                          <span className="text-muted-foreground">Fit</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                          <XCircle size={10} className="text-red-400" />
-                                          <span className="text-red-500 font-bold">{crm.notFitCount}</span>
+                                        {/* Fit Status Group */}
+                                        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-md px-2.5 py-1 border border-slate-200 dark:border-slate-700 shadow-sm">
+                                          <span className="flex items-center gap-1"><CheckCircle size={12} className="text-emerald-500" /><span className="text-emerald-600 font-bold">{crm.fitCount}</span><span className="text-muted-foreground">Fit</span></span>
+                                          <span className="text-slate-300 dark:text-slate-600">|</span>
+                                          <span className="flex items-center gap-1"><XCircle size={12} className="text-red-400" /><span className="text-red-500 font-bold">{crm.notFitCount}</span></span>
                                         </div>
 
-                                        <Separator orientation="vertical" className="h-4" />
-
-                                        {/* Pipeline */}
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-muted-foreground">L:</span>
-                                          <span className="font-bold">{crm.leadCount}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-muted-foreground">P:</span>
-                                          <span className="font-bold text-blue-600">{crm.prospectCount}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-muted-foreground">O:</span>
-                                          <span className="font-bold text-emerald-600">{crm.opportunityCount}</span>
+                                        {/* Pipeline Group */}
+                                        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-md px-2.5 py-1 border border-slate-200 dark:border-slate-700 shadow-sm">
+                                          <span className="flex items-center gap-1"><span className="text-muted-foreground">L:</span><span className="font-bold">{crm.leadCount}</span></span>
+                                          <span className="flex items-center gap-1"><span className="text-muted-foreground">P:</span><span className="font-bold text-blue-600">{crm.prospectCount}</span></span>
+                                          <span className="flex items-center gap-1"><span className="text-muted-foreground">O:</span><span className="font-bold text-emerald-600">{crm.opportunityCount}</span></span>
                                         </div>
 
-                                        <Separator orientation="vertical" className="h-4" />
-
-                                        {/* Score */}
-                                        <div className="flex items-center gap-1">
-                                          <Star size={10} className="text-amber-500" />
-                                          <span className={`font-bold px-1.5 py-0 rounded text-[10px] ${getScoreColor(crm.avgScore)}`}>{crm.avgScore}</span>
-                                        </div>
-
-                                        {/* Quality % */}
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-muted-foreground">{isRTL ? "جودة:" : "Q:"}</span>
-                                          <span className={`font-bold ${getQualityColor(qualityPct)}`}>{qualityPct.toFixed(0)}%</span>
+                                        {/* Score & Quality Group */}
+                                        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-md px-2.5 py-1 border border-slate-200 dark:border-slate-700 shadow-sm">
+                                          <span className="flex items-center gap-1"><Star size={12} className="text-amber-500" /><span className={`font-bold px-1.5 py-0.5 rounded text-[11px] ${getScoreColor(crm.avgScore)}`}>{crm.avgScore}</span></span>
+                                          <span className="text-slate-300 dark:text-slate-600">|</span>
+                                          <span className="flex items-center gap-1"><span className="text-muted-foreground whitespace-nowrap">{isRTL ? "جودة" : "Q"}</span><span className={`font-bold ${getQualityColor(qualityPct)}`}>{qualityPct.toFixed(0)}%</span></span>
                                         </div>
 
                                         {/* Cost per Hot */}
                                         {costPerHot > 0 && (
-                                          <div className="flex items-center gap-1">
-                                            <Flame size={10} className="text-red-500" />
-                                            <span className="text-muted-foreground">{isRTL ? "تكلفة:" : "Cost:"}</span>
-                                            <span className="font-bold text-red-600">{fmt.currency(costPerHot)}</span>
+                                          <div className="flex items-center gap-1.5 bg-red-50 dark:bg-red-900/20 rounded-md px-2.5 py-1 border border-red-200 dark:border-red-800 shadow-sm">
+                                            <Flame size={12} className="text-red-500 shrink-0" />
+                                            <span className="text-muted-foreground whitespace-nowrap">{isRTL ? "تكلفة" : "Cost"}</span>
+                                            <span className="font-bold text-red-600 whitespace-nowrap">{fmt.currency(costPerHot)}</span>
                                           </div>
                                         )}
 
                                         {/* Won Deals */}
                                         {crm.wonDeals > 0 && (
-                                          <>
-                                            <Separator orientation="vertical" className="h-4" />
-                                            <div className="flex items-center gap-1">
-                                              <Award size={10} className="text-yellow-500" />
-                                              <span className="font-bold text-yellow-600">{crm.wonDeals}</span>
-                                              <span className="text-muted-foreground">{isRTL ? "صفقة" : "won"}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                              <span className="font-bold text-emerald-600">{fmt.currencySar(crm.wonRevenue)}</span>
-                                            </div>
+                                          <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-md px-2.5 py-1 border border-yellow-200 dark:border-yellow-800 shadow-sm">
+                                            <Award size={12} className="text-yellow-500 shrink-0" />
+                                            <span className="font-bold text-yellow-600">{crm.wonDeals}</span>
+                                            <span className="text-muted-foreground">{isRTL ? "صفقة" : "won"}</span>
+                                            <span className="text-slate-300 dark:text-slate-600">|</span>
+                                            <span className="font-bold text-emerald-600 whitespace-nowrap">{fmt.currencySar(crm.wonRevenue)}</span>
                                             {roas > 0 && (
-                                              <Badge variant={roas >= 1 ? "default" : "destructive"} className="text-[10px] px-1.5 py-0">
+                                              <Badge variant={roas >= 1 ? "default" : "destructive"} className="text-[11px] px-2 py-0.5 ml-1">
                                                 ROAS: {roas.toFixed(2)}x
                                               </Badge>
                                             )}
-                                          </>
+                                          </div>
                                         )}
                                       </div>
                                     ) : (
-                                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-slate-50 text-slate-400 border-slate-200">CRM</Badge>
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-slate-50 text-slate-400 border-slate-200">CRM</Badge>
                                         {isRTL ? "لا توجد بيانات CRM لهذه الحملة" : "No CRM data for this campaign"}
                                       </div>
                                     )}
