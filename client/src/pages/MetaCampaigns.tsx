@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useLanguage } from "@/contexts/LanguageContext";
 import CRMLayout from "@/components/CRMLayout";
@@ -1083,96 +1084,117 @@ export default function MetaCampaigns() {
                                   <TableCell colSpan={visibleColumns.filter(c => ALL_COLUMNS.some(ac => ac.key === c)).length + (visibleColumns.includes("action") ? 1 : 0)} className="py-4 px-5">
                                     {crm ? (
                                       <div className="space-y-3">
-                                        {/* Header */}
-                                        <div className="flex items-center gap-2">
+                                        {/* Header with View Details */}
+                                        <div className="flex items-center justify-between">
                                           <Badge className="text-xs px-3 py-1 bg-emerald-500 text-white border-0 font-semibold">
                                             <Users size={14} className="mr-1.5" />
                                             {isRTL ? "بيانات CRM" : "CRM Data"}
                                           </Badge>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs h-7 px-3 gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              window.location.href = `/leads?campaign=${encodeURIComponent(c.campaignName)}`;
+                                            }}
+                                          >
+                                            <ExternalLink size={12} />
+                                            {isRTL ? "عرض العملاء" : "View Leads"}
+                                          </Button>
                                         </div>
 
-                                        {/* Cards Grid */}
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+                                        {/* Cards - flex wrap for proper sizing */}
+                                        <div className="flex flex-wrap gap-2.5">
 
                                           {/* Total Leads Card */}
-                                          <div className="bg-white dark:bg-slate-800 rounded-lg px-4 py-3 border border-slate-200 dark:border-slate-700 shadow-sm">
-                                            <div className="text-[11px] text-muted-foreground mb-1 whitespace-nowrap">{isRTL ? "إجمالي العملاء" : "Total Leads"}</div>
-                                            <div className="text-lg font-bold flex items-center gap-1.5">
-                                              <Users size={16} className="text-slate-500" />
+                                          <div className="bg-white dark:bg-slate-800 rounded-lg px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 shadow-sm min-w-[120px]">
+                                            <div className="text-[10px] text-muted-foreground mb-0.5 whitespace-nowrap">{isRTL ? "إجمالي العملاء" : "Total Leads"}</div>
+                                            <div className="text-base font-bold flex items-center gap-1.5">
+                                              <Users size={14} className="text-slate-500" />
                                               {crm.totalLeads}
                                             </div>
                                           </div>
 
                                           {/* Hot Leads Card */}
-                                          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-3 border border-red-200 dark:border-red-800 shadow-sm">
-                                            <div className="text-[11px] text-red-500 mb-1 whitespace-nowrap">{isRTL ? "ساخن" : "Hot"}</div>
-                                            <div className="text-lg font-bold text-red-600 flex items-center gap-1.5">
-                                              <Flame size={16} className="text-red-500" />
+                                          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg px-3.5 py-2.5 border border-red-200 dark:border-red-800 shadow-sm min-w-[80px]">
+                                            <div className="text-[10px] text-red-500 mb-0.5 whitespace-nowrap">{isRTL ? "ساخن" : "Hot"}</div>
+                                            <div className="text-base font-bold text-red-600 flex items-center gap-1.5">
+                                              <Flame size={14} className="text-red-500" />
                                               {crm.hot}
                                             </div>
                                           </div>
 
                                           {/* Warm Leads Card */}
-                                          <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg px-4 py-3 border border-orange-200 dark:border-orange-800 shadow-sm">
-                                            <div className="text-[11px] text-orange-500 mb-1 whitespace-nowrap">{isRTL ? "دافئ" : "Warm"}</div>
-                                            <div className="text-lg font-bold text-orange-600 flex items-center gap-1.5">
-                                              <ThermometerSun size={16} className="text-orange-500" />
+                                          <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg px-3.5 py-2.5 border border-orange-200 dark:border-orange-800 shadow-sm min-w-[80px]">
+                                            <div className="text-[10px] text-orange-500 mb-0.5 whitespace-nowrap">{isRTL ? "دافئ" : "Warm"}</div>
+                                            <div className="text-base font-bold text-orange-600 flex items-center gap-1.5">
+                                              <ThermometerSun size={14} className="text-orange-500" />
                                               {crm.warm}
                                             </div>
                                           </div>
 
                                           {/* Cold Leads Card */}
-                                          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-4 py-3 border border-blue-200 dark:border-blue-800 shadow-sm">
-                                            <div className="text-[11px] text-blue-500 mb-1 whitespace-nowrap">{isRTL ? "بارد" : "Cold"}</div>
-                                            <div className="text-lg font-bold text-blue-600 flex items-center gap-1.5">
-                                              <Snowflake size={16} className="text-blue-500" />
+                                          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3.5 py-2.5 border border-blue-200 dark:border-blue-800 shadow-sm min-w-[80px]">
+                                            <div className="text-[10px] text-blue-500 mb-0.5 whitespace-nowrap">{isRTL ? "بارد" : "Cold"}</div>
+                                            <div className="text-base font-bold text-blue-600 flex items-center gap-1.5">
+                                              <Snowflake size={14} className="text-blue-500" />
                                               {crm.cold}
                                             </div>
                                           </div>
 
+                                          {/* Divider */}
+                                          <div className="w-px bg-slate-200 dark:bg-slate-700 self-stretch mx-0.5" />
+
                                           {/* Quality % Card */}
-                                          <div className="bg-teal-50 dark:bg-teal-900/20 rounded-lg px-4 py-3 border border-teal-200 dark:border-teal-800 shadow-sm">
-                                            <div className="text-[11px] text-teal-500 mb-1 whitespace-nowrap">{isRTL ? "نسبة الجودة" : "Quality %"}</div>
-                                            <div className={`text-lg font-bold ${getQualityColor(qualityPct)}`}>
+                                          <div className="bg-teal-50 dark:bg-teal-900/20 rounded-lg px-3.5 py-2.5 border border-teal-200 dark:border-teal-800 shadow-sm min-w-[90px]">
+                                            <div className="text-[10px] text-teal-500 mb-0.5 whitespace-nowrap">{isRTL ? "نسبة الجودة" : "Quality %"}</div>
+                                            <div className={`text-base font-bold ${getQualityColor(qualityPct)}`}>
                                               {qualityPct.toFixed(0)}%
                                             </div>
                                           </div>
 
                                           {/* Fit Status Card */}
-                                          <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-4 py-3 border border-emerald-200 dark:border-emerald-800 shadow-sm">
-                                            <div className="text-[11px] text-emerald-500 mb-1 whitespace-nowrap">{isRTL ? "مناسب / غير مناسب" : "Fit / Not Fit"}</div>
-                                            <div className="text-lg font-bold flex items-center gap-2">
-                                              <span className="flex items-center gap-1 text-emerald-600"><CheckCircle size={14} />{crm.fitCount}</span>
+                                          <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-3.5 py-2.5 border border-emerald-200 dark:border-emerald-800 shadow-sm min-w-[120px]">
+                                            <div className="text-[10px] text-emerald-500 mb-0.5 whitespace-nowrap">{isRTL ? "مناسب / غير مناسب" : "Fit / Not Fit"}</div>
+                                            <div className="text-base font-bold flex items-center gap-1.5">
+                                              <span className="flex items-center gap-0.5 text-emerald-600"><CheckCircle size={12} />{crm.fitCount}</span>
                                               <span className="text-slate-300">/</span>
-                                              <span className="flex items-center gap-1 text-red-500"><XCircle size={14} />{crm.notFitCount}</span>
+                                              <span className="flex items-center gap-0.5 text-red-500"><XCircle size={12} />{crm.notFitCount}</span>
                                             </div>
                                           </div>
 
+                                          {/* Divider */}
+                                          <div className="w-px bg-slate-200 dark:bg-slate-700 self-stretch mx-0.5" />
+
                                           {/* Pipeline Card */}
-                                          <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg px-4 py-3 border border-indigo-200 dark:border-indigo-800 shadow-sm">
-                                            <div className="text-[11px] text-indigo-500 mb-1 whitespace-nowrap">{isRTL ? "المراحل" : "Pipeline"}</div>
-                                            <div className="text-sm font-bold flex items-center gap-2">
-                                              <span className="text-slate-600">{isRTL ? "عميل" : "Lead"} {crm.leadCount}</span>
-                                              <span className="text-blue-600">{isRTL ? "محتمل" : "Prospect"} {crm.prospectCount}</span>
-                                              <span className="text-emerald-600">{isRTL ? "فرصة" : "Opp"} {crm.opportunityCount}</span>
+                                          <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg px-3.5 py-2.5 border border-indigo-200 dark:border-indigo-800 shadow-sm min-w-[200px]">
+                                            <div className="text-[10px] text-indigo-500 mb-0.5 whitespace-nowrap">{isRTL ? "المراحل" : "Pipeline"}</div>
+                                            <div className="text-xs font-bold flex items-center gap-3">
+                                              <span className="flex items-center gap-1 text-slate-600 whitespace-nowrap">{isRTL ? "عميل" : "Lead"} <span className="text-sm">{crm.leadCount}</span></span>
+                                              <span className="flex items-center gap-1 text-blue-600 whitespace-nowrap">{isRTL ? "محتمل" : "Prospect"} <span className="text-sm">{crm.prospectCount}</span></span>
+                                              <span className="flex items-center gap-1 text-emerald-600 whitespace-nowrap">{isRTL ? "فرصة" : "Opp"} <span className="text-sm">{crm.opportunityCount}</span></span>
                                             </div>
                                           </div>
 
                                           {/* Avg Score Card */}
-                                          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg px-4 py-3 border border-amber-200 dark:border-amber-800 shadow-sm">
-                                            <div className="text-[11px] text-amber-500 mb-1 whitespace-nowrap">{isRTL ? "متوسط التقييم" : "Avg Score"}</div>
-                                            <div className="text-lg font-bold flex items-center gap-1.5">
-                                              <Star size={16} className="text-amber-500" />
+                                          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3.5 py-2.5 border border-amber-200 dark:border-amber-800 shadow-sm min-w-[100px]">
+                                            <div className="text-[10px] text-amber-500 mb-0.5 whitespace-nowrap">{isRTL ? "متوسط التقييم" : "Avg Score"}</div>
+                                            <div className="text-base font-bold flex items-center gap-1.5">
+                                              <Star size={14} className="text-amber-500" />
                                               <span className={getScoreColor(crm.avgScore)}>{crm.avgScore}</span>
                                             </div>
                                           </div>
 
+                                          {/* Divider */}
+                                          <div className="w-px bg-slate-200 dark:bg-slate-700 self-stretch mx-0.5" />
+
                                           {/* Cost per Hot Lead Card */}
                                           {costPerHot > 0 && (
-                                            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-3 border border-red-200 dark:border-red-800 shadow-sm">
-                                              <div className="text-[11px] text-red-500 mb-1 whitespace-nowrap">{isRTL ? "تكلفة العميل الساخن" : "Cost/Hot Lead"}</div>
-                                              <div className="text-lg font-bold text-red-600 flex items-center gap-1.5">
-                                                <Flame size={16} className="text-red-500" />
+                                            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg px-3.5 py-2.5 border border-red-200 dark:border-red-800 shadow-sm min-w-[140px]">
+                                              <div className="text-[10px] text-red-500 mb-0.5 whitespace-nowrap">{isRTL ? "تكلفة العميل الساخن" : "Cost/Hot Lead"}</div>
+                                              <div className="text-base font-bold text-red-600 flex items-center gap-1.5">
+                                                <Flame size={14} className="text-red-500" />
                                                 <span className="whitespace-nowrap">{fmt.currency(costPerHot)}</span>
                                               </div>
                                             </div>
@@ -1180,10 +1202,10 @@ export default function MetaCampaigns() {
 
                                           {/* Won Deals Card */}
                                           {crm.wonDeals > 0 && (
-                                            <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg px-4 py-3 border border-yellow-200 dark:border-yellow-800 shadow-sm">
-                                              <div className="text-[11px] text-yellow-600 mb-1 whitespace-nowrap">{isRTL ? "صفقات مكسوبة" : "Won Deals"}</div>
-                                              <div className="text-lg font-bold text-yellow-600 flex items-center gap-1.5">
-                                                <Award size={16} className="text-yellow-500" />
+                                            <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg px-3.5 py-2.5 border border-yellow-200 dark:border-yellow-800 shadow-sm min-w-[100px]">
+                                              <div className="text-[10px] text-yellow-600 mb-0.5 whitespace-nowrap">{isRTL ? "صفقات مكسوبة" : "Won Deals"}</div>
+                                              <div className="text-base font-bold text-yellow-600 flex items-center gap-1.5">
+                                                <Award size={14} className="text-yellow-500" />
                                                 {crm.wonDeals}
                                               </div>
                                             </div>
@@ -1191,9 +1213,9 @@ export default function MetaCampaigns() {
 
                                           {/* Revenue Card */}
                                           {crm.wonRevenue > 0 && (
-                                            <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-4 py-3 border border-emerald-200 dark:border-emerald-800 shadow-sm">
-                                              <div className="text-[11px] text-emerald-500 mb-1 whitespace-nowrap">{isRTL ? "الإيرادات" : "Revenue"}</div>
-                                              <div className="text-base font-bold text-emerald-600 whitespace-nowrap">
+                                            <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-3.5 py-2.5 border border-emerald-200 dark:border-emerald-800 shadow-sm min-w-[120px]">
+                                              <div className="text-[10px] text-emerald-500 mb-0.5 whitespace-nowrap">{isRTL ? "الإيرادات" : "Revenue"}</div>
+                                              <div className="text-sm font-bold text-emerald-600 whitespace-nowrap">
                                                 {fmt.currencySar(crm.wonRevenue)}
                                               </div>
                                             </div>
@@ -1201,9 +1223,9 @@ export default function MetaCampaigns() {
 
                                           {/* ROAS Card */}
                                           {roas > 0 && (
-                                            <div className={`rounded-lg px-4 py-3 border shadow-sm ${roas >= 1 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-                                              <div className="text-[11px] text-muted-foreground mb-1 whitespace-nowrap">ROAS</div>
-                                              <div className={`text-lg font-bold ${roas >= 1 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                            <div className={`rounded-lg px-3.5 py-2.5 border shadow-sm min-w-[80px] ${roas >= 1 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                                              <div className="text-[10px] text-muted-foreground mb-0.5 whitespace-nowrap">ROAS</div>
+                                              <div className={`text-base font-bold ${roas >= 1 ? 'text-emerald-600' : 'text-red-600'}`}>
                                                 {roas.toFixed(2)}x
                                               </div>
                                             </div>
