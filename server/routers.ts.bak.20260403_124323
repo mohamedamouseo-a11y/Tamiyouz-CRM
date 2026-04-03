@@ -79,7 +79,6 @@ import {
   getReportData,
   getLeadsForExport,
   getCampaignStats,
-  getCrmStatsByCampaign,
   getCampaignDetail,
   getInternalNotesByLead,
   createInternalNote,
