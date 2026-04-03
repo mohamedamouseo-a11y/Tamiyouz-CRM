@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLanguage } from "@/contexts/LanguageContext";
 import CRMLayout from "@/components/CRMLayout";
@@ -31,7 +31,8 @@ import {
   Clock, TrendingUp, TrendingDown, Eye, MousePointer, BarChart3, Pencil, Users,
   MessageSquare, Search, Download, Settings2, ChevronUp, ChevronDown, ChevronLeft,
   ChevronRight, ArrowUpRight, ArrowDownRight, X, Filter, Columns3, MoreHorizontal,
-  Zap, Activity, PieChart, ExternalLink,
+  Zap, Activity, PieChart, ExternalLink, Flame, ThermometerSun, Snowflake, XCircle,
+  CheckCircle, UserCheck, UserX, Briefcase, Award, Star,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
@@ -40,7 +41,7 @@ import {
 
 // ─── Types ─────────────────────────────────────────────────────────────
 type DatePreset = "today" | "yesterday" | "last_7d" | "last_14d" | "last_30d" | "last_90d" | "last_year" | "maximum" | "this_month" | "last_month" | "custom";
-type SortField = "name" | "status" | "objective" | "spend" | "impressions" | "clicks" | "ctr" | "cpc" | "cpl" | "roas" | "leads" | "dailyBudget";
+type SortField = "name" | "status" | "objective" | "spend" | "impressions" | "clicks" | "ctr" | "cpc" | "cpl" | "roas" | "leads" | "dailyBudget" | "crmLeads" | "hotLeads" | "qualityPercent";
 type SortDir = "asc" | "desc";
 
 const VISIBLE_COLUMNS_DEFAULT = ["name", "status", "objective", "dailyBudget", "spend", "impressions", "clicks", "ctr", "cpl", "leads", "action"];
@@ -90,6 +91,8 @@ export default function MetaCampaigns() {
   const [pageSize, setPageSize] = useState(10);
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [expandedCrm, setExpandedCrm] = useState<Record<string, boolean>>({});
+  const [showCrmRow, setShowCrmRow] = useState(true);
 
   // ─── Queries ───────────────────────────────────────────────────────────
   const activeAccountQ = trpc.meta.getActiveAdAccount.useQuery();
@@ -103,6 +106,14 @@ export default function MetaCampaigns() {
     { enabled: !!activeAccountQ.data }
   );
 
+  // ─── CRM Stats Query ──────────────────────────────────────────────────
+  const crmStatsQ = trpc.meta.getCrmStatsByCampaign.useQuery(
+    {
+      ...(datePreset === "custom" && customDateFrom && customDateTo ? { dateFrom: customDateFrom, dateTo: customDateTo } : {}),
+    },
+    { enabled: !!activeAccountQ.data }
+  );
+
   // ─── Mutations ─────────────────────────────────────────────────────────
   const syncCampaigns = trpc.meta.syncCampaigns.useMutation({
     onSuccess: (data) => {
@@ -110,6 +121,7 @@ export default function MetaCampaigns() {
       utils.meta.getCampaigns.invalidate();
       utils.meta.getActiveAdAccount.invalidate();
       utils.meta.getInsights.invalidate();
+      utils.meta.getCrmStatsByCampaign.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });
@@ -140,6 +152,7 @@ export default function MetaCampaigns() {
       utils.meta.getActiveAdAccount.invalidate();
       utils.meta.getCampaigns.invalidate();
       utils.meta.getInsights.invalidate();
+      utils.meta.getCrmStatsByCampaign.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });
@@ -149,6 +162,18 @@ export default function MetaCampaigns() {
   const campaigns = campaignsQ.data || [];
   const adAccounts = adAccountsQ.data || [];
   const insights: Record<string, any> = insightsQ.data || {};
+  const crmStats: any[] = crmStatsQ.data || [];
+
+  // Build CRM stats lookup by campaign name (case-insensitive)
+  const crmLookup = useMemo(() => {
+    const map: Record<string, any> = {};
+    for (const stat of crmStats) {
+      if (stat.campaignName) {
+        map[stat.campaignName.toLowerCase()] = stat;
+      }
+    }
+    return map;
+  }, [crmStats]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────
   const handleStatusChange = (snapshotId: number, newStatus: "ACTIVE" | "PAUSED") => {
@@ -191,6 +216,10 @@ export default function MetaCampaigns() {
     );
   };
 
+  const toggleCrmExpand = (campaignId: string) => {
+    setExpandedCrm(prev => ({ ...prev, [campaignId]: !prev[campaignId] }));
+  };
+
   // ─── Format Helpers ────────────────────────────────────────────────────
   const fmt = {
     budget: (amount: string | null) => {
@@ -208,6 +237,10 @@ export default function MetaCampaigns() {
       const num = typeof val === "string" ? parseFloat(val) : val;
       if (isNaN(num)) return "—";
       return `${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
+    },
+    currencySar: (val: number | null | undefined) => {
+      if (!val) return "—";
+      return `${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س`;
     },
     percent: (val: string | number | null | undefined) => {
       if (!val || val === "0") return "—";
@@ -240,6 +273,32 @@ export default function MetaCampaigns() {
     return { totalSpend, totalImpressions, totalClicks, totalLeads, totalMessages, avgCTR, avgCPC, avgCPL, avgCPM };
   }, [insights]);
 
+  // ─── CRM Aggregate Metrics ────────────────────────────────────────────
+  const crmAgg = useMemo(() => {
+    if (crmStats.length === 0) return null;
+    let totalCrmLeads = 0, totalHot = 0, totalWarm = 0, totalCold = 0, totalBad = 0;
+    let totalFit = 0, totalNotFit = 0;
+    let totalWonDeals = 0, totalWonRevenue = 0;
+    let totalLeadClass = 0, totalProspect = 0, totalOpportunity = 0;
+    for (const s of crmStats) {
+      totalCrmLeads += s.totalLeads;
+      totalHot += s.hot;
+      totalWarm += s.warm;
+      totalCold += s.cold;
+      totalBad += s.bad;
+      totalFit += s.fitCount;
+      totalNotFit += s.notFitCount;
+      totalWonDeals += s.wonDeals;
+      totalWonRevenue += s.wonRevenue;
+      totalLeadClass += s.leadCount;
+      totalProspect += s.prospectCount;
+      totalOpportunity += s.opportunityCount;
+    }
+    const qualityPercent = totalCrmLeads > 0 ? ((totalHot + totalWarm) / totalCrmLeads) * 100 : 0;
+    const fitPercent = totalCrmLeads > 0 ? (totalFit / totalCrmLeads) * 100 : 0;
+    return { totalCrmLeads, totalHot, totalWarm, totalCold, totalBad, totalFit, totalNotFit, totalWonDeals, totalWonRevenue, qualityPercent, fitPercent, totalLeadClass, totalProspect, totalOpportunity };
+  }, [crmStats]);
+
   // ─── Filter & Sort & Paginate ──────────────────────────────────────────
   const filteredCampaigns = useMemo(() => {
     let result = [...campaigns];
@@ -260,6 +319,8 @@ export default function MetaCampaigns() {
     result.sort((a: any, b: any) => {
       const ci_a = insights[a.campaignId] || {};
       const ci_b = insights[b.campaignId] || {};
+      const crm_a = crmLookup[a.campaignName?.toLowerCase()] || {};
+      const crm_b = crmLookup[b.campaignName?.toLowerCase()] || {};
       let valA: any, valB: any;
       switch (sortField) {
         case "name": valA = a.campaignName || ""; valB = b.campaignName || ""; break;
@@ -273,6 +334,12 @@ export default function MetaCampaigns() {
         case "cpc": valA = parseFloat(ci_a.cpc || "0"); valB = parseFloat(ci_b.cpc || "0"); break;
         case "cpl": valA = parseFloat(ci_a.cpl || "0"); valB = parseFloat(ci_b.cpl || "0"); break;
         case "leads": valA = parseInt(ci_a.leads || "0"); valB = parseInt(ci_b.leads || "0"); break;
+        case "crmLeads": valA = crm_a.totalLeads || 0; valB = crm_b.totalLeads || 0; break;
+        case "hotLeads": valA = crm_a.hot || 0; valB = crm_b.hot || 0; break;
+        case "qualityPercent":
+          valA = crm_a.totalLeads > 0 ? ((crm_a.hot + crm_a.warm) / crm_a.totalLeads) * 100 : 0;
+          valB = crm_b.totalLeads > 0 ? ((crm_b.hot + crm_b.warm) / crm_b.totalLeads) * 100 : 0;
+          break;
         default: valA = 0; valB = 0;
       }
       if (typeof valA === "string") {
@@ -281,7 +348,7 @@ export default function MetaCampaigns() {
       return sortDir === "asc" ? valA - valB : valB - valA;
     });
     return result;
-  }, [campaigns, searchQuery, statusFilter, objectiveFilter, sortField, sortDir, insights]);
+  }, [campaigns, searchQuery, statusFilter, objectiveFilter, sortField, sortDir, insights, crmLookup]);
 
   const totalPages = Math.ceil(filteredCampaigns.length / pageSize);
   const paginatedCampaigns = filteredCampaigns.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -295,20 +362,29 @@ export default function MetaCampaigns() {
 
   // ─── CSV Export ────────────────────────────────────────────────────────
   const exportCSV = () => {
-    const headers = ["Campaign", "Status", "Objective", "Daily Budget", "Lifetime Budget", "Spend", "Impressions", "Clicks", "CTR", "CPC", "CPL", "ROAS", "Leads", "Messages"];
+    const headers = ["Campaign", "Status", "Objective", "Daily Budget", "Spend", "Impressions", "Clicks", "CTR", "CPC", "CPL", "ROAS", "Meta Leads", "CRM Leads", "Hot", "Warm", "Cold", "Bad", "Fit%", "Avg Score", "Lead", "Prospect", "Opportunity", "Won Deals", "Won Revenue (SAR)", "Cost/Hot Lead"];
     const rows = filteredCampaigns.map((c: any) => {
       const ci = insights[c.campaignId] || {};
+      const crm = crmLookup[c.campaignName?.toLowerCase()] || {};
+      const spend = parseFloat(ci.spend || "0");
+      const costPerHot = crm.hot > 0 ? (spend / crm.hot).toFixed(2) : "";
+      const qualityPct = crm.totalLeads > 0 ? (((crm.hot || 0) + (crm.warm || 0)) / crm.totalLeads * 100).toFixed(1) : "";
+      const fitPct = crm.totalLeads > 0 ? ((crm.fitCount || 0) / crm.totalLeads * 100).toFixed(1) : "";
       return [
-        c.campaignName, c.status, c.objective || "", c.dailyBudget || "", c.lifetimeBudget || "",
+        c.campaignName, c.status, c.objective || "", c.dailyBudget || "",
         ci.spend || "", ci.impressions || "", ci.clicks || "", ci.ctr || "", ci.cpc || "",
-        ci.cpl || "", ci.roas || "", ci.leads || "", ci.messages || "",
+        ci.cpl || "", ci.roas || "", ci.leads || "",
+        crm.totalLeads || "", crm.hot || "", crm.warm || "", crm.cold || "", crm.bad || "",
+        fitPct, crm.avgScore || "",
+        crm.leadCount || "", crm.prospectCount || "", crm.opportunityCount || "",
+        crm.wonDeals || "", crm.wonRevenue || "", costPerHot,
       ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",");
     });
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `meta-campaigns-${datePreset === "custom" ? `${customDateFrom}_${customDateTo}` : datePreset}.csv`; a.click();
+    a.href = url; a.download = `meta-campaigns-crm-${datePreset === "custom" ? `${customDateFrom}_${customDateTo}` : datePreset}.csv`; a.click();
     URL.revokeObjectURL(url);
     toast.success(isRTL ? "تم تصدير البيانات" : "Data exported successfully");
   };
@@ -350,14 +426,14 @@ export default function MetaCampaigns() {
       className="cursor-pointer select-none hover:bg-muted/50 transition-colors whitespace-nowrap"
       onClick={() => handleSort(field)}
     >
-      <span className="flex items-center gap-1">
+      <div className="flex items-center gap-1">
         {children}
         {sortField === field ? (
-          sortDir === "asc" ? <ChevronUp size={14} className="text-primary" /> : <ChevronDown size={14} className="text-primary" />
+          sortDir === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />
         ) : (
-          <ChevronDown size={14} className="text-muted-foreground/30" />
+          <ChevronDown size={12} className="opacity-30" />
         )}
-      </span>
+      </div>
     </TableHead>
   );
 
@@ -382,6 +458,19 @@ export default function MetaCampaigns() {
     </Card>
   );
 
+  // ─── Quality Color Helper ─────────────────────────────────────────────
+  const getQualityColor = (percent: number) => {
+    if (percent >= 60) return "text-emerald-600";
+    if (percent >= 30) return "text-amber-600";
+    return "text-red-600";
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 60) return "text-emerald-600 bg-emerald-50";
+    if (score >= 30) return "text-amber-600 bg-amber-50";
+    return "text-red-600 bg-red-50";
+  };
+
   // ═══════════════════════════════════════════════════════════════════════
   // ─── RENDER ────────────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════
@@ -397,15 +486,15 @@ export default function MetaCampaigns() {
             <div>
               <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium backdrop-blur-sm">
                 <Megaphone size={14} />
-                Meta Campaigns Dashboard
+                Meta Campaigns + CRM Analytics
               </div>
               <h1 className="text-2xl font-bold">
-                {isRTL ? "إدارة حملات Meta الإعلانية" : "Manage Meta Ad Campaigns"}
+                {isRTL ? "حملات Meta + تحليلات CRM" : "Meta Campaigns + CRM Analytics"}
               </h1>
               <p className="mt-1.5 text-sm text-blue-100 max-w-2xl">
                 {isRTL
-                  ? "تتبع الإنفاق والعملاء المحتملين وعائد الإنفاق. تحكم في حالة الحملات والميزانيات مباشرة."
-                  : "Track spend, leads, CPL & ROAS. Control campaign status and budgets with live API sync."}
+                  ? "تتبع الإنفاق وجودة العملاء والعائد. قارن بيانات Meta مع بيانات CRM لكل حملة."
+                  : "Track spend, lead quality & ROAS. Compare Meta data with CRM data for each campaign."}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -476,6 +565,7 @@ export default function MetaCampaigns() {
                       onClick={() => {
                         if (customDateFrom && customDateTo) {
                           utils.meta.getInsights.invalidate();
+                          utils.meta.getCrmStatsByCampaign.invalidate();
                           setCurrentPage(1);
                           toast.success(isRTL ? "تم تطبيق الفترة المخصصة" : "Custom range applied");
                         } else {
@@ -547,7 +637,7 @@ export default function MetaCampaigns() {
           )}
         </div>
 
-        {/* ═══ KPI Cards ═════════════════════════════════════════════════ */}
+        {/* ═══ KPI Cards — Meta ══════════════════════════════════════════ */}
         {activeAccount && agg && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <KPICard
@@ -559,7 +649,7 @@ export default function MetaCampaigns() {
             />
             <KPICard
               icon={Users}
-              title={isRTL ? "العملاء المحتملين" : "Total Leads"}
+              title={isRTL ? "عملاء Meta" : "Meta Leads"}
               value={fmt.compact(agg.totalLeads)}
               subtitle={`CPL: ${fmt.currency(agg.avgCPL)}`}
               iconBg="bg-gradient-to-br from-emerald-500 to-emerald-600"
@@ -588,6 +678,52 @@ export default function MetaCampaigns() {
               subtitle={`CPC: ${fmt.currency(agg.avgCPC)}`}
               iconBg="bg-gradient-to-br from-rose-500 to-rose-600"
               color="from-rose-500 to-rose-600"
+            />
+          </div>
+        )}
+
+        {/* ═══ KPI Cards — CRM ═══════════════════════════════════════════ */}
+        {activeAccount && crmAgg && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <KPICard
+              icon={Users}
+              title={isRTL ? "عملاء CRM" : "CRM Leads"}
+              value={fmt.compact(crmAgg.totalCrmLeads)}
+              subtitle={isRTL ? `Fit: ${crmAgg.fitPercent.toFixed(0)}%` : `Fit: ${crmAgg.fitPercent.toFixed(0)}%`}
+              iconBg="bg-gradient-to-br from-cyan-500 to-cyan-600"
+              color="from-cyan-500 to-cyan-600"
+            />
+            <KPICard
+              icon={Flame}
+              title={isRTL ? "عملاء ساخنين" : "Hot Leads"}
+              value={fmt.compact(crmAgg.totalHot)}
+              subtitle={agg && agg.totalSpend > 0 && crmAgg.totalHot > 0 ? `${isRTL ? "تكلفة:" : "Cost:"} ${fmt.currency(agg.totalSpend / crmAgg.totalHot)}` : "—"}
+              iconBg="bg-gradient-to-br from-red-500 to-orange-500"
+              color="from-red-500 to-orange-500"
+            />
+            <KPICard
+              icon={TrendingUp}
+              title={isRTL ? "نسبة الجودة" : "Quality %"}
+              value={`${crmAgg.qualityPercent.toFixed(1)}%`}
+              subtitle={`${isRTL ? "ساخن+دافئ" : "Hot+Warm"}: ${crmAgg.totalHot + crmAgg.totalWarm}`}
+              iconBg="bg-gradient-to-br from-teal-500 to-teal-600"
+              color="from-teal-500 to-teal-600"
+            />
+            <KPICard
+              icon={Award}
+              title={isRTL ? "صفقات مكسوبة" : "Won Deals"}
+              value={String(crmAgg.totalWonDeals)}
+              subtitle={fmt.currencySar(crmAgg.totalWonRevenue)}
+              iconBg="bg-gradient-to-br from-yellow-500 to-yellow-600"
+              color="from-yellow-500 to-yellow-600"
+            />
+            <KPICard
+              icon={BarChart3}
+              title="ROAS"
+              value={agg && agg.totalSpend > 0 && crmAgg.totalWonRevenue > 0 ? `${(crmAgg.totalWonRevenue / agg.totalSpend).toFixed(2)}x` : "—"}
+              subtitle={isRTL ? "العائد على الإنفاق" : "Return on Ad Spend"}
+              iconBg="bg-gradient-to-br from-indigo-500 to-indigo-600"
+              color="from-indigo-500 to-indigo-600"
             />
           </div>
         )}
@@ -664,6 +800,17 @@ export default function MetaCampaigns() {
 
                 <Separator orientation="vertical" className="h-8 hidden lg:block" />
 
+                {/* Toggle CRM Row */}
+                <Button
+                  variant={showCrmRow ? "default" : "outline"}
+                  size="sm"
+                  className="h-10"
+                  onClick={() => setShowCrmRow(!showCrmRow)}
+                >
+                  <BarChart3 size={14} className="mr-1.5" />
+                  {isRTL ? "بيانات CRM" : "CRM Data"}
+                </Button>
+
                 {/* Column Visibility */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -721,12 +868,20 @@ export default function MetaCampaigns() {
                   {isRTL ? "الحملات" : "Campaigns"}
                   <Badge variant="secondary" className="text-xs ml-1">{filteredCampaigns.length}</Badge>
                 </CardTitle>
-                {insightsQ.isLoading && (
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Loader2 size={12} className="animate-spin" />
-                    {isRTL ? "تحميل المقاييس..." : "Loading metrics..."}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {crmStatsQ.isLoading && (
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Loader2 size={12} className="animate-spin" />
+                      {isRTL ? "تحميل CRM..." : "Loading CRM..."}
+                    </span>
+                  )}
+                  {insightsQ.isLoading && (
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Loader2 size={12} className="animate-spin" />
+                      {isRTL ? "تحميل Meta..." : "Loading Meta..."}
+                    </span>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0 mt-4">
@@ -774,140 +929,268 @@ export default function MetaCampaigns() {
                       <TableBody>
                         {paginatedCampaigns.map((c: any) => {
                           const ci = insights[c.campaignId] || {};
+                          const crm = crmLookup[c.campaignName?.toLowerCase()] || null;
+                          const spend = parseFloat(ci.spend || "0");
+                          const qualityPct = crm && crm.totalLeads > 0 ? ((crm.hot + crm.warm) / crm.totalLeads) * 100 : 0;
+                          const fitPct = crm && crm.totalLeads > 0 ? (crm.fitCount / crm.totalLeads) * 100 : 0;
+                          const costPerHot = crm && crm.hot > 0 && spend > 0 ? spend / crm.hot : 0;
+                          const roas = crm && crm.wonRevenue > 0 && spend > 0 ? crm.wonRevenue / spend : 0;
+
                           return (
-                            <TableRow
-                              key={c.id}
-                              className="cursor-pointer hover:bg-primary/5 transition-colors group h-10"
-                              onClick={() => openDrawer(c)}
-                            >
-                              {visibleColumns.includes("name") && (
-                                <TableCell className="font-medium max-w-[200px] py-1.5 text-xs">
-                                  <div className="truncate">{c.campaignName}</div>
-                                  <div className="text-[10px] text-muted-foreground truncate">{c.campaignId}</div>
-                                </TableCell>
-                              )}
-                              {visibleColumns.includes("status") && (
-                                <TableCell>{getStatusBadge(c.status)}</TableCell>
-                              )}
-                              {visibleColumns.includes("objective") && (
-                                <TableCell>
-                                  <Badge variant="outline" className="text-xs font-normal">
-                                    <Target size={10} className="mr-1" />
-                                    {c.objective || "—"}
-                                  </Badge>
-                                </TableCell>
-                              )}
-                              {visibleColumns.includes("dailyBudget") && (
-                                <TableCell>
-                                  <div className="flex items-center gap-1 text-sm">
-                                    <span className="font-medium">{fmt.budget(c.dailyBudget)}</span>
-                                    {c.dailyBudget && c.dailyBudget !== "0.00" && (
-                                      <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        onClick={(e) => { e.stopPropagation(); openBudgetEdit(c.id, c.campaignName, "daily", c.dailyBudget); }}>
-                                        <Pencil size={10} />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              )}
-                              {visibleColumns.includes("lifetimeBudget") && (
-                                <TableCell>
-                                  <div className="flex items-center gap-1 text-sm">
-                                    <span>{fmt.budget(c.lifetimeBudget)}</span>
-                                    {c.lifetimeBudget && c.lifetimeBudget !== "0.00" && (
-                                      <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        onClick={(e) => { e.stopPropagation(); openBudgetEdit(c.id, c.campaignName, "lifetime", c.lifetimeBudget); }}>
-                                        <Pencil size={10} />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              )}
-                              {visibleColumns.includes("spend") && (
-                                <TableCell className="text-xs font-semibold py-1.5">{fmt.currency(ci.spend)}</TableCell>
-                              )}
-                              {visibleColumns.includes("impressions") && (
-                                <TableCell className="text-xs py-1.5">{fmt.number(ci.impressions)}</TableCell>
-                              )}
-                              {visibleColumns.includes("clicks") && (
-                                <TableCell className="text-xs py-1.5">{fmt.number(ci.clicks)}</TableCell>
-                              )}
-                              {visibleColumns.includes("ctr") && (
-                                <TableCell className="text-xs py-1.5">{fmt.percent(ci.ctr)}</TableCell>
-                              )}
-                              {visibleColumns.includes("cpc") && (
-                                <TableCell className="text-xs py-1.5">{fmt.currency(ci.cpc)}</TableCell>
-                              )}
-                              {visibleColumns.includes("cpm") && (
-                                <TableCell className="text-xs py-1.5">{fmt.currency(ci.cpm)}</TableCell>
-                              )}
-                              {visibleColumns.includes("cpl") && (
-                                <TableCell className="text-xs font-semibold py-1.5">
-                                  {ci.cpl ? fmt.currency(ci.cpl) : (ci.costPerMessage ? fmt.currency(ci.costPerMessage) : "—")}
-                                </TableCell>
-                              )}
-                              {visibleColumns.includes("roas") && (
-                                <TableCell>
-                                  {ci.roas ? (
-                                    <Badge variant={parseFloat(ci.roas) >= 1 ? "default" : "destructive"} className="text-xs">
-                                      {parseFloat(ci.roas).toFixed(2)}x
+                            <React.Fragment key={c.id}>
+                              {/* ─── Row 1: Meta API Data ─── */}
+                              <TableRow
+                                className={`cursor-pointer hover:bg-primary/5 transition-colors group h-10 ${showCrmRow && crm ? "border-b-0" : ""}`}
+                                onClick={() => openDrawer(c)}
+                              >
+                                {visibleColumns.includes("name") && (
+                                  <TableCell className="font-medium max-w-[200px] py-1.5 text-xs" rowSpan={showCrmRow && crm ? 1 : 1}>
+                                    <div className="flex items-center gap-1.5">
+                                      <Badge variant="outline" className="text-[9px] px-1 py-0 bg-blue-50 text-blue-600 border-blue-200 shrink-0">Meta</Badge>
+                                      <div>
+                                        <div className="truncate font-semibold">{c.campaignName}</div>
+                                        <div className="text-[10px] text-muted-foreground truncate">{c.campaignId}</div>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                )}
+                                {visibleColumns.includes("status") && (
+                                  <TableCell>{getStatusBadge(c.status)}</TableCell>
+                                )}
+                                {visibleColumns.includes("objective") && (
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-xs font-normal">
+                                      <Target size={10} className="mr-1" />
+                                      {c.objective || "—"}
                                     </Badge>
-                                  ) : "—"}
-                                </TableCell>
-                              )}
-                              {visibleColumns.includes("leads") && (
-                                <TableCell className="text-xs font-semibold text-emerald-600 py-1.5">
-                                  {ci.leads && ci.leads !== "0" ? ci.leads : "—"}
-                                </TableCell>
-                              )}
-                              {visibleColumns.includes("messages") && (
-                                <TableCell className="text-xs py-1.5">
-                                  {ci.messages && ci.messages !== "0" ? ci.messages : "—"}
-                                </TableCell>
-                              )}
-                              {visibleColumns.includes("action") && (
-                                <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                                        <MoreHorizontal size={16} />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onClick={() => openDrawer(c)}>
-                                        <Eye size={14} className="mr-2" />
-                                        {isRTL ? "عرض التفاصيل" : "View Details"}
-                                      </DropdownMenuItem>
+                                  </TableCell>
+                                )}
+                                {visibleColumns.includes("dailyBudget") && (
+                                  <TableCell>
+                                    <div className="flex items-center gap-1 text-sm">
+                                      <span className="font-medium">{fmt.budget(c.dailyBudget)}</span>
                                       {c.dailyBudget && c.dailyBudget !== "0.00" && (
-                                        <DropdownMenuItem onClick={() => openBudgetEdit(c.id, c.campaignName, "daily", c.dailyBudget)}>
-                                          <Pencil size={14} className="mr-2" />
-                                          {isRTL ? "تعديل الميزانية اليومية" : "Edit Daily Budget"}
-                                        </DropdownMenuItem>
+                                        <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          onClick={(e) => { e.stopPropagation(); openBudgetEdit(c.id, c.campaignName, "daily", c.dailyBudget); }}>
+                                          <Pencil size={10} />
+                                        </Button>
                                       )}
+                                    </div>
+                                  </TableCell>
+                                )}
+                                {visibleColumns.includes("lifetimeBudget") && (
+                                  <TableCell>
+                                    <div className="flex items-center gap-1 text-sm">
+                                      <span>{fmt.budget(c.lifetimeBudget)}</span>
                                       {c.lifetimeBudget && c.lifetimeBudget !== "0.00" && (
-                                        <DropdownMenuItem onClick={() => openBudgetEdit(c.id, c.campaignName, "lifetime", c.lifetimeBudget)}>
-                                          <Pencil size={14} className="mr-2" />
-                                          {isRTL ? "تعديل الميزانية الإجمالية" : "Edit Lifetime Budget"}
-                                        </DropdownMenuItem>
+                                        <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          onClick={(e) => { e.stopPropagation(); openBudgetEdit(c.id, c.campaignName, "lifetime", c.lifetimeBudget); }}>
+                                          <Pencil size={10} />
+                                        </Button>
                                       )}
-                                      <DropdownMenuSeparator />
-                                      {(c.status === "ACTIVE" || c.status === "PAUSED") && (
-                                        <DropdownMenuItem
-                                          onClick={() => handleStatusChange(c.id, c.status === "ACTIVE" ? "PAUSED" : "ACTIVE")}
-                                          disabled={updatingId === c.id}
-                                        >
-                                          {c.status === "ACTIVE" ? (
-                                            <><Pause size={14} className="mr-2" />{isRTL ? "إيقاف الحملة" : "Pause Campaign"}</>
-                                          ) : (
-                                            <><Play size={14} className="mr-2" />{isRTL ? "تشغيل الحملة" : "Activate Campaign"}</>
-                                          )}
+                                    </div>
+                                  </TableCell>
+                                )}
+                                {visibleColumns.includes("spend") && (
+                                  <TableCell className="text-xs font-semibold py-1.5">{fmt.currency(ci.spend)}</TableCell>
+                                )}
+                                {visibleColumns.includes("impressions") && (
+                                  <TableCell className="text-xs py-1.5">{fmt.number(ci.impressions)}</TableCell>
+                                )}
+                                {visibleColumns.includes("clicks") && (
+                                  <TableCell className="text-xs py-1.5">{fmt.number(ci.clicks)}</TableCell>
+                                )}
+                                {visibleColumns.includes("ctr") && (
+                                  <TableCell className="text-xs py-1.5">{fmt.percent(ci.ctr)}</TableCell>
+                                )}
+                                {visibleColumns.includes("cpc") && (
+                                  <TableCell className="text-xs py-1.5">{fmt.currency(ci.cpc)}</TableCell>
+                                )}
+                                {visibleColumns.includes("cpm") && (
+                                  <TableCell className="text-xs py-1.5">{fmt.currency(ci.cpm)}</TableCell>
+                                )}
+                                {visibleColumns.includes("cpl") && (
+                                  <TableCell className="text-xs font-semibold py-1.5">
+                                    {ci.cpl ? fmt.currency(ci.cpl) : (ci.costPerMessage ? fmt.currency(ci.costPerMessage) : "—")}
+                                  </TableCell>
+                                )}
+                                {visibleColumns.includes("roas") && (
+                                  <TableCell>
+                                    {ci.roas ? (
+                                      <Badge variant={parseFloat(ci.roas) >= 1 ? "default" : "destructive"} className="text-xs">
+                                        {parseFloat(ci.roas).toFixed(2)}x
+                                      </Badge>
+                                    ) : "—"}
+                                  </TableCell>
+                                )}
+                                {visibleColumns.includes("leads") && (
+                                  <TableCell className="text-xs font-semibold text-emerald-600 py-1.5">
+                                    {ci.leads && ci.leads !== "0" ? ci.leads : "—"}
+                                  </TableCell>
+                                )}
+                                {visibleColumns.includes("messages") && (
+                                  <TableCell className="text-xs py-1.5">
+                                    {ci.messages && ci.messages !== "0" ? ci.messages : "—"}
+                                  </TableCell>
+                                )}
+                                {visibleColumns.includes("action") && (
+                                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                          <MoreHorizontal size={16} />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => openDrawer(c)}>
+                                          <Eye size={14} className="mr-2" />
+                                          {isRTL ? "عرض التفاصيل" : "View Details"}
                                         </DropdownMenuItem>
-                                      )}
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </TableCell>
+                                        {c.dailyBudget && c.dailyBudget !== "0.00" && (
+                                          <DropdownMenuItem onClick={() => openBudgetEdit(c.id, c.campaignName, "daily", c.dailyBudget)}>
+                                            <Pencil size={14} className="mr-2" />
+                                            {isRTL ? "تعديل الميزانية اليومية" : "Edit Daily Budget"}
+                                          </DropdownMenuItem>
+                                        )}
+                                        {c.lifetimeBudget && c.lifetimeBudget !== "0.00" && (
+                                          <DropdownMenuItem onClick={() => openBudgetEdit(c.id, c.campaignName, "lifetime", c.lifetimeBudget)}>
+                                            <Pencil size={14} className="mr-2" />
+                                            {isRTL ? "تعديل الميزانية الإجمالية" : "Edit Lifetime Budget"}
+                                          </DropdownMenuItem>
+                                        )}
+                                        <DropdownMenuSeparator />
+                                        {(c.status === "ACTIVE" || c.status === "PAUSED") && (
+                                          <DropdownMenuItem
+                                            onClick={() => handleStatusChange(c.id, c.status === "ACTIVE" ? "PAUSED" : "ACTIVE")}
+                                            disabled={updatingId === c.id}
+                                          >
+                                            {c.status === "ACTIVE" ? (
+                                              <><Pause size={14} className="mr-2" />{isRTL ? "إيقاف الحملة" : "Pause Campaign"}</>
+                                            ) : (
+                                              <><Play size={14} className="mr-2" />{isRTL ? "تشغيل الحملة" : "Activate Campaign"}</>
+                                            )}
+                                          </DropdownMenuItem>
+                                        )}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                )}
+                              </TableRow>
+
+                              {/* ─── Row 2: CRM Data ─── */}
+                              {showCrmRow && (
+                                <TableRow className="bg-gradient-to-r from-slate-50/80 to-blue-50/40 dark:from-slate-900/30 dark:to-blue-900/10 border-b-2 border-muted/40 hover:bg-blue-50/60">
+                                  <TableCell colSpan={visibleColumns.filter(c => ALL_COLUMNS.some(ac => ac.key === c)).length + (visibleColumns.includes("action") ? 1 : 0)} className="py-2 px-3">
+                                    {crm ? (
+                                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px]">
+                                        {/* CRM Label */}
+                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-50 text-emerald-600 border-emerald-200 shrink-0">CRM</Badge>
+
+                                        {/* Lead Quality */}
+                                        <div className="flex items-center gap-1.5">
+                                          <Users size={11} className="text-slate-500" />
+                                          <span className="text-muted-foreground">{isRTL ? "عملاء:" : "Leads:"}</span>
+                                          <span className="font-bold">{crm.totalLeads}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-red-500 font-bold">{crm.hot}</span>
+                                          <Flame size={10} className="text-red-500" />
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-orange-500 font-bold">{crm.warm}</span>
+                                          <ThermometerSun size={10} className="text-orange-500" />
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-blue-500 font-bold">{crm.cold}</span>
+                                          <Snowflake size={10} className="text-blue-500" />
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-slate-400 font-bold">{crm.bad}</span>
+                                          <XCircle size={10} className="text-slate-400" />
+                                        </div>
+
+                                        <Separator orientation="vertical" className="h-4" />
+
+                                        {/* Fit Status */}
+                                        <div className="flex items-center gap-1">
+                                          <CheckCircle size={10} className="text-emerald-500" />
+                                          <span className="text-emerald-600 font-bold">{crm.fitCount}</span>
+                                          <span className="text-muted-foreground">Fit</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <XCircle size={10} className="text-red-400" />
+                                          <span className="text-red-500 font-bold">{crm.notFitCount}</span>
+                                        </div>
+
+                                        <Separator orientation="vertical" className="h-4" />
+
+                                        {/* Pipeline */}
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-muted-foreground">L:</span>
+                                          <span className="font-bold">{crm.leadCount}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-muted-foreground">P:</span>
+                                          <span className="font-bold text-blue-600">{crm.prospectCount}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-muted-foreground">O:</span>
+                                          <span className="font-bold text-emerald-600">{crm.opportunityCount}</span>
+                                        </div>
+
+                                        <Separator orientation="vertical" className="h-4" />
+
+                                        {/* Score */}
+                                        <div className="flex items-center gap-1">
+                                          <Star size={10} className="text-amber-500" />
+                                          <span className={`font-bold px-1.5 py-0 rounded text-[10px] ${getScoreColor(crm.avgScore)}`}>{crm.avgScore}</span>
+                                        </div>
+
+                                        {/* Quality % */}
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-muted-foreground">{isRTL ? "جودة:" : "Q:"}</span>
+                                          <span className={`font-bold ${getQualityColor(qualityPct)}`}>{qualityPct.toFixed(0)}%</span>
+                                        </div>
+
+                                        {/* Cost per Hot */}
+                                        {costPerHot > 0 && (
+                                          <div className="flex items-center gap-1">
+                                            <Flame size={10} className="text-red-500" />
+                                            <span className="text-muted-foreground">{isRTL ? "تكلفة:" : "Cost:"}</span>
+                                            <span className="font-bold text-red-600">{fmt.currency(costPerHot)}</span>
+                                          </div>
+                                        )}
+
+                                        {/* Won Deals */}
+                                        {crm.wonDeals > 0 && (
+                                          <>
+                                            <Separator orientation="vertical" className="h-4" />
+                                            <div className="flex items-center gap-1">
+                                              <Award size={10} className="text-yellow-500" />
+                                              <span className="font-bold text-yellow-600">{crm.wonDeals}</span>
+                                              <span className="text-muted-foreground">{isRTL ? "صفقة" : "won"}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              <span className="font-bold text-emerald-600">{fmt.currencySar(crm.wonRevenue)}</span>
+                                            </div>
+                                            {roas > 0 && (
+                                              <Badge variant={roas >= 1 ? "default" : "destructive"} className="text-[10px] px-1.5 py-0">
+                                                ROAS: {roas.toFixed(2)}x
+                                              </Badge>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-slate-50 text-slate-400 border-slate-200">CRM</Badge>
+                                        {isRTL ? "لا توجد بيانات CRM لهذه الحملة" : "No CRM data for this campaign"}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
                               )}
-                            </TableRow>
+                            </React.Fragment>
                           );
                         })}
                       </TableBody>
@@ -995,6 +1278,12 @@ export default function MetaCampaigns() {
           <SheetContent className="w-full sm:max-w-lg overflow-y-auto p-0" side={isRTL ? "left" : "right"}>
             {selectedCampaign && (() => {
               const ci = insights[selectedCampaign.campaignId] || {};
+              const crm = crmLookup[selectedCampaign.campaignName?.toLowerCase()] || null;
+              const spend = parseFloat(ci.spend || "0");
+              const qualityPct = crm && crm.totalLeads > 0 ? ((crm.hot + crm.warm) / crm.totalLeads) * 100 : 0;
+              const costPerHot = crm && crm.hot > 0 && spend > 0 ? spend / crm.hot : 0;
+              const roas = crm && crm.wonRevenue > 0 && spend > 0 ? crm.wonRevenue / spend : 0;
+
               return (
                 <div className="flex flex-col h-full">
                   {/* Header */}
@@ -1071,15 +1360,15 @@ export default function MetaCampaigns() {
                       </div>
                       <div className="rounded-lg bg-amber-50 border border-amber-100 p-2.5 text-center">
                         <p className="text-[9px] text-amber-500 font-semibold uppercase tracking-wider">ROAS</p>
-                        <p className="text-sm font-bold mt-0.5 text-amber-700">{ci.roas ? `${parseFloat(ci.roas).toFixed(2)}x` : "—"}</p>
+                        <p className="text-sm font-bold mt-0.5 text-amber-700">{roas > 0 ? `${roas.toFixed(2)}x` : (ci.roas ? `${parseFloat(ci.roas).toFixed(2)}x` : "—")}</p>
                       </div>
                     </div>
 
-                    {/* Performance Metrics */}
+                    {/* Meta Performance Metrics */}
                     <div className="rounded-lg border bg-card">
-                      <div className="px-3 py-2.5 border-b bg-muted/30">
+                      <div className="px-3 py-2.5 border-b bg-blue-50/50">
                         <h4 className="text-xs font-semibold flex items-center gap-1.5">
-                          <BarChart3 size={13} className="text-primary" />
+                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-blue-50 text-blue-600 border-blue-200">Meta</Badge>
                           {isRTL ? "مقاييس الأداء" : "Performance Metrics"}
                         </h4>
                       </div>
@@ -1101,6 +1390,87 @@ export default function MetaCampaigns() {
                         ))}
                       </div>
                     </div>
+
+                    {/* CRM Analytics Section */}
+                    {crm && (
+                      <div className="rounded-lg border bg-card">
+                        <div className="px-3 py-2.5 border-b bg-emerald-50/50">
+                          <h4 className="text-xs font-semibold flex items-center gap-1.5">
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-50 text-emerald-600 border-emerald-200">CRM</Badge>
+                            {isRTL ? "تحليلات العملاء" : "Lead Analytics"}
+                          </h4>
+                        </div>
+                        <div className="divide-y">
+                          {/* Quality Breakdown */}
+                          <div className="px-3 py-2.5">
+                            <p className="text-[10px] text-muted-foreground mb-2">{isRTL ? "جودة العملاء" : "Lead Quality"}</p>
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-1">
+                                <Flame size={12} className="text-red-500" />
+                                <span className="text-xs font-bold text-red-600">{crm.hot}</span>
+                                <span className="text-[10px] text-muted-foreground">{isRTL ? "ساخن" : "Hot"}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <ThermometerSun size={12} className="text-orange-500" />
+                                <span className="text-xs font-bold text-orange-600">{crm.warm}</span>
+                                <span className="text-[10px] text-muted-foreground">{isRTL ? "دافئ" : "Warm"}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Snowflake size={12} className="text-blue-500" />
+                                <span className="text-xs font-bold text-blue-600">{crm.cold}</span>
+                                <span className="text-[10px] text-muted-foreground">{isRTL ? "بارد" : "Cold"}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <XCircle size={12} className="text-slate-400" />
+                                <span className="text-xs font-bold text-slate-500">{crm.bad}</span>
+                                <span className="text-[10px] text-muted-foreground">{isRTL ? "سيء" : "Bad"}</span>
+                              </div>
+                            </div>
+                            {/* Quality Bar */}
+                            <div className="flex h-2 rounded-full overflow-hidden mt-2 bg-slate-100">
+                              {crm.totalLeads > 0 && (
+                                <>
+                                  <div className="bg-red-500 transition-all" style={{ width: `${(crm.hot / crm.totalLeads) * 100}%` }} />
+                                  <div className="bg-orange-400 transition-all" style={{ width: `${(crm.warm / crm.totalLeads) * 100}%` }} />
+                                  <div className="bg-blue-400 transition-all" style={{ width: `${(crm.cold / crm.totalLeads) * 100}%` }} />
+                                  <div className="bg-slate-300 transition-all" style={{ width: `${(crm.bad / crm.totalLeads) * 100}%` }} />
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Key Metrics */}
+                          {[
+                            { label: isRTL ? "إجمالي العملاء (CRM)" : "Total CRM Leads", value: String(crm.totalLeads), icon: Users, color: "text-cyan-500" },
+                            { label: isRTL ? "نسبة الجودة" : "Quality %", value: `${qualityPct.toFixed(1)}%`, icon: TrendingUp, color: getQualityColor(qualityPct) },
+                            { label: "Fit / Not Fit", value: `${crm.fitCount} / ${crm.notFitCount}`, icon: CheckCircle, color: "text-emerald-500" },
+                            { label: isRTL ? "متوسط السكور" : "Avg Score", value: String(crm.avgScore), icon: Star, color: "text-amber-500" },
+                            { label: "Lead / Prospect / Opportunity", value: `${crm.leadCount} / ${crm.prospectCount} / ${crm.opportunityCount}`, icon: Briefcase, color: "text-indigo-500" },
+                            { label: isRTL ? "تكلفة العميل الساخن" : "Cost per Hot Lead", value: costPerHot > 0 ? fmt.currency(costPerHot) : "—", icon: Flame, color: "text-red-500" },
+                            { label: isRTL ? "صفقات مكسوبة" : "Won Deals", value: `${crm.wonDeals} (${fmt.currencySar(crm.wonRevenue)})`, icon: Award, color: "text-yellow-500" },
+                            { label: "ROAS", value: roas > 0 ? `${roas.toFixed(2)}x` : "—", icon: BarChart3, color: "text-indigo-500" },
+                          ].map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between px-3 py-2">
+                              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <item.icon size={13} className={item.color} />
+                                {item.label}
+                              </span>
+                              <span className="text-xs font-semibold">{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* No CRM Data */}
+                    {!crm && (
+                      <div className="rounded-lg border bg-card p-4 text-center">
+                        <Users size={24} className="mx-auto text-muted-foreground mb-2" />
+                        <p className="text-xs text-muted-foreground">
+                          {isRTL ? "لا توجد بيانات CRM لهذه الحملة" : "No CRM data for this campaign"}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Budget Info */}
                     <div className="rounded-lg border bg-card">
