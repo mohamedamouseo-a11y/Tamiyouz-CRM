@@ -3763,6 +3763,15 @@ byLeadStageChanges: protectedProcedure
         }
         return fetchAllMetaCampaignInsights(active.id, input.datePreset, input.dateFrom, input.dateTo);
       }),
+    // ─── CRM Stats by Campaign (for Meta Campaigns integration) ──────────────
+    getCrmStatsByCampaign: mediaBuyerOrAdminProcedure
+      .input(z.object({
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
+      }))
+      .query(async ({ input }) => {
+        return getCrmStatsByCampaign(input.dateFrom, input.dateTo);
+      }),
 
     // ─── Meta Leadgen Webhook Integration ──────────────────────────────────────
     leadgen: router({
