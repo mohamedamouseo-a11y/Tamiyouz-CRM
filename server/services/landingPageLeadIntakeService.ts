@@ -136,6 +136,33 @@ function validateAntiSpam(payload: PublicLeadPayload): string | null {
   return null;
 }
 
+/* ── Turnstile verification ───────────────────────────────────────────── */
+async function verifyTurnstileToken(token: string | undefined | null, ipAddress?: string | null): Promise<string | null> {
+  const secretKey = process.env.TURNSTILE_SECRET_KEY;
+  if (!secretKey) return null; // Skip verification if no secret key configured
+  if (!token) return "Turnstile token is missing";
+
+  try {
+    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        secret: secretKey,
+        response: token,
+        remoteip: ipAddress || undefined,
+      }),
+    });
+    const data = await response.json() as { success: boolean; "error-codes"?: string[] };
+    if (!data.success) {
+      return `Turnstile verification failed: ${(data["error-codes"] || []).join(", ")}`;
+    }
+    return null;
+  } catch (err: any) {
+    console.error("Turnstile verification error:", err);
+    return null; // Allow submission if Turnstile API is unreachable
+  }
+}
+
 /* ── Main intake function ────────────────────────────────────────────── */
 
 export async function intakeLandingPageLead(slug: string, rawPayload: unknown, context: IntakeContext = {}) {
@@ -156,6 +183,13 @@ export async function intakeLandingPageLead(slug: string, rawPayload: unknown, c
   if (antiSpamError) {
     await logLandingPageSubmission({ integrationId: integration.id, status: "blocked", payloadJson: payload, origin: context.origin, ipAddress: context.ipAddress, userAgent: context.userAgent, errorMessage: antiSpamError });
     throw new Error(antiSpamError);
+  }
+
+  // Turnstile verification
+  const turnstileError = await verifyTurnstileToken((payload as any).cf_turnstile_response, context.ipAddress);
+  if (turnstileError) {
+    await logLandingPageSubmission({ integrationId: integration.id, status: "blocked", payloadJson: payload, origin: context.origin, ipAddress: context.ipAddress, userAgent: context.userAgent, errorMessage: turnstileError });
+    throw new Error(turnstileError);
   }
 
   const phone = normalizePhone(payload.phone || "");
