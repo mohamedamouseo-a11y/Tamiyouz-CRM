@@ -53,6 +53,7 @@ import {
   getDealByLead,
   getDealsByUser,
   getLeadById,
+  getLeadConflictByPhone,
   getLeads,
   getLeadsCount,
   getPipelineStages,
@@ -654,12 +655,24 @@ export const appRouter = router({
 
         // ── Duplicate phone check ──
         const normalizedPhone = normalizePhone(input.phone);
-        const existingLead = await getLeadByPhone(normalizedPhone);
-        if (existingLead) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: `رقم الهاتف موجود بالفعل للعميل: ${existingLead.name || existingLead.phone}`,
-          });
+        const conflict = await getLeadConflictByPhone(normalizedPhone);
+        if (conflict) {
+          const isSameAgent = conflict.ownerId === ctx.user.id;
+          if (isSameAgent) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "هذا الرقم مسجل عندك بالفعل",
+            });
+          } else {
+            const dateStr = conflict.createdAt
+              ? new Date(conflict.createdAt).toLocaleDateString("en-GB")
+              : "";
+            const ownerStr = conflict.ownerName || "وكيل مبيعات";
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: `هذا الرقم مسجل بالفعل بتاريخ ${dateStr} بواسطة ${ownerStr}`,
+            });
+          }
         }
 
         const id = await createLead({ ...input, ownerId } as any);
@@ -711,6 +724,29 @@ export const appRouter = router({
             newValue[key] = (data as any)[key] ?? null;
           }
         }
+        // ── Phone conflict check on update ──
+        if (data.phone) {
+          const normalizedNewPhone = normalizePhone(data.phone);
+          const phoneConflict = await getLeadConflictByPhone(normalizedNewPhone, id);
+          if (phoneConflict) {
+            const isSameAgent = phoneConflict.ownerId === ctx.user.id;
+            if (isSameAgent) {
+              throw new TRPCError({
+                code: "CONFLICT",
+                message: "هذا الرقم مسجل عندك بالفعل",
+              });
+            } else {
+              const dateStr = phoneConflict.createdAt
+                ? new Date(phoneConflict.createdAt).toLocaleDateString("en-GB")
+                : "";
+              const ownerStr = phoneConflict.ownerName || "وكيل مبيعات";
+              throw new TRPCError({
+                code: "CONFLICT",
+                message: `هذا الرقم مسجل بالفعل بتاريخ ${dateStr} بواسطة ${ownerStr}`,
+              });
+            }
+          }
+        }
         await updateLead(id, data as any);
         // Create audit log with previousValue/newValue for undo support
         await createAuditLog({
@@ -726,6 +762,35 @@ export const appRouter = router({
           newValue,
         });
         return { success: true };
+      }),
+
+
+    checkPhoneConflict: protectedProcedure
+      .input(z.object({ phone: z.string().min(3) }))
+      .query(async ({ ctx, input }) => {
+        const normalizedPhone = normalizePhone(input.phone);
+        const conflict = await getLeadConflictByPhone(normalizedPhone);
+        if (!conflict) {
+          return {
+            exists: false,
+            isOwnedByCurrentUser: false,
+            isAccessibleToCurrentUser: false,
+            conflictWithAnotherSalesAgent: false,
+            ownerName: null,
+            createdAt: null,
+          };
+        }
+        const isOwnedByCurrentUser = conflict.ownerId === ctx.user.id;
+        const isSalesAgent = ctx.user.role === "SalesAgent";
+        const conflictWithAnotherSalesAgent = isSalesAgent && !isOwnedByCurrentUser;
+        return {
+          exists: true,
+          isOwnedByCurrentUser,
+          isAccessibleToCurrentUser: isOwnedByCurrentUser,
+          conflictWithAnotherSalesAgent,
+          ownerName: conflictWithAnotherSalesAgent ? conflict.ownerName : null,
+          createdAt: conflictWithAnotherSalesAgent ? conflict.createdAt : null,
+        };
       }),
 
     delete: protectedProcedure

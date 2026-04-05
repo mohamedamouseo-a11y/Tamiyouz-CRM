@@ -349,6 +349,27 @@ export default function LeadsList() {
     if (didReset) setPage(0);
   }, [visibleColumns, stage, quality, fitStatusFilter, classificationFilter, campaign, ownerId]);
 
+  // Debounce search phone conflict
+  useEffect(() => {
+    const looksLikePhone = /^\+?[\d\s\-]{9,}$/.test(search.trim());
+    if (!looksLikePhone || !search.trim()) {
+      setDebouncedSearchPhone("");
+      return;
+    }
+    const timer = setTimeout(() => setDebouncedSearchPhone(search.trim()), 600);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Debounce form phone conflict
+  useEffect(() => {
+    if (!formPhoneRaw) {
+      setDebouncedFormPhone("");
+      return;
+    }
+    const timer = setTimeout(() => setDebouncedFormPhone(formPhoneRaw), 600);
+    return () => clearTimeout(timer);
+  }, [formPhoneRaw]);
+
   async function handleExport() {
     setExporting(true);
     try {
@@ -431,9 +452,20 @@ export default function LeadsList() {
       setShowNewLead(false);
       refetch();
       reset();
+      setFormPhoneRaw("");
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const { data: searchPhoneConflict } = trpc.leads.checkPhoneConflict.useQuery(
+    { phone: debouncedSearchPhone },
+    { enabled: !!debouncedSearchPhone }
+  );
+
+  const { data: formPhoneConflict } = trpc.leads.checkPhoneConflict.useQuery(
+    { phone: debouncedFormPhone },
+    { enabled: !!debouncedFormPhone }
+  );
 
   const deleteLead = trpc.leads.delete.useMutation({
     onSuccess: () => {
@@ -463,6 +495,9 @@ export default function LeadsList() {
   const [phoneValid, setPhoneValid] = useState(false);
   const [phoneError, setPhoneError] = useState(false);
   const [campaignError, setCampaignError] = useState(false);
+  const [debouncedSearchPhone, setDebouncedSearchPhone] = useState("");
+  const [formPhoneRaw, setFormPhoneRaw] = useState("");
+  const [debouncedFormPhone, setDebouncedFormPhone] = useState("");
 
   const onSubmit = (formData: any) => {
     if (!phoneValid) {
@@ -470,6 +505,9 @@ export default function LeadsList() {
       return;
     }
     setPhoneError(false);
+    if (formPhoneConflict?.conflictWithAnotherSalesAgent) {
+      return;
+    }
 
     if (!formData.campaignName) {
       setCampaignError(true);
@@ -788,6 +826,16 @@ export default function LeadsList() {
                     className={isRTL ? "pr-9" : "pl-9"}
                   />
                 </div>
+                {searchPhoneConflict?.conflictWithAnotherSalesAgent && (
+                  <div className="flex items-center gap-2 rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-600 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 mt-1">
+                    <AlertTriangle size={13} className="shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span>
+                      {isRTL
+                        ? `الرقم مسجل على الـ CRM مع وكيل مبيعات آخر: ${searchPhoneConflict.ownerName}`
+                        : `Phone is registered in CRM under another agent: ${searchPhoneConflict.ownerName}`}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2 min-w-[250px]">
@@ -1172,6 +1220,7 @@ export default function LeadsList() {
                   onChange={(fullPhone, valid) => {
                     setValue("phone", fullPhone);
                     setPhoneValid(valid);
+                    setFormPhoneRaw(fullPhone);
                     if (valid) setPhoneError(false);
                     const sorted = [...countries].sort((a, b) => b.phoneCode.length - a.phoneCode.length);
                     for (const c of sorted) {
@@ -1187,6 +1236,14 @@ export default function LeadsList() {
                 />
                 {phoneError && (
                   <p className="text-red-500 text-xs">{isRTL ? "رقم الهاتف غير صحيح" : "Invalid phone number"}</p>
+                )}
+                {formPhoneConflict?.conflictWithAnotherSalesAgent && (
+                  <p className="flex items-center gap-1.5 text-amber-600 text-xs mt-1">
+                    <AlertTriangle size={12} className="shrink-0" />
+                    {isRTL
+                      ? `هذا الرقم مسجل بالفعل بتاريخ ${formPhoneConflict.createdAt ? new Date(formPhoneConflict.createdAt).toLocaleDateString("ar-EG") : ""} بواسطة ${formPhoneConflict.ownerName}`
+                      : `Phone already registered on ${formPhoneConflict.createdAt ? new Date(formPhoneConflict.createdAt).toLocaleDateString() : ""} by ${formPhoneConflict.ownerName}`}
+                  </p>
                 )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1340,7 +1397,7 @@ export default function LeadsList() {
                 size="lg"
                 style={{ background: tokens.primaryColor }}
                 className="text-white min-w-[120px]"
-                disabled={createLead.isPending}
+                disabled={createLead.isPending || !!formPhoneConflict?.conflictWithAnotherSalesAgent}
               >
                 {createLead.isPending ? (
                   <span className="flex items-center gap-2">

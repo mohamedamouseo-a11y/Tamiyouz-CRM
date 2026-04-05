@@ -433,6 +433,27 @@ export async function getLeadByPhone(phone: string): Promise<any | null> {
     .limit(1);
   return result.length > 0 ? result[0] : null;
 }
+export async function getLeadConflictByPhone(
+  phone: string,
+  excludeLeadId?: number
+): Promise<{ ownerId: number | null; ownerName: string | null; createdAt: Date | null } | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const conditions: any[] = [eq(leads.phone, phone), isNull(leads.deletedAt)];
+  if (excludeLeadId) conditions.push(sql`${leads.id} != ${excludeLeadId}`);
+  const result = await db
+    .select({
+      ownerId: leads.ownerId,
+      ownerName: users.name,
+      createdAt: leads.createdAt,
+    })
+    .from(leads)
+    .leftJoin(users, eq(leads.ownerId, users.id))
+    .where(and(...conditions))
+    .limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
 export async function updateLead(id: number, data: Partial<InsertLead>): Promise<void> {
   const db = await getDb();
   if (!db) return;
