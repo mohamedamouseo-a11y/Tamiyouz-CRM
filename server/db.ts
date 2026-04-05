@@ -2966,28 +2966,146 @@ export async function getOnboardingItemMeta(id: number) {
   return row;
 }
 
-export async function updateOnboardingItem(id: number, isChecked: boolean, notes?: string | null) {
+export async function updateOnboardingItem(
+  id: number,
+  isChecked: boolean,
+  notes?: string | null,
+  actorId: number = 0,
+  actorName: string = "System",
+  actorRole: string = "AccountManager",
+) {
   const db = await getDb();
   if (!db) return;
+
+  // Capture before state
+  const prevRows = await db.select().from(clientOnboardingItems).where(eq(clientOnboardingItems.id, id)).limit(1);
+  const prev = prevRows[0] as any;
+
   const updateData: any = { isChecked: isChecked ? 1 : 0 };
   if (notes !== undefined) updateData.notes = notes;
-  await db
-    .update(clientOnboardingItems)
-    .set(updateData)
-    .where(eq(clientOnboardingItems.id, id));
+  await db.update(clientOnboardingItems).set(updateData).where(eq(clientOnboardingItems.id, id));
+
+  if (prev) {
+    const wasChecked = !!prev.isChecked;
+    const action = isChecked && !wasChecked ? "ONBOARDING_ITEM_COMPLETED"
+      : !isChecked && wasChecked ? "ONBOARDING_ITEM_UNCOMPLETED"
+      : "ONBOARDING_ITEM_UPDATED";
+    await createAuditLog({
+      userId: actorId,
+      userName: actorName,
+      userRole: actorRole,
+      action,
+      entityType: "client_onboarding_item",
+      entityId: id,
+      entityName: prev.itemName,
+      details: { clientId: prev.clientId, itemName: prev.itemName },
+      previousValue: { isChecked: wasChecked, notes: prev.notes ?? null },
+      newValue: { isChecked, notes: notes !== undefined ? notes : (prev.notes ?? null) },
+    });
+  }
 }
 
-export async function addOnboardingItem(clientId: number, itemName: string, phase: number = 1, phaseLabel: string = "Phase 1", phaseOrder: number = 0): Promise<number> {
+export async function editOnboardingItemTitle(
+  id: number,
+  newItemName: string,
+  newNotes?: string | null,
+  actorId: number = 0,
+  actorName: string = "System",
+  actorRole: string = "AccountManager",
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const prevRows = await db.select().from(clientOnboardingItems).where(eq(clientOnboardingItems.id, id)).limit(1);
+  const prev = prevRows[0] as any;
+  const updateData: any = { itemName: newItemName };
+  if (newNotes !== undefined) updateData.notes = newNotes;
+  await db.update(clientOnboardingItems).set(updateData).where(eq(clientOnboardingItems.id, id));
+  if (prev) {
+    await createAuditLog({
+      userId: actorId,
+      userName: actorName,
+      userRole: actorRole,
+      action: "ONBOARDING_ITEM_UPDATED",
+      entityType: "client_onboarding_item",
+      entityId: id,
+      entityName: newItemName,
+      details: { clientId: prev.clientId, changedFields: ["itemName", ...(newNotes !== undefined ? ["notes"] : [])] },
+      previousValue: { itemName: prev.itemName, notes: prev.notes ?? null },
+      newValue: { itemName: newItemName, notes: newNotes !== undefined ? newNotes : (prev.notes ?? null) },
+    });
+  }
+}
+
+export async function getClientHandoverHistory(clientId: number, limit: number = 50): Promise<any[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(auditLogs)
+    .where(
+      and(
+        eq(auditLogs.entityId, clientId),
+        sql`${auditLogs.entityType} IN ('client_handover_brief','client_status','client_assignment')`
+      )
+    )
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(limit);
+}
+
+export async function addOnboardingItem(
+  clientId: number,
+  itemName: string,
+  phase: number = 1,
+  phaseLabel: string = "Phase 1",
+  phaseOrder: number = 0,
+  actorId: number = 0,
+  actorName: string = "System",
+  actorRole: string = "AccountManager",
+): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
   const result = await db.insert(clientOnboardingItems).values({ clientId, itemName, isChecked: 0, phase, phaseLabel, phaseOrder } as any);
-  return Number((result as any)[0]?.insertId ?? 0);
+  const id = Number((result as any)[0]?.insertId ?? 0);
+  await createAuditLog({
+    userId: actorId,
+    userName: actorName,
+    userRole: actorRole,
+    action: "ONBOARDING_ITEM_ADDED",
+    entityType: "client_onboarding_item",
+    entityId: id,
+    entityName: itemName,
+    details: { clientId, itemName, phase, phaseLabel },
+    newValue: { itemName, phase, phaseLabel },
+  });
+  return id;
 }
 
-export async function removeOnboardingItem(id: number): Promise<void> {
+export async function removeOnboardingItem(
+  id: number,
+  actorId: number = 0,
+  actorName: string = "System",
+  actorRole: string = "AccountManager",
+): Promise<void> {
   const db = await getDb();
   if (!db) return;
+  // Capture snapshot before delete
+  const rows = await db.select().from(clientOnboardingItems).where(eq(clientOnboardingItems.id, id)).limit(1);
+  const snapshot = rows[0] as any;
   await db.delete(clientOnboardingItems).where(eq(clientOnboardingItems.id, id));
+  if (snapshot) {
+    await createAuditLog({
+      userId: actorId,
+      userName: actorName,
+      userRole: actorRole,
+      action: "ONBOARDING_ITEM_DELETED",
+      entityType: "client_onboarding_item",
+      entityId: id,
+      entityName: snapshot.itemName,
+      details: { clientId: snapshot.clientId, snapshot },
+      previousValue: { itemName: snapshot.itemName, phase: snapshot.phase, isChecked: snapshot.isChecked },
+      newValue: null,
+    });
+  }
 }
 
 export async function initializeOnboarding(clientId: number, checklistId: number) {
@@ -3038,20 +3156,164 @@ export async function getHandoverBrief(clientId: number): Promise<ClientHandover
   return rows[0] ?? null;
 }
 
-export async function saveHandoverBrief(clientId: number, data: Omit<InsertClientHandoverBrief, "clientId" | "createdAt" | "updatedAt">): Promise<number> {
+export async function saveHandoverBrief(
+  clientId: number,
+  data: Omit<InsertClientHandoverBrief, "clientId" | "createdAt" | "updatedAt">,
+  actorId: number = 0,
+  actorName: string = "System",
+  actorRole: string = "SalesAgent",
+): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
+
+  // Check if brief already exists (create vs update)
+  const existingBrief = await getHandoverBrief(clientId);
+  const isUpdate = !!existingBrief;
+
   // Upsert: delete old and insert new
   await db.delete(clientHandoverBriefs).where(eq(clientHandoverBriefs.clientId, clientId));
   const result = await db.insert(clientHandoverBriefs).values({ ...data, clientId } as any);
+  const insertId = Number((result as any)[0]?.insertId ?? 0);
+
   // Update briefStatus on client
+  const clientRows = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
+  const clientRow = clientRows[0] as any;
+  const oldBriefStatus = clientRow?.briefStatus ?? null;
+  const oldHandoverStatus = clientRow?.handoverStatus ?? null;
+
   await db.update(clients).set({ briefStatus: "Submitted" } as any).where(eq(clients.id, clientId));
+
   // Update handoverStatus if still AwaitingSalesBrief
-  const clientRow = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
-  if ((clientRow[0] as any)?.handoverStatus === "AwaitingSalesBrief") {
+  if (oldHandoverStatus === "AwaitingSalesBrief") {
     await db.update(clients).set({ handoverStatus: "BriefSubmitted" } as any).where(eq(clients.id, clientId));
   }
-  return Number((result as any)[0]?.insertId ?? 0);
+
+  // Audit: brief created or updated
+  const changedFields = isUpdate ? Object.keys(data).filter(k => {
+    const old = (existingBrief as any)[k];
+    const nw = (data as any)[k];
+    return String(old ?? "") !== String(nw ?? "");
+  }) : Object.keys(data);
+
+  await createAuditLog({
+    userId: actorId,
+    userName: actorName,
+    userRole: actorRole,
+    action: isUpdate ? "HANDOVER_BRIEF_UPDATED" : "HANDOVER_BRIEF_CREATED",
+    entityType: "client_handover_brief",
+    entityId: clientId,
+    entityName: `Client #${clientId} Handover Brief`,
+    details: { clientId, changedFields },
+    previousValue: isUpdate ? { ...existingBrief } : null,
+    newValue: { ...data },
+  });
+
+  // Audit: briefStatus change
+  if (oldBriefStatus !== "Submitted") {
+    await createAuditLog({
+      userId: actorId,
+      userName: actorName,
+      userRole: actorRole,
+      action: "CLIENT_BRIEF_STATUS_CHANGED",
+      entityType: "client_status",
+      entityId: clientId,
+      entityName: `Client #${clientId}`,
+      details: { clientId, oldStatus: oldBriefStatus, newStatus: "Submitted" },
+      previousValue: { briefStatus: oldBriefStatus },
+      newValue: { briefStatus: "Submitted" },
+    });
+  }
+
+  // Audit: handoverStatus change
+  if (oldHandoverStatus === "AwaitingSalesBrief") {
+    await createAuditLog({
+      userId: actorId,
+      userName: actorName,
+      userRole: actorRole,
+      action: "CLIENT_HANDOVER_STATUS_CHANGED",
+      entityType: "client_status",
+      entityId: clientId,
+      entityName: `Client #${clientId}`,
+      details: { clientId, oldStatus: oldHandoverStatus, newStatus: "BriefSubmitted" },
+      previousValue: { handoverStatus: oldHandoverStatus },
+      newValue: { handoverStatus: "BriefSubmitted" },
+    });
+  }
+
+  return insertId;
+}
+
+export async function deleteHandoverBrief(
+  clientId: number,
+  actorId: number,
+  actorName: string,
+  actorRole: string,
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await getHandoverBrief(clientId);
+  if (!existing) return;
+
+  await db.delete(clientHandoverBriefs).where(eq(clientHandoverBriefs.clientId, clientId));
+  await db.update(clients).set({ briefStatus: "NotStarted" } as any).where(eq(clients.id, clientId));
+
+  await createAuditLog({
+    userId: actorId,
+    userName: actorName,
+    userRole: actorRole,
+    action: "HANDOVER_BRIEF_DELETED",
+    entityType: "client_handover_brief",
+    entityId: clientId,
+    entityName: `Client #${clientId} Handover Brief`,
+    details: { clientId, snapshot: existing },
+    previousValue: { ...existing },
+    newValue: null,
+  });
+
+  await createAuditLog({
+    userId: actorId,
+    userName: actorName,
+    userRole: actorRole,
+    action: "CLIENT_BRIEF_STATUS_CHANGED",
+    entityType: "client_status",
+    entityId: clientId,
+    entityName: `Client #${clientId}`,
+    details: { clientId, oldStatus: "Submitted", newStatus: "NotStarted", reason: "Brief deleted" },
+    previousValue: { briefStatus: "Submitted" },
+    newValue: { briefStatus: "NotStarted" },
+  });
+}
+
+export async function updateBriefStatus(
+  clientId: number,
+  newStatus: "Reviewed" | "NeedsInfo" | "Submitted" | "NotStarted",
+  actorId: number,
+  actorName: string,
+  actorRole: string,
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const clientRows = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
+  const oldStatus = (clientRows[0] as any)?.briefStatus ?? null;
+  await db.update(clients).set({ briefStatus: newStatus } as any).where(eq(clients.id, clientId));
+  const actionMap: Record<string, string> = {
+    Reviewed: "HANDOVER_BRIEF_REVIEWED",
+    NeedsInfo: "HANDOVER_BRIEF_NEEDS_INFO",
+    Submitted: "CLIENT_BRIEF_STATUS_CHANGED",
+    NotStarted: "CLIENT_BRIEF_STATUS_CHANGED",
+  };
+  await createAuditLog({
+    userId: actorId,
+    userName: actorName,
+    userRole: actorRole,
+    action: actionMap[newStatus] ?? "CLIENT_BRIEF_STATUS_CHANGED",
+    entityType: "client_handover_brief",
+    entityId: clientId,
+    entityName: `Client #${clientId} Handover Brief`,
+    details: { clientId, oldStatus, newStatus },
+    previousValue: { briefStatus: oldStatus },
+    newValue: { briefStatus: newStatus },
+  });
 }
 
 // ─── Default Onboarding Checklist ─────────────────────────────────────────────
@@ -3131,18 +3393,69 @@ export async function createDefaultOnboardingItems(clientId: number): Promise<vo
   }
 }
 
-export async function assignAccountManagerToClient(clientId: number, accountManagerId: number): Promise<void> {
+export async function assignAccountManagerToClient(
+  clientId: number,
+  accountManagerId: number,
+  actorId: number = 0,
+  actorName: string = "System",
+  actorRole: string = "Admin",
+): Promise<void> {
   const db = await getDb();
   if (!db) return;
+
+  // Get current client state (previous AM and current brief)
+  const clientRows = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
+  const clientRow = clientRows[0] as any;
+  const prevAMId = clientRow?.accountManagerId ?? null;
+  const isReassign = !!prevAMId && prevAMId !== accountManagerId;
+
+  // Check if a brief already exists
+  const briefRows = await db.select({ id: clientHandoverBriefs.id }).from(clientHandoverBriefs)
+    .where(eq(clientHandoverBriefs.clientId, clientId)).limit(1);
+  const hasBrief = briefRows.length > 0;
+
+  // Set status: InOnboarding if brief exists, else AwaitingSalesBrief
+  const newHandoverStatus = hasBrief ? "InOnboarding" : "AwaitingSalesBrief";
+  const oldHandoverStatus = clientRow?.handoverStatus ?? null;
+
   await db.update(clients).set({
     accountManagerId,
-    handoverStatus: "InOnboarding",
+    handoverStatus: newHandoverStatus,
     planStatus: "Active",
   } as any).where(eq(clients.id, clientId));
+
   // Create default onboarding items if none exist
   await createDefaultOnboardingItems(clientId);
-  // Update handoverStatus to AwaitingSalesBrief only if it is AwaitingAssignment
-  // clientRow select for reference (removed unnecessary check)
+
+  // Audit: AM assignment
+  await createAuditLog({
+    userId: actorId,
+    userName: actorName,
+    userRole: actorRole,
+    action: isReassign ? "CLIENT_REASSIGNED_TO_ACCOUNT_MANAGER" : "CLIENT_ASSIGNED_TO_ACCOUNT_MANAGER",
+    entityType: "client_assignment",
+    entityId: clientId,
+    entityName: `Client #${clientId}`,
+    details: { clientId, newAccountManagerId: accountManagerId, oldAccountManagerId: prevAMId, hasBrief },
+    previousValue: { accountManagerId: prevAMId },
+    newValue: { accountManagerId },
+  });
+
+  // Audit: handover status change (if changed)
+  if (oldHandoverStatus !== newHandoverStatus) {
+    await createAuditLog({
+      userId: actorId,
+      userName: actorName,
+      userRole: actorRole,
+      action: "CLIENT_HANDOVER_STATUS_CHANGED",
+      entityType: "client_status",
+      entityId: clientId,
+      entityName: `Client #${clientId}`,
+      details: { clientId, oldStatus: oldHandoverStatus, newStatus: newHandoverStatus, reason: isReassign ? "AM reassignment" : "AM assigned" },
+      previousValue: { handoverStatus: oldHandoverStatus },
+      newValue: { handoverStatus: newHandoverStatus },
+    });
+  }
 }
 
 

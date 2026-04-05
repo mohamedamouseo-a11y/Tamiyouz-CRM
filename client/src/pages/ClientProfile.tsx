@@ -334,6 +334,34 @@ export default function ClientProfile({ params }: RouteProps) {
     onError: (e: any) => toast.error(e?.message || "Failed to submit brief"),
   });
 
+  const deleteBriefM = trpc.accountManagement.deleteHandoverBrief.useMutation({
+    onSuccess: async () => {
+      toast.success("Brief cleared");
+      await briefQ.refetch();
+      await profileQ.refetch();
+    },
+    onError: (e: any) => toast.error(e?.message || "Failed to delete brief"),
+  });
+
+  const updateBriefStatusM = trpc.accountManagement.updateBriefStatus.useMutation({
+    onSuccess: async () => {
+      toast.success("Brief status updated");
+      await briefQ.refetch();
+      await profileQ.refetch();
+    },
+    onError: (e: any) => toast.error(e?.message || "Failed to update status"),
+  });
+
+  const editItemTitleM = trpc.onboarding.editItemTitle.useMutation({
+    onSuccess: async () => { await onboardingQ.refetch(); setEditingItemId(null); setEditingItemName(""); },
+    onError: (e: any) => toast.error(e?.message || "Failed to edit item"),
+  });
+
+  const clientHistoryQ = trpc.accountManagement.getClientHistory.useQuery({ clientId: id }, { enabled: Number.isFinite(id) });
+
+  const [editingItemId, setEditingItemId] = React.useState<number | null>(null);
+  const [editingItemName, setEditingItemName] = React.useState("");
+
   // Add item dialog state
   const [newItemOpen, setNewItemOpen] = React.useState(false);
   const [newItemName, setNewItemName] = React.useState("");
@@ -764,10 +792,11 @@ export default function ClientProfile({ params }: RouteProps) {
         ) : (
           <Tabs defaultValue="overview" className="w-full">
             <div className="rounded-2xl border bg-card p-4 shadow-sm">
-              <TabsList className="grid w-full grid-cols-10 text-xs">
+              <TabsList className="grid w-full grid-cols-11 text-xs">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="handover-brief">Handover</TabsTrigger>
                 <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+                <TabsTrigger value="history">History</TabsTrigger>
                 <TabsTrigger value="contracts">Contracts</TabsTrigger>
                 <TabsTrigger value="followups">Follow-ups</TabsTrigger>
                 <TabsTrigger value="tasks">Tasks</TabsTrigger>
@@ -982,8 +1011,32 @@ export default function ClientProfile({ params }: RouteProps) {
             <TabsContent value="handover-brief" className="mt-4 space-y-4">
               <div className="rounded-2xl border bg-card p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold">Sales Handover Brief</h2>
-                  <div className="flex gap-2">
+                  <div>
+                    <h2 className="text-lg font-semibold">Sales Handover Brief</h2>
+                    {briefQ.data && (
+                      <div className="flex items-center gap-2 mt-1">
+                        {(briefQ.data as any).submittedByName && (
+                          <span className="text-xs text-muted-foreground">By: {(briefQ.data as any).submittedByName}</span>
+                        )}
+                        {(briefQ.data as any).updatedAt && (
+                          <span className="text-xs text-muted-foreground">· Updated: {new Date((briefQ.data as any).updatedAt).toLocaleDateString()}</span>
+                        )}
+                        {(() => {
+                          const bStatus = (client as any)?.briefStatus ?? (profileQ.data?.client as any)?.briefStatus;
+                          const statusMap: Record<string,string> = { Submitted:"bg-blue-100 text-blue-700", Reviewed:"bg-green-100 text-green-700", NeedsInfo:"bg-yellow-100 text-yellow-700", NotStarted:"bg-slate-100 text-slate-600" };
+                          const cls = statusMap[bStatus] ?? "bg-slate-100 text-slate-600";
+                          return bStatus ? <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{bStatus}</span> : null;
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 flex-wrap justify-end">
+                    {briefQ.data && !briefEditing && (["Admin","SalesManager","admin"] as string[]).includes(user?.role ?? "") && (
+                      <>
+                        <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50" onClick={() => updateBriefStatusM.mutate({ clientId: id, status: "Reviewed" })} disabled={updateBriefStatusM.isPending}>✓ Reviewed</Button>
+                        <Button size="sm" variant="outline" className="text-yellow-700 border-yellow-300 hover:bg-yellow-50" onClick={() => updateBriefStatusM.mutate({ clientId: id, status: "NeedsInfo" })} disabled={updateBriefStatusM.isPending}>⚠ Needs Info</Button>
+                      </>
+                    )}
                     {briefQ.data && !briefEditing && (
                       <Button size="sm" variant="outline" onClick={() => {
                         const b = briefQ.data as any;
@@ -997,7 +1050,12 @@ export default function ClientProfile({ params }: RouteProps) {
                           dataProvidedByClient: b.dataProvidedByClient || "", extraNotes: b.extraNotes || "",
                         });
                         setBriefEditing(true);
-                      }}>Edit Brief</Button>
+                      }}>Edit</Button>
+                    )}
+                    {briefQ.data && !briefEditing && (
+                      <Button size="sm" variant="destructive" onClick={() => { if (confirm("Clear the handover brief? This will be logged.")) deleteBriefM.mutate({ clientId: id }); }} disabled={deleteBriefM.isPending}>
+                        {deleteBriefM.isPending ? "Deleting..." : "Clear"}
+                      </Button>
                     )}
                     {!briefQ.data && (
                       <Button size="sm" onClick={() => setBriefEditing(true)}>Submit Brief</Button>
@@ -1229,6 +1287,68 @@ export default function ClientProfile({ params }: RouteProps) {
                         {addOnboardingItemM.isPending ? "Adding..." : "Add"}
                       </Button>
                     </div>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* ── Handover History Tab ── */}
+            <TabsContent value="history" className="mt-4 space-y-4">
+              <div className="rounded-2xl border bg-card p-6 shadow-sm">
+                <h2 className="text-lg font-semibold mb-4">Handover & Onboarding Audit Trail</h2>
+                {clientHistoryQ.isLoading ? (
+                  <div className="text-sm text-muted-foreground py-4 text-center">Loading history...</div>
+                ) : !clientHistoryQ.data || clientHistoryQ.data.length === 0 ? (
+                  <div className="text-sm text-muted-foreground py-8 text-center">No handover/onboarding events logged yet.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {clientHistoryQ.data.map((log: any) => {
+                      const actionColorMap: Record<string, string> = {
+                        HANDOVER_BRIEF_CREATED: "bg-blue-100 text-blue-700",
+                        HANDOVER_BRIEF_UPDATED: "bg-indigo-100 text-indigo-700",
+                        HANDOVER_BRIEF_DELETED: "bg-red-100 text-red-700",
+                        HANDOVER_BRIEF_REVIEWED: "bg-green-100 text-green-700",
+                        HANDOVER_BRIEF_NEEDS_INFO: "bg-yellow-100 text-yellow-700",
+                        CLIENT_ASSIGNED_TO_ACCOUNT_MANAGER: "bg-teal-100 text-teal-700",
+                        CLIENT_REASSIGNED_TO_ACCOUNT_MANAGER: "bg-cyan-100 text-cyan-700",
+                        CLIENT_HANDOVER_STATUS_CHANGED: "bg-purple-100 text-purple-700",
+                        CLIENT_BRIEF_STATUS_CHANGED: "bg-orange-100 text-orange-700",
+                        ONBOARDING_ITEM_ADDED: "bg-emerald-100 text-emerald-700",
+                        ONBOARDING_ITEM_UPDATED: "bg-slate-100 text-slate-700",
+                        ONBOARDING_ITEM_COMPLETED: "bg-green-100 text-green-700",
+                        ONBOARDING_ITEM_UNCOMPLETED: "bg-gray-100 text-gray-600",
+                        ONBOARDING_ITEM_DELETED: "bg-red-100 text-red-700",
+                      };
+                      const cls = actionColorMap[log.action] ?? "bg-slate-100 text-slate-700";
+                      return (
+                        <div key={log.id} className="flex items-start gap-3 p-3 rounded-xl border border-border/50 hover:bg-slate-50/50">
+                          <span className={`inline-flex shrink-0 px-2 py-0.5 rounded-md text-xs font-medium ${cls}`}>{log.action}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-medium">{log.userName ?? "Unknown"}</span>
+                              <span className="text-xs text-muted-foreground">({log.userRole})</span>
+                              <span className="text-xs text-muted-foreground ml-auto">{log.createdAt ? new Date(log.createdAt).toLocaleString() : ""}</span>
+                            </div>
+                            {log.details && typeof log.details === "object" && (
+                              <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                                {(log.details as any).changedFields?.length > 0 && (
+                                  <div>Fields changed: <strong>{(log.details as any).changedFields.join(", ")}</strong></div>
+                                )}
+                                {(log.details as any).oldStatus && (
+                                  <div>Status: <span className="line-through">{(log.details as any).oldStatus}</span> → <strong>{(log.details as any).newStatus}</strong></div>
+                                )}
+                                {(log.details as any).newAccountManagerId && (
+                                  <div>AM: <strong>ID {(log.details as any).newAccountManagerId}</strong>{(log.details as any).oldAccountManagerId ? ` (was: ID ${(log.details as any).oldAccountManagerId})` : ""}</div>
+                                )}
+                                {(log.details as any).itemName && (
+                                  <div>Item: <strong>{(log.details as any).itemName}</strong></div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -152,6 +152,10 @@ import {
   removeOnboardingItem,
   notifyAdminsOfHandoverBrief,
   getClientByLeadId,
+  deleteHandoverBrief,
+  updateBriefStatus,
+  editOnboardingItemTitle,
+  getClientHandoverHistory,
   listAllUsers,
   getAMDashboardStats,
   getAMLeadDashboardStats,
@@ -2537,10 +2541,33 @@ byLeadStageChanges: protectedProcedure
           signedContract: rest.signedContract ? 1 : 0,
           submittedByUserId: ctx.user.id,
           submittedByName: ctx.user.name ?? null,
-        } as any);
+        } as any, ctx.user.id, ctx.user.name ?? "Unknown", ctx.user.role);
         // Notify admins that brief is submitted
         notifyAdminsOfHandoverBrief(clientId).catch(e => console.error("[Brief] notify error:", e));
         return { id };
+      }),
+
+    deleteHandoverBrief: notMediaBuyerProcedure
+      .input(z.object({ clientId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await deleteHandoverBrief(input.clientId, ctx.user.id, ctx.user.name ?? "Unknown", ctx.user.role);
+        return { success: true };
+      }),
+
+    updateBriefStatus: adminProcedure
+      .input(z.object({
+        clientId: z.number(),
+        status: z.enum(["Reviewed", "NeedsInfo", "Submitted", "NotStarted"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await updateBriefStatus(input.clientId, input.status as any, ctx.user.id, ctx.user.name ?? "Unknown", ctx.user.role);
+        return { success: true };
+      }),
+
+    getClientHistory: accountManagerProcedure
+      .input(z.object({ clientId: z.number(), limit: z.number().optional() }))
+      .query(async ({ input }) => {
+        return getClientHandoverHistory(input.clientId, input.limit ?? 50);
       }),
 
     // ─── Assign Account Manager ────────────────────────────────────────
@@ -2550,7 +2577,7 @@ byLeadStageChanges: protectedProcedure
         accountManagerId: z.number(),
       }))
       .mutation(async ({ input, ctx }) => {
-        await assignAccountManagerToClient(input.clientId, input.accountManagerId);
+        await assignAccountManagerToClient(input.clientId, input.accountManagerId, ctx.user.id, ctx.user.name ?? "Unknown", ctx.user.role);
         // Notify the assigned AM
         try {
           await createInAppNotification({
@@ -2981,7 +3008,7 @@ byLeadStageChanges: protectedProcedure
             throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
           }
         }
-        await updateOnboardingItem(input.id, input.isChecked, input.notes);
+        await updateOnboardingItem(input.id, input.isChecked, input.notes, ctx.user.id, ctx.user.name ?? "Unknown", ctx.user.role);
         return { success: true };
       }),
 
@@ -3000,7 +3027,7 @@ byLeadStageChanges: protectedProcedure
             throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
           }
         }
-        const id = await addOnboardingItem(input.clientId, input.itemName, input.phase, input.phaseLabel, input.phaseOrder);
+        const id = await addOnboardingItem(input.clientId, input.itemName, input.phase, input.phaseLabel, input.phaseOrder, ctx.user.id, ctx.user.name ?? "Unknown", ctx.user.role);
         return { id };
       }),
 
@@ -3014,7 +3041,7 @@ byLeadStageChanges: protectedProcedure
             throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
           }
         }
-        await removeOnboardingItem(input.id);
+        await removeOnboardingItem(input.id, ctx.user.id, ctx.user.name ?? "Unknown", ctx.user.role);
         return { success: true };
       }),
 
@@ -3028,6 +3055,17 @@ byLeadStageChanges: protectedProcedure
           }
         }
         await createDefaultOnboardingItems(input.clientId);
+        return { success: true };
+      }),
+
+    editItemTitle: accountManagerProcedure
+      .input(z.object({
+        id: z.number(),
+        itemName: z.string().min(1),
+        notes: z.string().optional().nullable(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await editOnboardingItemTitle(input.id, input.itemName, input.notes, ctx.user.id, ctx.user.name ?? "Unknown", ctx.user.role);
         return { success: true };
       }),
   }),
