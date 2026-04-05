@@ -3146,6 +3146,19 @@ export async function assignAccountManagerToClient(clientId: number, accountMana
 }
 
 
+
+export async function getClientByLeadId(leadId: number): Promise<{ id: number; handoverStatus: string | null; briefStatus: string | null; accountManagerId: number | null } | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select({
+    id: clients.id,
+    handoverStatus: (clients as any).handoverStatus,
+    briefStatus: (clients as any).briefStatus,
+    accountManagerId: clients.accountManagerId,
+  }).from(clients).where(and(eq(clients.leadId, leadId), isNull(clients.deletedAt))).limit(1);
+  return rows[0] ?? null;
+}
+
 export async function notifyAdminsOfHandoverBrief(clientId: number): Promise<void> {
   const db = await getDb();
   if (!db) return;

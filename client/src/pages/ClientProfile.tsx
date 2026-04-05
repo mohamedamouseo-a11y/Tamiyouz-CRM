@@ -95,6 +95,7 @@ export default function ClientProfile({ params }: RouteProps) {
   const followUpsQ = trpc.followUps.list.useQuery({ clientId: id }, { enabled: Number.isFinite(id) });
   const tasksQ = trpc.clientTasks.list.useQuery({ clientId: id }, { enabled: Number.isFinite(id) });
   const onboardingQ = trpc.onboarding.getItems.useQuery({ clientId: id }, { enabled: Number.isFinite(id) });
+  const briefQ = trpc.accountManagement.getHandoverBrief.useQuery({ clientId: id }, { enabled: Number.isFinite(id) });
   const usersListQ = trpc.usersList.list.useQuery();
 
   // ─── Tamara ─────────────────────────────────────────────────────────────────
@@ -296,6 +297,53 @@ export default function ClientProfile({ params }: RouteProps) {
       await onboardingQ.refetch();
     },
   });
+
+  const initDefaultsM = trpc.onboarding.initializeDefaults.useMutation({
+    onSuccess: async () => { await onboardingQ.refetch(); toast.success("Default onboarding checklist created"); },
+    onError: (e: any) => toast.error(e?.message || "Failed to initialize"),
+  });
+
+  const updateItemWithNotesM = trpc.onboarding.updateItemWithNotes.useMutation({
+    onSuccess: async () => { await onboardingQ.refetch(); },
+  });
+
+  const addOnboardingItemM = trpc.onboarding.addItem.useMutation({
+    onSuccess: async () => { await onboardingQ.refetch(); setNewItemName(""); setNewItemOpen(false); },
+    onError: (e: any) => toast.error(e?.message || "Failed to add item"),
+  });
+
+  const removeOnboardingItemM = trpc.onboarding.removeItem.useMutation({
+    onSuccess: async () => { await onboardingQ.refetch(); },
+    onError: (e: any) => toast.error(e?.message || "Failed to remove item"),
+  });
+
+  // Handover brief form state
+  const [briefForm, setBriefForm] = React.useState({
+    companyName: "", contactPersonName: "", phoneOrWhatsapp: "", signedContract: false,
+    contractedServiceDetails: "", packageOrPrice: "", contractDuration: "", paymentStatus: "",
+    clientGoals: "", painPoints: "", expectations: "", salesPromises: "", dataProvidedByClient: "", extraNotes: "",
+  });
+  const [briefEditing, setBriefEditing] = React.useState(false);
+  const submitBriefM = trpc.accountManagement.submitHandoverBrief.useMutation({
+    onSuccess: async () => {
+      toast.success("Handover brief submitted successfully");
+      setBriefEditing(false);
+      await briefQ.refetch();
+      await profileQ.refetch();
+    },
+    onError: (e: any) => toast.error(e?.message || "Failed to submit brief"),
+  });
+
+  // Add item dialog state
+  const [newItemOpen, setNewItemOpen] = React.useState(false);
+  const [newItemName, setNewItemName] = React.useState("");
+  const [newItemPhase, setNewItemPhase] = React.useState(2);
+
+  // Phase labels
+  const phaseLabels: Record<number, string> = {
+    2: "Phase 2: Account Setup", 3: "Phase 3: Creative & Content",
+    4: "Phase 4: Campaign Launch", 5: "Phase 5: Reporting & Optimization", 6: "Phase 6: Account Review",
+  };
 
   // Phase 4+5 mutations
   const createObjectiveM = trpc.objectives.create.useMutation({ onSuccess: async () => { setObjectiveTitle(""); await objectivesQ.refetch(); } });
@@ -716,8 +764,10 @@ export default function ClientProfile({ params }: RouteProps) {
         ) : (
           <Tabs defaultValue="overview" className="w-full">
             <div className="rounded-2xl border bg-card p-4 shadow-sm">
-              <TabsList className="grid w-full grid-cols-9">
+              <TabsList className="grid w-full grid-cols-10 text-xs">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="handover-brief">Handover</TabsTrigger>
+                <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
                 <TabsTrigger value="contracts">Contracts</TabsTrigger>
                 <TabsTrigger value="followups">Follow-ups</TabsTrigger>
                 <TabsTrigger value="tasks">Tasks</TabsTrigger>
@@ -725,7 +775,6 @@ export default function ClientProfile({ params }: RouteProps) {
                 <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
                 <TabsTrigger value="upsell">Upsell</TabsTrigger>
                 <TabsTrigger value="communication">Communication</TabsTrigger>
-                <TabsTrigger value="onboarding" className="hidden">Onboarding</TabsTrigger>
               </TabsList>
             </div>
 
@@ -925,6 +974,262 @@ export default function ClientProfile({ params }: RouteProps) {
                       ))}
                     </div>
                   </>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* ── Handover Brief Tab ── */}
+            <TabsContent value="handover-brief" className="mt-4 space-y-4">
+              <div className="rounded-2xl border bg-card p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold">Sales Handover Brief</h2>
+                  <div className="flex gap-2">
+                    {briefQ.data && !briefEditing && (
+                      <Button size="sm" variant="outline" onClick={() => {
+                        const b = briefQ.data as any;
+                        setBriefForm({
+                          companyName: b.companyName || "", contactPersonName: b.contactPersonName || "",
+                          phoneOrWhatsapp: b.phoneOrWhatsapp || "", signedContract: !!b.signedContract,
+                          contractedServiceDetails: b.contractedServiceDetails || "", packageOrPrice: b.packageOrPrice || "",
+                          contractDuration: b.contractDuration || "", paymentStatus: b.paymentStatus || "",
+                          clientGoals: b.clientGoals || "", painPoints: b.painPoints || "",
+                          expectations: b.expectations || "", salesPromises: b.salesPromises || "",
+                          dataProvidedByClient: b.dataProvidedByClient || "", extraNotes: b.extraNotes || "",
+                        });
+                        setBriefEditing(true);
+                      }}>Edit Brief</Button>
+                    )}
+                    {!briefQ.data && (
+                      <Button size="sm" onClick={() => setBriefEditing(true)}>Submit Brief</Button>
+                    )}
+                  </div>
+                </div>
+
+                {briefEditing ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Company Name</Label>
+                        <Input value={briefForm.companyName} onChange={e => setBriefForm(s => ({ ...s, companyName: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Contact Person</Label>
+                        <Input value={briefForm.contactPersonName} onChange={e => setBriefForm(s => ({ ...s, contactPersonName: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Phone / WhatsApp</Label>
+                        <Input value={briefForm.phoneOrWhatsapp} onChange={e => setBriefForm(s => ({ ...s, phoneOrWhatsapp: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Package / Price</Label>
+                        <Input value={briefForm.packageOrPrice} onChange={e => setBriefForm(s => ({ ...s, packageOrPrice: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Contract Duration</Label>
+                        <Input value={briefForm.contractDuration} onChange={e => setBriefForm(s => ({ ...s, contractDuration: e.target.value }))} placeholder="e.g. 6 months" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Payment Status</Label>
+                        <Input value={briefForm.paymentStatus} onChange={e => setBriefForm(s => ({ ...s, paymentStatus: e.target.value }))} placeholder="e.g. Paid, Partial, Pending" />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Contracted Services</Label>
+                        <Textarea value={briefForm.contractedServiceDetails} onChange={e => setBriefForm(s => ({ ...s, contractedServiceDetails: e.target.value }))} rows={2} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" id="signedContract" checked={briefForm.signedContract} onChange={e => setBriefForm(s => ({ ...s, signedContract: e.target.checked }))} className="h-4 w-4 rounded" />
+                        <Label htmlFor="signedContract">Signed Contract Received</Label>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Client Goals</Label>
+                        <Textarea value={briefForm.clientGoals} onChange={e => setBriefForm(s => ({ ...s, clientGoals: e.target.value }))} rows={3} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Pain Points</Label>
+                        <Textarea value={briefForm.painPoints} onChange={e => setBriefForm(s => ({ ...s, painPoints: e.target.value }))} rows={3} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Client Expectations</Label>
+                        <Textarea value={briefForm.expectations} onChange={e => setBriefForm(s => ({ ...s, expectations: e.target.value }))} rows={3} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Sales Promises</Label>
+                        <Textarea value={briefForm.salesPromises} onChange={e => setBriefForm(s => ({ ...s, salesPromises: e.target.value }))} rows={3} />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Data Provided by Client</Label>
+                        <Textarea value={briefForm.dataProvidedByClient} onChange={e => setBriefForm(s => ({ ...s, dataProvidedByClient: e.target.value }))} rows={2} />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Extra Notes</Label>
+                        <Textarea value={briefForm.extraNotes} onChange={e => setBriefForm(s => ({ ...s, extraNotes: e.target.value }))} rows={2} />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button variant="outline" onClick={() => setBriefEditing(false)}>Cancel</Button>
+                      <Button
+                        disabled={submitBriefM.isPending}
+                        onClick={() => submitBriefM.mutate({ clientId: id, ...briefForm })}
+                      >
+                        {submitBriefM.isPending ? "Submitting..." : "Submit Brief"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : briefQ.data ? (
+                  <div className="space-y-4">
+                    {(briefQ.data as any).submittedByName && (
+                      <div className="text-sm text-muted-foreground">Submitted by: <strong>{(briefQ.data as any).submittedByName}</strong></div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[
+                        { label: "Company Name", key: "companyName" },
+                        { label: "Contact Person", key: "contactPersonName" },
+                        { label: "Phone / WhatsApp", key: "phoneOrWhatsapp" },
+                        { label: "Signed Contract", key: "signedContract" },
+                        { label: "Package / Price", key: "packageOrPrice" },
+                        { label: "Contract Duration", key: "contractDuration" },
+                        { label: "Payment Status", key: "paymentStatus" },
+                        { label: "Contracted Services", key: "contractedServiceDetails" },
+                        { label: "Client Goals", key: "clientGoals" },
+                        { label: "Pain Points", key: "painPoints" },
+                        { label: "Client Expectations", key: "expectations" },
+                        { label: "Sales Promises", key: "salesPromises" },
+                        { label: "Data Provided", key: "dataProvidedByClient" },
+                        { label: "Extra Notes", key: "extraNotes" },
+                      ].map(({ label, key }) => {
+                        const val = (briefQ.data as any)[key];
+                        if (!val && val !== 0) return null;
+                        return (
+                          <div key={key} className="space-y-1">
+                            <div className="text-xs font-medium text-muted-foreground">{label}</div>
+                            <div className="text-sm">{key === "signedContract" ? (val ? "✅ Yes" : "❌ No") : String(val)}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center text-sm text-muted-foreground py-8">
+                    No handover brief submitted yet. Sales team should submit the brief before onboarding begins.
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* ── Onboarding Tab (Phase 2-6) ── */}
+            <TabsContent value="onboarding" className="mt-4 space-y-4">
+              <div className="rounded-2xl border bg-card p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold">Onboarding Checklist</h2>
+                  <div className="flex gap-2">
+                    {onboardingItems.length === 0 && (
+                      <Button size="sm" onClick={() => initDefaultsM.mutate({ clientId: id })} disabled={initDefaultsM.isPending}>
+                        {initDefaultsM.isPending ? "Creating..." : "Create Default Checklist"}
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => setNewItemOpen(true)}>+ Add Item</Button>
+                  </div>
+                </div>
+
+                {/* Overall Progress */}
+                {onboardingTotal > 0 && (
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-medium">Overall Progress</span>
+                      <span className="text-muted-foreground">{onboardingChecked}/{onboardingTotal} ({onboardingPercent}%)</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-3">
+                      <div className="bg-emerald-500 h-3 rounded-full transition-all duration-300" style={{ width: `${onboardingPercent}%` }} />
+                    </div>
+                  </div>
+                )}
+
+                {onboardingItems.length === 0 ? (
+                  <div className="text-center text-sm text-muted-foreground py-8">
+                    No onboarding items yet. Click "Create Default Checklist" to start with the standard onboarding phases.
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {(() => {
+                      const grouped: Record<number, any[]> = {};
+                      for (const item of onboardingItems) {
+                        const ph = (item as any).phase ?? 1;
+                        if (!grouped[ph]) grouped[ph] = [];
+                        grouped[ph].push(item);
+                      }
+                      return Object.entries(grouped).sort(([a], [b]) => Number(a) - Number(b)).map(([phaseNum, items]) => {
+                        const ph = Number(phaseNum);
+                        const phLabel = (items[0] as any).phaseLabel || phaseLabels[ph] || `Phase ${ph}`;
+                        const phChecked = items.filter((i: any) => i.isChecked).length;
+                        const phTotal = items.length;
+                        const phPct = phTotal > 0 ? Math.round((phChecked / phTotal) * 100) : 0;
+                        return (
+                          <div key={ph} className="border border-border rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <h3 className="font-semibold text-sm">{phLabel}</h3>
+                              <span className="text-xs text-muted-foreground">{phChecked}/{phTotal}</span>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-1.5 mb-3">
+                              <div className="bg-teal-500 h-1.5 rounded-full transition-all" style={{ width: `${phPct}%` }} />
+                            </div>
+                            <div className="space-y-2">
+                              {items.map((item: any) => (
+                                <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 group">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!item.isChecked}
+                                    onChange={(e) => updateItemWithNotesM.mutate({ id: item.id, isChecked: e.target.checked })}
+                                    className="h-4 w-4 rounded border-slate-300 shrink-0"
+                                  />
+                                  <span className={`text-sm flex-1 ${item.isChecked ? "line-through text-muted-foreground" : ""}`}>
+                                    {item.itemName}
+                                  </span>
+                                  <button
+                                    className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs transition-opacity"
+                                    onClick={() => { if (confirm("Remove this item?")) removeOnboardingItemM.mutate({ id: item.id }); }}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
+
+                {/* Add Item Dialog */}
+                {newItemOpen && (
+                  <div className="mt-4 p-4 border border-dashed rounded-xl space-y-3">
+                    <h3 className="text-sm font-medium">Add New Checklist Item</h3>
+                    <select
+                      value={newItemPhase}
+                      onChange={e => setNewItemPhase(Number(e.target.value))}
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      {[2,3,4,5,6].map(p => <option key={p} value={p}>{phaseLabels[p]}</option>)}
+                    </select>
+                    <Input
+                      placeholder="Item name..."
+                      value={newItemName}
+                      onChange={e => setNewItemName(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && newItemName.trim()) { addOnboardingItemM.mutate({ clientId: id, itemName: newItemName.trim(), phase: newItemPhase, phaseLabel: phaseLabels[newItemPhase], phaseOrder: 99 }); } }}
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => { setNewItemOpen(false); setNewItemName(""); }}>Cancel</Button>
+                      <Button
+                        size="sm"
+                        disabled={!newItemName.trim() || addOnboardingItemM.isPending}
+                        onClick={() => addOnboardingItemM.mutate({ clientId: id, itemName: newItemName.trim(), phase: newItemPhase, phaseLabel: phaseLabels[newItemPhase], phaseOrder: 99 })}
+                      >
+                        {addOnboardingItemM.isPending ? "Adding..." : "Add"}
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
             </TabsContent>

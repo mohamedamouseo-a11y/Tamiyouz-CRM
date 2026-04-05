@@ -45,17 +45,38 @@ const renewalStatusColors: Record<string, string> = {
   Cancelled: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
 };
 
+const handoverStatusColors: Record<string, string> = {
+  AwaitingAssignment: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  AwaitingSalesBrief: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  BriefSubmitted: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  InOnboarding: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
+  ReadyForActivation: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+};
+
+const handoverStatusLabels: Record<string, string> = {
+  AwaitingAssignment: "Awaiting Assignment",
+  AwaitingSalesBrief: "Awaiting Brief",
+  BriefSubmitted: "Brief Submitted",
+  InOnboarding: "In Onboarding",
+  ReadyForActivation: "Ready for Activation",
+};
+
 export default function ClientPool() {
   const { t, isRTL } = useLanguage();
   const { user } = useAuth();
   const [search, setSearch] = useState(() => sessionStorage.getItem("clients_search") || "");
   const [planFilter, setPlanFilter] = useState<string>(() => sessionStorage.getItem("clients_planFilter") || "");
   const [renewalFilter, setRenewalFilter] = useState<string>(() => sessionStorage.getItem("clients_renewalFilter") || "");
+  const [handoverFilter, setHandoverFilter] = useState<string>(() => sessionStorage.getItem("clients_handoverFilter") || "");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [assignAMOpen, setAssignAMOpen] = useState(false);
+  const [assignAMClientId, setAssignAMClientId] = useState<number | null>(null);
+  const [assignAMSelectedId, setAssignAMSelectedId] = useState<string>("");
   // ── Persist filters to sessionStorage ──
   useEffect(() => { sessionStorage.setItem("clients_search", search); }, [search]);
   useEffect(() => { sessionStorage.setItem("clients_planFilter", planFilter); }, [planFilter]);
   useEffect(() => { sessionStorage.setItem("clients_renewalFilter", renewalFilter); }, [renewalFilter]);
+  useEffect(() => { sessionStorage.setItem("clients_handoverFilter", handoverFilter); }, [handoverFilter]);
 
   // Add Client dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -109,6 +130,7 @@ export default function ClientPool() {
     search: search || undefined,
     planStatus: planFilter || undefined,
     renewalStatus: renewalFilter || undefined,
+    handoverStatus: handoverFilter || undefined,
     limit: 50,
     offset: 0,
   });
@@ -127,6 +149,17 @@ export default function ClientPool() {
     onSuccess: async () => {
       await refetch();
     },
+  });
+
+  const assignAMM = trpc.accountManagement.assignAccountManager.useMutation({
+    onSuccess: async () => {
+      toast.success("Account Manager assigned successfully");
+      setAssignAMOpen(false);
+      setAssignAMClientId(null);
+      setAssignAMSelectedId("");
+      await refetch();
+    },
+    onError: (e: any) => toast.error(e?.message || "Failed to assign"),
   });
 
   const clients = data?.data ?? [];
@@ -421,6 +454,18 @@ export default function ClientPool() {
             <option value="Expired">{t("expired" as any)}</option>
             <option value="Cancelled">{t("cancelled" as any)}</option>
           </select>
+          <select
+            value={handoverFilter}
+            onChange={(e) => setHandoverFilter(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Handover: All</option>
+            <option value="AwaitingAssignment">Awaiting Assignment</option>
+            <option value="AwaitingSalesBrief">Awaiting Brief</option>
+            <option value="BriefSubmitted">Brief Submitted</option>
+            <option value="InOnboarding">In Onboarding</option>
+            <option value="ReadyForActivation">Ready for Activation</option>
+          </select>
         </div>
 
         {/* Client List */}
@@ -468,6 +513,11 @@ export default function ClientPool() {
                       {client.renewalStatus && client.renewalStatus !== "Pending" && (
                         <Badge className={cn("text-xs", renewalStatusColors[client.renewalStatus] || "")}>
                           {client.renewalStatus}
+                        </Badge>
+                      )}
+                      {client.handoverStatus && client.handoverStatus !== "ReadyForActivation" && (
+                        <Badge className={cn("text-xs", handoverStatusColors[client.handoverStatus] || "bg-gray-100 text-gray-800")}>
+                          {handoverStatusLabels[client.handoverStatus] || client.handoverStatus}
                         </Badge>
                       )}
                       {expandedId === client.id ? (
@@ -610,6 +660,22 @@ export default function ClientPool() {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
+                        {(user?.role === "Admin" || user?.role === "admin") && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1 text-orange-700 border-orange-300 hover:bg-orange-50"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAssignAMClientId(client.id);
+                              setAssignAMSelectedId(client.accountManagerId ? String(client.accountManagerId) : "");
+                              setAssignAMOpen(true);
+                            }}
+                          >
+                            <UserCheck className="w-3 h-3" />
+                            {client.accountManagerId ? "Reassign AM" : "Assign AM"}
+                          </Button>
+                        )}
                         <Link href={`/clients/${client.id}`}>
                           <Button variant="outline" size="sm" className="gap-1">
                             <FileText className="w-3 h-3" />
@@ -625,6 +691,42 @@ export default function ClientPool() {
           </div>
         )}
       </div>
+      {/* Assign Account Manager Dialog */}
+      <Dialog open={assignAMOpen} onOpenChange={setAssignAMOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Account Manager</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <Label>Select Account Manager</Label>
+            <select
+              value={assignAMSelectedId}
+              onChange={(e) => setAssignAMSelectedId(e.target.value)}
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">-- Select AM --</option>
+              {(managersQ.data ?? []).map((m: any) => (
+                <option key={m.id} value={String(m.id)}>
+                  {m.name} ({m.role})
+                </option>
+              ))}
+            </select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignAMOpen(false)}>Cancel</Button>
+            <Button
+              disabled={!assignAMSelectedId || assignAMM.isPending}
+              onClick={() => {
+                if (assignAMClientId && assignAMSelectedId) {
+                  assignAMM.mutate({ clientId: assignAMClientId, accountManagerId: Number(assignAMSelectedId) });
+                }
+              }}
+            >
+              {assignAMM.isPending ? "Assigning..." : "Assign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </CRMLayout>
   );
 }

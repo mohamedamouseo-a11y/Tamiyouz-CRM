@@ -151,6 +151,7 @@ import {
   addOnboardingItem,
   removeOnboardingItem,
   notifyAdminsOfHandoverBrief,
+  getClientByLeadId,
   listAllUsers,
   getAMDashboardStats,
   getAMLeadDashboardStats,
@@ -2423,6 +2424,12 @@ byLeadStageChanges: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         return getClientById(input.id);
+      }),
+
+    getClientByLeadId: protectedProcedure
+      .input(z.object({ leadId: z.number() }))
+      .query(async ({ input }) => {
+        return getClientByLeadId(input.leadId);
       }),
 
     getClientProfile: accountManagerProcedure
