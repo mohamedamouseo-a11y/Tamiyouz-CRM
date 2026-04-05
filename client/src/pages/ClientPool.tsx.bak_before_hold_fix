@@ -27,7 +27,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { Link } from "wouter";
 
 const planStatusColors: Record<string, string> = {
@@ -147,29 +146,24 @@ export default function ClientPool() {
   }
 
   async function submitAddClient() {
-    try {
-      await createClientM.mutateAsync({
-        businessProfile: addForm.businessProfile.trim() || undefined,
-        group: addForm.group.trim() || undefined,
-        competentPerson: addForm.competentPerson.trim() || undefined,
-        contactEmail: addForm.contactEmail.trim() || undefined,
-        contactPhone: addForm.contactPhone.trim() || undefined,
-        leadName: addForm.leadName.trim() || undefined,
-        phone: addForm.phone.trim() || undefined,
-        otherPhones: addForm.otherPhones.trim() || undefined,
-        planStatus: addForm.planStatus as any,
-        renewalStatus: addForm.renewalStatus as any,
-        accountManagerId: addForm.accountManagerId ? Number(addForm.accountManagerId) : null,
-        marketingObjective: addForm.marketingObjective.trim() || undefined,
-        servicesNeeded: addForm.servicesNeeded.length > 0 ? addForm.servicesNeeded.join(", ") : undefined,
-        socialMedia: addForm.socialMedia.trim() || undefined,
-        notes: addForm.notes.trim() || undefined,
-        contractLink: addForm.contractLink.trim() || undefined,
-      });
-      toast.success("Client created successfully");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to create client");
-    }
+    await createClientM.mutateAsync({
+      businessProfile: addForm.businessProfile.trim() || undefined,
+      group: addForm.group.trim() || undefined,
+      competentPerson: addForm.competentPerson.trim() || undefined,
+      contactEmail: addForm.contactEmail.trim() || undefined,
+      contactPhone: addForm.contactPhone.trim() || undefined,
+      leadName: addForm.leadName.trim() || undefined,
+      phone: addForm.phone.trim() || undefined,
+      otherPhones: addForm.otherPhones.trim() || undefined,
+      planStatus: addForm.planStatus as any,
+      renewalStatus: addForm.renewalStatus as any,
+      accountManagerId: addForm.accountManagerId ? Number(addForm.accountManagerId) : null,
+      marketingObjective: addForm.marketingObjective.trim() || undefined,
+      servicesNeeded: addForm.servicesNeeded.length > 0 ? addForm.servicesNeeded.join(", ") : undefined,
+      socialMedia: addForm.socialMedia.trim() || undefined,
+      notes: addForm.notes.trim() || undefined,
+      contractLink: addForm.contractLink.trim() || undefined,
+    });
   }
 
   return (
