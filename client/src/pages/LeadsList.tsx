@@ -360,6 +360,9 @@ export default function LeadsList() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  const [formPhoneRaw, setFormPhoneRaw] = useState("");
+  const [debouncedFormPhone, setDebouncedFormPhone] = useState("");
+
   // Debounce form phone conflict
   useEffect(() => {
     if (!formPhoneRaw) {
@@ -496,8 +499,6 @@ export default function LeadsList() {
   const [phoneError, setPhoneError] = useState(false);
   const [campaignError, setCampaignError] = useState(false);
   const [debouncedSearchPhone, setDebouncedSearchPhone] = useState("");
-  const [formPhoneRaw, setFormPhoneRaw] = useState("");
-  const [debouncedFormPhone, setDebouncedFormPhone] = useState("");
 
   const onSubmit = (formData: any) => {
     if (!phoneValid) {
