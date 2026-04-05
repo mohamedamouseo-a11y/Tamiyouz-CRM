@@ -3177,6 +3177,7 @@ export async function saveHandoverBrief(
   actorId: number = 0,
   actorName: string = "System",
   actorRole: string = "SalesAgent",
+  status: "Draft" | "Submitted" = "Submitted",
 ): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
@@ -3196,10 +3197,10 @@ export async function saveHandoverBrief(
   const oldBriefStatus = clientRow?.briefStatus ?? null;
   const oldHandoverStatus = clientRow?.handoverStatus ?? null;
 
-  await db.update(clients).set({ briefStatus: "Submitted" } as any).where(eq(clients.id, clientId));
+  await db.update(clients).set({ briefStatus: status } as any).where(eq(clients.id, clientId));
 
-  // Update handoverStatus if still AwaitingSalesBrief
-  if (oldHandoverStatus === "AwaitingSalesBrief") {
+  // Update handoverStatus if still AwaitingSalesBrief (only on full submit, not draft)
+  if (status === "Submitted" && oldHandoverStatus === "AwaitingSalesBrief") {
     await db.update(clients).set({ handoverStatus: "BriefSubmitted" } as any).where(eq(clients.id, clientId));
   }
 
@@ -3224,7 +3225,7 @@ export async function saveHandoverBrief(
   });
 
   // Audit: briefStatus change
-  if (oldBriefStatus !== "Submitted") {
+  if (oldBriefStatus !== status) {
     await createAuditLog({
       userId: actorId,
       userName: actorName,
@@ -3233,9 +3234,9 @@ export async function saveHandoverBrief(
       entityType: "client_status",
       entityId: clientId,
       entityName: `Client #${clientId}`,
-      details: { clientId, oldStatus: oldBriefStatus, newStatus: "Submitted" },
+      details: { clientId, oldStatus: oldBriefStatus, newStatus: status },
       previousValue: { briefStatus: oldBriefStatus },
-      newValue: { briefStatus: "Submitted" },
+      newValue: { briefStatus: status },
     });
   }
 

@@ -2519,6 +2519,7 @@ byLeadStageChanges: protectedProcedure
     submitHandoverBrief: notMediaBuyerProcedure
       .input(z.object({
         clientId: z.number(),
+        isDraft: z.boolean().optional(),
         companyName: z.string().optional(),
         contactPersonName: z.string().optional(),
         phoneOrWhatsapp: z.string().optional(),
@@ -2535,15 +2536,16 @@ byLeadStageChanges: protectedProcedure
         extraNotes: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const { clientId, ...rest } = input;
+        const { clientId, isDraft, ...rest } = input;
+        const briefStatus = isDraft ? "Draft" : "Submitted";
         const id = await saveHandoverBrief(clientId, {
           ...rest,
           signedContract: rest.signedContract ? 1 : 0,
           submittedByUserId: ctx.user.id,
           submittedByName: ctx.user.name ?? null,
-        } as any, ctx.user.id, ctx.user.name ?? "Unknown", ctx.user.role);
-        // Notify admins that brief is submitted
-        notifyAdminsOfHandoverBrief(clientId).catch(e => console.error("[Brief] notify error:", e));
+        } as any, ctx.user.id, ctx.user.name ?? "Unknown", ctx.user.role, briefStatus);
+        // Notify admins only on full submission (not draft)
+        if (!isDraft) notifyAdminsOfHandoverBrief(clientId).catch(e => console.error("[Brief] notify error:", e));
         return { id };
       }),
 

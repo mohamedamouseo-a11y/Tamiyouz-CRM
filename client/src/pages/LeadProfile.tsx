@@ -340,6 +340,10 @@ export default function LeadProfile() {
   const { data: activities, refetch: refetchActivities } = trpc.activities.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const { data: deal, refetch: refetchDeal } = trpc.deals.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const clientByLeadQ = trpc.accountManagement.getClientByLeadId.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
+  const briefQ = trpc.accountManagement.getHandoverBrief.useQuery(
+    { clientId: clientByLeadQ.data?.id ?? 0 },
+    { enabled: !!clientByLeadQ.data?.id },
+  );
   const { data: stages } = trpc.pipeline.list.useQuery();
   const { data: campaigns } = trpc.campaigns.list.useQuery();
   const { data: allUsers } = trpc.users.list.useQuery();
@@ -429,9 +433,36 @@ export default function LeadProfile() {
     onError: (e) => toast.error(e.message),
   });
 
+  // Pre-populate form from existing brief when dialog opens
+  React.useEffect(() => {
+    if (briefDialogOpen && briefQ.data) {
+      const b = briefQ.data as any;
+      setLeadBriefForm({
+        companyName: b.companyName ?? "",
+        contactPersonName: b.contactPersonName ?? "",
+        phoneOrWhatsapp: b.phoneOrWhatsapp ?? "",
+        signedContract: !!b.signedContract,
+        contractedServiceDetails: b.contractedServiceDetails ?? "",
+        packageOrPrice: b.packageOrPrice ?? "",
+        contractDuration: b.contractDuration ?? "",
+        paymentStatus: b.paymentStatus ?? "",
+        clientGoals: b.clientGoals ?? "",
+        painPoints: b.painPoints ?? "",
+        expectations: b.expectations ?? "",
+        salesPromises: b.salesPromises ?? "",
+        dataProvidedByClient: b.dataProvidedByClient ?? "",
+        extraNotes: b.extraNotes ?? "",
+      });
+    } else if (!briefDialogOpen) {
+      // Reset form when closed only if no brief data (fresh start)
+      if (!briefQ.data) setLeadBriefForm({ companyName: "", contactPersonName: "", phoneOrWhatsapp: "", signedContract: false, contractedServiceDetails: "", packageOrPrice: "", contractDuration: "", paymentStatus: "", clientGoals: "", painPoints: "", expectations: "", salesPromises: "", dataProvidedByClient: "", extraNotes: "" });
+    }
+  }, [briefDialogOpen, briefQ.data]);
+
   const submitLeadBriefM = trpc.accountManagement.submitHandoverBrief.useMutation({
     onSuccess: () => {
-      toast.success(isRTL ? "تم تقديم ملخص التسليم بنجاح" : "Handover brief submitted successfully");
+      toast.success(isRTL ? "تم حفظ ملخص التسليم بنجاح" : "Handover brief saved successfully");
+      briefQ.refetch();
       setBriefDialogOpen(false);
     },
     onError: (e: any) => toast.error(e?.message || "Failed to submit brief"),
@@ -1490,12 +1521,35 @@ export default function LeadProfile() {
                           <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
                             {isRTL ? "🎉 تم الفوز بهذه الصفقة!" : "🎉 Deal Won! Client is in the pool."}
                           </p>
+                          {/* Brief status badge */}
+                          {(() => {
+                            const bStatus = (clientByLeadQ.data as any)?.briefStatus ?? "NotStarted";
+                            const statusCfg: Record<string, { label: string; labelAr: string; cls: string }> = {
+                              NotStarted: { label: "Not Started", labelAr: "لم يبدأ", cls: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
+                              Draft: { label: "Draft", labelAr: "مسودة", cls: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
+                              Submitted: { label: "Submitted", labelAr: "مُقدَّم", cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+                              Reviewed: { label: "Reviewed", labelAr: "تمت المراجعة", cls: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+                              NeedsInfo: { label: "Needs Info", labelAr: "يحتاج معلومات", cls: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },
+                            };
+                            const cfg = statusCfg[bStatus] ?? statusCfg.NotStarted;
+                            return (
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">{isRTL ? "ملخص التسليم:" : "Handover Brief:"}</span>
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cfg.cls}`}>{isRTL ? cfg.labelAr : cfg.label}</span>
+                              </div>
+                            );
+                          })()}
                           <Button
                             size="sm"
                             className="w-full h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
                             onClick={() => setBriefDialogOpen(true)}
                           >
-                            {isRTL ? "تقديم ملخص التسليم" : "Submit Handover Brief"}
+                            {(() => {
+                              const bStatus = (clientByLeadQ.data as any)?.briefStatus ?? "NotStarted";
+                              if (bStatus === "NotStarted") return isRTL ? "تقديم ملخص التسليم" : "Fill Handover Brief";
+                              if (bStatus === "Draft") return isRTL ? "إكمال المسودة" : "Complete Draft Brief";
+                              return isRTL ? "تعديل ملخص التسليم" : "Edit Handover Brief";
+                            })()}
                           </Button>
                           <a href={`/clients/${clientByLeadQ.data.id}?tab=handover-brief`} className="block text-center text-xs text-emerald-600 hover:underline">
                             {isRTL ? "عرض ملف العميل" : "View Client Profile →"}
@@ -2108,7 +2162,24 @@ export default function LeadProfile() {
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">{isRTL ? "ملخص التسليم" : "Sales Handover Brief"}</h2>
+                <div>
+                  <h2 className="text-lg font-semibold">{isRTL ? "ملخص التسليم" : "Sales Handover Brief"}</h2>
+                  {clientByLeadQ.data && (() => {
+                    const bStatus = (clientByLeadQ.data as any)?.briefStatus ?? "NotStarted";
+                    const labels: Record<string, [string, string]> = {
+                      NotStarted: ["Not Started", "لم يبدأ"], Draft: ["Draft", "مسودة"],
+                      Submitted: ["Submitted", "مُقدَّم"], Reviewed: ["Reviewed", "تمت المراجعة"],
+                      NeedsInfo: ["Needs Info", "يحتاج معلومات"],
+                    };
+                    const clsMap: Record<string, string> = {
+                      NotStarted: "bg-gray-100 text-gray-600", Draft: "bg-yellow-100 text-yellow-700",
+                      Submitted: "bg-blue-100 text-blue-700", Reviewed: "bg-green-100 text-green-700",
+                      NeedsInfo: "bg-orange-100 text-orange-700",
+                    };
+                    const [en, ar] = labels[bStatus] ?? labels.NotStarted;
+                    return <span className={`text-xs font-medium px-2 py-0.5 rounded-full mt-1 inline-block ${clsMap[bStatus] ?? clsMap.NotStarted}`}>{isRTL ? ar : en}</span>;
+                  })()}
+                </div>
                 <button onClick={() => setBriefDialogOpen(false)} className="text-muted-foreground hover:text-foreground">✕</button>
               </div>
             </div>
@@ -2180,14 +2251,25 @@ export default function LeadProfile() {
               </button>
               <button
                 disabled={submitLeadBriefM.isPending || !clientByLeadQ.data?.id}
-                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-50"
+                className="px-4 py-2 rounded-lg border text-sm hover:bg-muted disabled:opacity-50"
                 onClick={() => {
                   if (clientByLeadQ.data?.id) {
-                    submitLeadBriefM.mutate({ clientId: clientByLeadQ.data.id, ...leadBriefForm });
+                    submitLeadBriefM.mutate({ clientId: clientByLeadQ.data.id, isDraft: true, ...leadBriefForm });
                   }
                 }}
               >
-                {submitLeadBriefM.isPending ? (isRTL ? "جارٍ التقديم..." : "Submitting...") : (isRTL ? "تقديم الملخص" : "Submit Brief")}
+                {submitLeadBriefM.isPending ? "..." : (isRTL ? "حفظ مسودة" : "Save Draft")}
+              </button>
+              <button
+                disabled={submitLeadBriefM.isPending || !clientByLeadQ.data?.id}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-50"
+                onClick={() => {
+                  if (clientByLeadQ.data?.id) {
+                    submitLeadBriefM.mutate({ clientId: clientByLeadQ.data.id, isDraft: false, ...leadBriefForm });
+                  }
+                }}
+              >
+                {submitLeadBriefM.isPending ? (isRTL ? "جارٍ الحفظ..." : "Saving...") : (isRTL ? "تقديم الملخص" : "Submit Brief")}
               </button>
             </div>
           </div>
