@@ -323,6 +323,12 @@ export default function LeadProfile() {
 
   const [composerMode, setComposerMode] = useState<"note" | "activity">("note");
   const [dealOpen, setDealOpen] = useState(true);
+  const [briefDialogOpen, setBriefDialogOpen] = useState(false);
+  const [leadBriefForm, setLeadBriefForm] = useState({
+    companyName: "", contactPersonName: "", phoneOrWhatsapp: "", signedContract: false,
+    contractedServiceDetails: "", packageOrPrice: "", contractDuration: "", paymentStatus: "",
+    clientGoals: "", painPoints: "", expectations: "", salesPromises: "", dataProvidedByClient: "", extraNotes: "",
+  });
   const [teamOpen, setTeamOpen] = useState(true);
   const [remindersOpen, setRemindersOpen] = useState(true);
   const [attachmentsOpen, setAttachmentsOpen] = useState(true);
@@ -333,6 +339,7 @@ export default function LeadProfile() {
   const { data: lead, isLoading, refetch } = trpc.leads.byId.useQuery({ id: leadId }, { enabled: Number.isFinite(leadId) });
   const { data: activities, refetch: refetchActivities } = trpc.activities.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const { data: deal, refetch: refetchDeal } = trpc.deals.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
+  const clientByLeadQ = trpc.accountManagement.getClientByLeadId.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const { data: stages } = trpc.pipeline.list.useQuery();
   const { data: campaigns } = trpc.campaigns.list.useQuery();
   const { data: allUsers } = trpc.users.list.useQuery();
@@ -420,6 +427,14 @@ export default function LeadProfile() {
       refetchDeal();
     },
     onError: (e) => toast.error(e.message),
+  });
+
+  const submitLeadBriefM = trpc.accountManagement.submitHandoverBrief.useMutation({
+    onSuccess: () => {
+      toast.success(isRTL ? "تم تقديم ملخص التسليم بنجاح" : "Handover brief submitted successfully");
+      setBriefDialogOpen(false);
+    },
+    onError: (e: any) => toast.error(e?.message || "Failed to submit brief"),
   });
 
   const tamaraCheckout = trpc.tamara.createCheckout.useMutation({
@@ -1470,6 +1485,23 @@ export default function LeadProfile() {
                         </Button>
                       )}
 
+                      {deal.status === "Won" && clientByLeadQ.data && (
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800 p-3 space-y-2">
+                          <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                            {isRTL ? "🎉 تم الفوز بهذه الصفقة!" : "🎉 Deal Won! Client is in the pool."}
+                          </p>
+                          <Button
+                            size="sm"
+                            className="w-full h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                            onClick={() => setBriefDialogOpen(true)}
+                          >
+                            {isRTL ? "تقديم ملخص التسليم" : "Submit Handover Brief"}
+                          </Button>
+                          <a href={`/clients/${clientByLeadQ.data.id}?tab=handover-brief`} className="block text-center text-xs text-emerald-600 hover:underline">
+                            {isRTL ? "عرض ملف العميل" : "View Client Profile →"}
+                          </a>
+                        </div>
+                      )}
                       {canEdit && deal.status !== "Won" && (
                         <Button
                           size="sm"
@@ -2069,7 +2101,99 @@ export default function LeadProfile() {
           )}
         </DialogContent>
       </Dialog>
-    </CRMLayout>
+    
+      {/* ── Handover Brief Dialog (from LeadProfile) ── */}
+      {briefDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">{isRTL ? "ملخص التسليم" : "Sales Handover Brief"}</h2>
+                <button onClick={() => setBriefDialogOpen(false)} className="text-muted-foreground hover:text-foreground">✕</button>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "اسم الشركة" : "Company Name"}</label>
+                  <input className="w-full h-9 rounded-md border px-3 text-sm bg-background" value={leadBriefForm.companyName} onChange={e => setLeadBriefForm(s => ({ ...s, companyName: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "شخص التواصل" : "Contact Person"}</label>
+                  <input className="w-full h-9 rounded-md border px-3 text-sm bg-background" value={leadBriefForm.contactPersonName} onChange={e => setLeadBriefForm(s => ({ ...s, contactPersonName: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "الهاتف / واتساب" : "Phone / WhatsApp"}</label>
+                  <input className="w-full h-9 rounded-md border px-3 text-sm bg-background" value={leadBriefForm.phoneOrWhatsapp} onChange={e => setLeadBriefForm(s => ({ ...s, phoneOrWhatsapp: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "الباقة / السعر" : "Package / Price"}</label>
+                  <input className="w-full h-9 rounded-md border px-3 text-sm bg-background" value={leadBriefForm.packageOrPrice} onChange={e => setLeadBriefForm(s => ({ ...s, packageOrPrice: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "مدة العقد" : "Contract Duration"}</label>
+                  <input className="w-full h-9 rounded-md border px-3 text-sm bg-background" value={leadBriefForm.contractDuration} onChange={e => setLeadBriefForm(s => ({ ...s, contractDuration: e.target.value }))} placeholder="e.g. 6 months" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "حالة الدفع" : "Payment Status"}</label>
+                  <input className="w-full h-9 rounded-md border px-3 text-sm bg-background" value={leadBriefForm.paymentStatus} onChange={e => setLeadBriefForm(s => ({ ...s, paymentStatus: e.target.value }))} />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "تفاصيل الخدمات المتعاقد عليها" : "Contracted Services"}</label>
+                  <textarea className="w-full rounded-md border px-3 py-2 text-sm bg-background" rows={2} value={leadBriefForm.contractedServiceDetails} onChange={e => setLeadBriefForm(s => ({ ...s, contractedServiceDetails: e.target.value }))} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="lp-signedContract" checked={leadBriefForm.signedContract} onChange={e => setLeadBriefForm(s => ({ ...s, signedContract: e.target.checked }))} className="h-4 w-4 rounded" />
+                  <label htmlFor="lp-signedContract" className="text-sm">{isRTL ? "تم استلام العقد الموقع" : "Signed Contract Received"}</label>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "أهداف العميل" : "Client Goals"}</label>
+                  <textarea className="w-full rounded-md border px-3 py-2 text-sm bg-background" rows={3} value={leadBriefForm.clientGoals} onChange={e => setLeadBriefForm(s => ({ ...s, clientGoals: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "نقاط الألم" : "Pain Points"}</label>
+                  <textarea className="w-full rounded-md border px-3 py-2 text-sm bg-background" rows={3} value={leadBriefForm.painPoints} onChange={e => setLeadBriefForm(s => ({ ...s, painPoints: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "توقعات العميل" : "Expectations"}</label>
+                  <textarea className="w-full rounded-md border px-3 py-2 text-sm bg-background" rows={3} value={leadBriefForm.expectations} onChange={e => setLeadBriefForm(s => ({ ...s, expectations: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "وعود المبيعات" : "Sales Promises"}</label>
+                  <textarea className="w-full rounded-md border px-3 py-2 text-sm bg-background" rows={3} value={leadBriefForm.salesPromises} onChange={e => setLeadBriefForm(s => ({ ...s, salesPromises: e.target.value }))} />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "البيانات المقدمة من العميل" : "Data Provided by Client"}</label>
+                  <textarea className="w-full rounded-md border px-3 py-2 text-sm bg-background" rows={2} value={leadBriefForm.dataProvidedByClient} onChange={e => setLeadBriefForm(s => ({ ...s, dataProvidedByClient: e.target.value }))} />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">{isRTL ? "ملاحظات إضافية" : "Extra Notes"}</label>
+                  <textarea className="w-full rounded-md border px-3 py-2 text-sm bg-background" rows={2} value={leadBriefForm.extraNotes} onChange={e => setLeadBriefForm(s => ({ ...s, extraNotes: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t flex gap-2 justify-end">
+              <button className="px-4 py-2 rounded-lg border text-sm hover:bg-muted" onClick={() => setBriefDialogOpen(false)}>
+                {isRTL ? "إلغاء" : "Cancel"}
+              </button>
+              <button
+                disabled={submitLeadBriefM.isPending || !clientByLeadQ.data?.id}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-50"
+                onClick={() => {
+                  if (clientByLeadQ.data?.id) {
+                    submitLeadBriefM.mutate({ clientId: clientByLeadQ.data.id, ...leadBriefForm });
+                  }
+                }}
+              >
+                {submitLeadBriefM.isPending ? (isRTL ? "جارٍ التقديم..." : "Submitting...") : (isRTL ? "تقديم الملخص" : "Submit Brief")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+</CRMLayout>
   );
 }
 
