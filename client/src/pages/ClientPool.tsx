@@ -78,6 +78,13 @@ export default function ClientPool() {
     contractLink: "",
   });
 
+  // Auto-set accountManagerId to the logged-in user if they are an AccountManager
+  useEffect(() => {
+    if (user && (user.role === "AccountManager" || user.role === "AccountManagerLead")) {
+      setAddForm((s) => ({ ...s, accountManagerId: String(user.id) }));
+    }
+  }, [user]);
+
   const SERVICE_OPTIONS = [
     "Social Media Management",
     "SEO",
@@ -137,7 +144,7 @@ export default function ClientPool() {
       otherPhones: "",
       planStatus: "Active",
       renewalStatus: "Pending",
-      accountManagerId: "",
+      accountManagerId: user && (user.role === "AccountManager" || user.role === "AccountManagerLead") ? String(user.id) : "",
       marketingObjective: "",
       servicesNeeded: [] as string[],
       socialMedia: "",
