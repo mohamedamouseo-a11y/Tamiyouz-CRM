@@ -60,7 +60,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Link, useLocation, useParams } from "wouter";
@@ -434,7 +434,7 @@ export default function LeadProfile() {
   });
 
   // Pre-populate form from existing brief when dialog opens
-  React.useEffect(() => {
+  useEffect(() => {
     if (briefDialogOpen && briefQ.data) {
       const b = briefQ.data as any;
       setLeadBriefForm({
