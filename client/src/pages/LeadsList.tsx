@@ -460,6 +460,8 @@ export default function LeadsList() {
     onError: (e) => toast.error(e.message),
   });
 
+  const [debouncedSearchPhone, setDebouncedSearchPhone] = useState("");
+
   const { data: searchPhoneConflict } = trpc.leads.checkPhoneConflict.useQuery(
     { phone: debouncedSearchPhone },
     { enabled: !!debouncedSearchPhone }
@@ -498,7 +500,6 @@ export default function LeadsList() {
   const [phoneValid, setPhoneValid] = useState(false);
   const [phoneError, setPhoneError] = useState(false);
   const [campaignError, setCampaignError] = useState(false);
-  const [debouncedSearchPhone, setDebouncedSearchPhone] = useState("");
 
   const onSubmit = (formData: any) => {
     if (!phoneValid) {
