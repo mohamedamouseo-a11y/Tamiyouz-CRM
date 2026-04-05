@@ -187,6 +187,7 @@ export const deals = mysqlTable("deals", {
 	dealType: mysqlEnum(['New','Contract','Renewal','Upsell']).default('New'),
 	lossReason: text(),
 	notes: text(),
+	dealDuration: int(),
 
 	createdAt: timestamp({ mode: 'string' }).default(sql`(now())`).notNull(),
 	updatedAt: timestamp({ mode: 'string' }).default(sql`(now())`).onUpdateNow().notNull(),
