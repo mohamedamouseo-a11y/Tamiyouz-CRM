@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Phone, Mail, MessageCircle, Users, CheckCircle, Clock, GripVertical, Loader2, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 function toDateInput(value: unknown) {
   if (!value) return "";
@@ -89,6 +90,7 @@ type RouteProps = { params: { id: string } };
 
 export default function ClientProfile({ params }: RouteProps) {
   const id = Number(params.id);
+  const { user } = useAuth();
 
   const managersQ = trpc.accountManagement.listAccountManagers.useQuery();
   const clientQ = trpc.accountManagement.getClientProfile.useQuery({ id }, { enabled: Number.isFinite(id) });
@@ -329,7 +331,7 @@ export default function ClientProfile({ params }: RouteProps) {
       toast.success("Handover brief submitted successfully");
       setBriefEditing(false);
       await briefQ.refetch();
-      await profileQ.refetch();
+      await clientQ.refetch();
     },
     onError: (e: any) => toast.error(e?.message || "Failed to submit brief"),
   });
@@ -338,7 +340,7 @@ export default function ClientProfile({ params }: RouteProps) {
     onSuccess: async () => {
       toast.success("Brief cleared");
       await briefQ.refetch();
-      await profileQ.refetch();
+      await clientQ.refetch();
     },
     onError: (e: any) => toast.error(e?.message || "Failed to delete brief"),
   });
@@ -347,7 +349,7 @@ export default function ClientProfile({ params }: RouteProps) {
     onSuccess: async () => {
       toast.success("Brief status updated");
       await briefQ.refetch();
-      await profileQ.refetch();
+      await clientQ.refetch();
     },
     onError: (e: any) => toast.error(e?.message || "Failed to update status"),
   });
@@ -1022,7 +1024,7 @@ export default function ClientProfile({ params }: RouteProps) {
                           <span className="text-xs text-muted-foreground">· Updated: {new Date((briefQ.data as any).updatedAt).toLocaleDateString()}</span>
                         )}
                         {(() => {
-                          const bStatus = (client as any)?.briefStatus ?? (profileQ.data?.client as any)?.briefStatus;
+                          const bStatus = (client as any)?.briefStatus;
                           const statusMap: Record<string,string> = { Submitted:"bg-blue-100 text-blue-700", Reviewed:"bg-green-100 text-green-700", NeedsInfo:"bg-yellow-100 text-yellow-700", NotStarted:"bg-slate-100 text-slate-600" };
                           const cls = statusMap[bStatus] ?? "bg-slate-100 text-slate-600";
                           return bStatus ? <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{bStatus}</span> : null;
