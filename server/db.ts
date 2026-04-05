@@ -2400,6 +2400,7 @@ export async function markAllNotificationsRead(userId: number): Promise<void> {
 export async function getClients(filters: {
   planStatus?: string;
   renewalStatus?: string;
+  handoverStatus?: string;
   accountManagerId?: number;
   search?: string;
   limit?: number;
@@ -2414,6 +2415,7 @@ export async function getClients(filters: {
 
   if (filters.planStatus) conditions.push(eq(clients.planStatus, filters.planStatus as any));
   if (filters.renewalStatus) conditions.push(eq(clients.renewalStatus, filters.renewalStatus as any));
+  if (filters.handoverStatus) conditions.push(eq((clients as any).handoverStatus, filters.handoverStatus));
   if (filters.accountManagerId) conditions.push(eq(clients.accountManagerId, filters.accountManagerId));
   if (filters.search) conditions.push(like(clients.businessProfile, `%${filters.search}%`));
 
@@ -2450,6 +2452,8 @@ export async function getClients(filters: {
       updatedAt: clients.updatedAt,
       healthScore: clients.healthScore,
       accountManagerName: users.name,
+      handoverStatus: (clients as any).handoverStatus,
+      briefStatus: (clients as any).briefStatus,
     }).from(clients)
       .leftJoin(users, eq(clients.accountManagerId, users.id))
       .where(whereClause)
@@ -3043,7 +3047,7 @@ export async function saveHandoverBrief(clientId: number, data: Omit<InsertClien
   // Update briefStatus on client
   await db.update(clients).set({ briefStatus: "Submitted" } as any).where(eq(clients.id, clientId));
   // Update handoverStatus if still AwaitingSalesBrief
-  const clientRow = await db.select({ handoverStatus: (clients as any).handoverStatus }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  const clientRow = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
   if ((clientRow[0] as any)?.handoverStatus === "AwaitingSalesBrief") {
     await db.update(clients).set({ handoverStatus: "BriefSubmitted" } as any).where(eq(clients.id, clientId));
   }
@@ -3138,12 +3142,26 @@ export async function assignAccountManagerToClient(clientId: number, accountMana
   // Create default onboarding items if none exist
   await createDefaultOnboardingItems(clientId);
   // Update handoverStatus to AwaitingSalesBrief only if it is AwaitingAssignment
-  const clientRow = await db.select({ handoverStatus: (clients as any).handoverStatus }).from(clients).where(eq(clients.id, clientId)).limit(1);
-  // If brief not yet submitted, set to AwaitingSalesBrief
-  const hs = (clientRow[0] as any)?.handoverStatus;
-  if (hs === "AwaitingAssignment" || hs === "BriefSubmitted") {
-    // Keep InOnboarding (set above)
-  }
+  // clientRow select for reference (removed unnecessary check)
+}
+
+
+export async function notifyAdminsOfHandoverBrief(clientId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const admins = await db.select({ id: users.id }).from(users)
+    .where(and(eq(users.role, "Admin" as any), eq(users.isActive, true), isNull(users.deletedAt)));
+  if (admins.length === 0) return;
+  await createBulkInAppNotifications(admins.map(a => ({
+    userId: a.id,
+    type: "system" as any,
+    title: "Handover Brief Submitted",
+    titleAr: "تم تقديم ملخص التسليم",
+    body: `Sales team submitted a handover brief for client #${clientId}.`,
+    bodyAr: `قدّم فريق المبيعات ملخص التسليم للعميل #${clientId}.`,
+    link: `/clients/${clientId}`,
+    isRead: 0 as any,
+  })));
 }
 
 export async function listAllUsers() {

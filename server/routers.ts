@@ -144,6 +144,13 @@ import {
   getOnboardingItemMeta,
   updateOnboardingItem,
   initializeOnboarding,
+  getHandoverBrief,
+  saveHandoverBrief,
+  assignAccountManagerToClient,
+  createDefaultOnboardingItems,
+  addOnboardingItem,
+  removeOnboardingItem,
+  notifyAdminsOfHandoverBrief,
   listAllUsers,
   getAMDashboardStats,
   getAMLeadDashboardStats,
@@ -2398,6 +2405,7 @@ byLeadStageChanges: protectedProcedure
       .input(z.object({
         planStatus: z.string().optional(),
         renewalStatus: z.string().optional(),
+        handoverStatus: z.string().optional(),
         accountManagerId: z.number().optional(),
         search: z.string().optional(),
         limit: z.number().default(50),
@@ -2474,6 +2482,8 @@ byLeadStageChanges: protectedProcedure
         socialMedia: z.string().optional(),
         feedback: z.string().optional(),
         notes: z.string().optional(),
+        handoverStatus: z.enum(["AwaitingAssignment","AwaitingSalesBrief","BriefSubmitted","InOnboarding","ReadyForActivation"]).optional(),
+        briefStatus: z.enum(["NotStarted","Draft","Submitted","Reviewed","NeedsInfo"]).optional(),
       }))
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
@@ -2485,6 +2495,68 @@ byLeadStageChanges: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await deleteClient(input.id, ctx.user.id);
+        return { success: true };
+      }),
+
+    // ─── Handover Brief ────────────────────────────────────────────────
+    getHandoverBrief: protectedProcedure
+      .input(z.object({ clientId: z.number() }))
+      .query(async ({ input }) => {
+        return getHandoverBrief(input.clientId);
+      }),
+
+    submitHandoverBrief: notMediaBuyerProcedure
+      .input(z.object({
+        clientId: z.number(),
+        companyName: z.string().optional(),
+        contactPersonName: z.string().optional(),
+        phoneOrWhatsapp: z.string().optional(),
+        signedContract: z.boolean().optional(),
+        contractedServiceDetails: z.string().optional(),
+        packageOrPrice: z.string().optional(),
+        contractDuration: z.string().optional(),
+        paymentStatus: z.string().optional(),
+        clientGoals: z.string().optional(),
+        painPoints: z.string().optional(),
+        expectations: z.string().optional(),
+        salesPromises: z.string().optional(),
+        dataProvidedByClient: z.string().optional(),
+        extraNotes: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { clientId, ...rest } = input;
+        const id = await saveHandoverBrief(clientId, {
+          ...rest,
+          signedContract: rest.signedContract ? 1 : 0,
+          submittedByUserId: ctx.user.id,
+          submittedByName: ctx.user.name ?? null,
+        } as any);
+        // Notify admins that brief is submitted
+        notifyAdminsOfHandoverBrief(clientId).catch(e => console.error("[Brief] notify error:", e));
+        return { id };
+      }),
+
+    // ─── Assign Account Manager ────────────────────────────────────────
+    assignAccountManager: adminProcedure
+      .input(z.object({
+        clientId: z.number(),
+        accountManagerId: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assignAccountManagerToClient(input.clientId, input.accountManagerId);
+        // Notify the assigned AM
+        try {
+          await createInAppNotification({
+            userId: input.accountManagerId,
+            type: "system" as any,
+            title: "Client Assigned to You",
+            titleAr: "تم تعيين عميل لك",
+            body: `A new client (#${input.clientId}) has been assigned to you for onboarding.`,
+            bodyAr: `تم تعيين عميل جديد (#${input.clientId}) لك للتأهيل.`,
+            link: `/clients/${input.clientId}`,
+            isRead: false,
+          });
+        } catch(e) { console.error("[AssignAM] notify error:", e); }
         return { success: true };
       }),
 
@@ -2889,6 +2961,66 @@ byLeadStageChanges: protectedProcedure
           }
         }
         await initializeOnboarding(input.clientId, input.checklistId);
+        return { success: true };
+      }),
+
+    updateItemWithNotes: accountManagerProcedure
+      .input(z.object({ id: z.number(), isChecked: z.boolean(), notes: z.string().optional().nullable() }))
+      .mutation(async ({ input, ctx }) => {
+        const meta = await getOnboardingItemMeta(input.id);
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(meta.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        await updateOnboardingItem(input.id, input.isChecked, input.notes);
+        return { success: true };
+      }),
+
+    addItem: accountManagerProcedure
+      .input(z.object({
+        clientId: z.number(),
+        itemName: z.string().min(1),
+        phase: z.number().default(1),
+        phaseLabel: z.string().default("Phase 1"),
+        phaseOrder: z.number().default(0),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(input.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        const id = await addOnboardingItem(input.clientId, input.itemName, input.phase, input.phaseLabel, input.phaseOrder);
+        return { id };
+      }),
+
+    removeItem: accountManagerProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const meta = await getOnboardingItemMeta(input.id);
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(meta.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        await removeOnboardingItem(input.id);
+        return { success: true };
+      }),
+
+    initializeDefaults: accountManagerProcedure
+      .input(z.object({ clientId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.role === "AccountManager") {
+          const client = await getClientProfileById(input.clientId);
+          if (client.client.accountManagerId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        await createDefaultOnboardingItems(input.clientId);
         return { success: true };
       }),
   }),
