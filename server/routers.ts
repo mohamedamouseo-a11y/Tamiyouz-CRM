@@ -859,7 +859,6 @@ export const appRouter = router({
             .enum(["Contacted", "NoAnswer", "Interested", "NotInterested", "Meeting", "Offer", "Won", "Lost", "Callback"])
             .optional(),
           notes: z.string().optional(),
-          dealDuration: z.number().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -942,7 +941,6 @@ export const appRouter = router({
             .enum(["Contacted", "NoAnswer", "Interested", "NotInterested", "Meeting", "Offer", "Won", "Lost", "Callback"])
             .optional(),
           notes: z.string().optional(),
-          dealDuration: z.number().optional(),
         })
       )
       .mutation(({ input }) => {

@@ -554,7 +554,7 @@ export default function LeadProfile() {
   });
 
   const { register: dealRegister, handleSubmit: dealHandleSubmit, reset: dealReset, setValue: dealSetValue } = useForm({
-    defaultValues: { valueSar: "", status: "Pending" as const, dealType: "New" as const, lossReason: "", notes: "", currency: "SAR" as string },
+    defaultValues: { valueSar: "", status: "Pending" as const, dealType: "New" as const, lossReason: "", notes: "", currency: "SAR" as string, dealDuration: 1 },
   });
 
   const { register: transferRegister, handleSubmit: transferHandleSubmit, reset: transferReset, setValue: transferSetValue } = useForm({
@@ -582,7 +582,7 @@ export default function LeadProfile() {
   };
 
   const onCreateDeal = (data: any) => {
-    createDeal.mutate({ leadId, ...data });
+    createDeal.mutate({ leadId, ...data, dealDuration: Number(data.dealDuration) || 1 });
   };
 
   const onTransfer = (data: any) => {
@@ -1424,6 +1424,7 @@ export default function LeadProfile() {
 
                       <div className="space-y-1.5">
                         <InfoRow label={t("dealType")} value={t(deal.dealType as any)} />
+                        {(deal as any).dealDuration && <InfoRow label={isRTL ? "مدة الصفقة" : "Deal Duration"} value={`${(deal as any).dealDuration} ${(deal as any).dealDuration === 1 ? (isRTL ? "شهر" : "Month") : (isRTL ? "أشهر" : "Months")}`} />}
                         {deal.closedAt && <InfoRow label={t("closedAt")} value={format(new Date(deal.closedAt), "dd/MM/yyyy")} />}
                         {deal.lossReason && <InfoRow label={t("lossReason")} value={deal.lossReason} multiline />}
                         {deal.notes && <InfoRow label={t("notes")} value={deal.notes} multiline />}
@@ -1803,6 +1804,26 @@ export default function LeadProfile() {
                   <SelectItem value="Pending">{t("Pending")}</SelectItem>
                   <SelectItem value="Won">{t("Won")}</SelectItem>
                   <SelectItem value="Lost">{t("Lost")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>{isRTL ? "مدة الصفقة" : "Deal Duration"}</Label>
+              <Select defaultValue="1" onValueChange={(v) => dealSetValue("dealDuration", Number(v) as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">{isRTL ? "شهر واحد" : "1 Month"}</SelectItem>
+                  <SelectItem value="2">{isRTL ? "شهرين" : "2 Months"}</SelectItem>
+                  <SelectItem value="3">{isRTL ? "3 أشهر" : "3 Months"}</SelectItem>
+                  <SelectItem value="4">{isRTL ? "4 أشهر" : "4 Months"}</SelectItem>
+                  <SelectItem value="5">{isRTL ? "5 أشهر" : "5 Months"}</SelectItem>
+                  <SelectItem value="6">{isRTL ? "6 أشهر" : "6 Months"}</SelectItem>
+                  <SelectItem value="7">{isRTL ? "7 أشهر" : "7 Months"}</SelectItem>
+                  <SelectItem value="8">{isRTL ? "8 أشهر" : "8 Months"}</SelectItem>
+                  <SelectItem value="9">{isRTL ? "9 أشهر" : "9 Months"}</SelectItem>
+                  <SelectItem value="10">{isRTL ? "10 أشهر" : "10 Months"}</SelectItem>
+                  <SelectItem value="11">{isRTL ? "11 شهر" : "11 Months"}</SelectItem>
+                  <SelectItem value="12">{isRTL ? "سنة" : "12 Months (1 Year)"}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
