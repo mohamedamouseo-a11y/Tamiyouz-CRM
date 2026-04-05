@@ -371,8 +371,8 @@ export default function ClientProfile({ params }: RouteProps) {
 
   // Phase labels
   const phaseLabels: Record<number, string> = {
-    2: "Phase 2: Account Setup", 3: "Phase 3: Creative & Content",
-    4: "Phase 4: Campaign Launch", 5: "Phase 5: Reporting & Optimization", 6: "Phase 6: Account Review",
+    2: "Phase 2: Account Manager Preparation", 3: "Phase 3: First Client Contact",
+    4: "Phase 4: Onboarding Meeting", 5: "Phase 5: Access & Setup", 6: "Phase 6: Internal Team Activation",
   };
 
   // Phase 4+5 mutations
