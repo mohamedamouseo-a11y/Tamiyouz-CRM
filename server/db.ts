@@ -3039,7 +3039,8 @@ export async function editOnboardingItemTitle(
 export async function getClientHandoverHistory(clientId: number, limit: number = 50): Promise<any[]> {
   const db = await getDb();
   if (!db) return [];
-  return db
+  // Fetch client-level events (entityId = clientId) + onboarding item events (clientId in details JSON)
+  const clientLevelEvents = db
     .select()
     .from(auditLogs)
     .where(
@@ -3047,9 +3048,23 @@ export async function getClientHandoverHistory(clientId: number, limit: number =
         eq(auditLogs.entityId, clientId),
         sql`${auditLogs.entityType} IN ('client_handover_brief','client_status','client_assignment')`
       )
-    )
-    .orderBy(desc(auditLogs.createdAt))
-    .limit(limit);
+    );
+  const itemEvents = db
+    .select()
+    .from(auditLogs)
+    .where(
+      and(
+        eq(auditLogs.entityType, "client_onboarding_item"),
+        sql`JSON_UNQUOTE(JSON_EXTRACT(${auditLogs.details}, '$.clientId')) = ${clientId}`
+      )
+    );
+  const [a, b] = await Promise.all([clientLevelEvents, itemEvents]);
+  const combined = [...a, ...b].sort((x, y) => {
+    const da = new Date(x.createdAt).getTime();
+    const db2 = new Date(y.createdAt).getTime();
+    return db2 - da;
+  });
+  return combined.slice(0, limit);
 }
 
 export async function addOnboardingItem(

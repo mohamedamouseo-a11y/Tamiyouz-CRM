@@ -1241,15 +1241,42 @@ export default function ClientProfile({ params }: RouteProps) {
                                     onChange={(e) => updateItemWithNotesM.mutate({ id: item.id, isChecked: e.target.checked })}
                                     className="h-4 w-4 rounded border-slate-300 shrink-0"
                                   />
-                                  <span className={`text-sm flex-1 ${item.isChecked ? "line-through text-muted-foreground" : ""}`}>
-                                    {item.itemName}
-                                  </span>
-                                  <button
-                                    className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs transition-opacity"
-                                    onClick={() => { if (confirm("Remove this item?")) removeOnboardingItemM.mutate({ id: item.id }); }}
-                                  >
-                                    ✕
-                                  </button>
+                                  {editingItemId === item.id ? (
+                                    <div className="flex items-center gap-1 flex-1">
+                                      <input
+                                        autoFocus
+                                        className="text-sm flex-1 border-b border-primary outline-none bg-transparent"
+                                        value={editingItemName}
+                                        onChange={e => setEditingItemName(e.target.value)}
+                                        onKeyDown={e => {
+                                          if (e.key === "Enter" && editingItemName.trim()) {
+                                            editItemTitleM.mutate({ id: item.id, itemName: editingItemName.trim() });
+                                          } else if (e.key === "Escape") { setEditingItemId(null); }
+                                        }}
+                                      />
+                                      <button className="text-xs text-primary px-1" onClick={() => editingItemName.trim() && editItemTitleM.mutate({ id: item.id, itemName: editingItemName.trim() })}>✓</button>
+                                      <button className="text-xs text-muted-foreground" onClick={() => setEditingItemId(null)}>✕</button>
+                                    </div>
+                                  ) : (
+                                    <span
+                                      className={`text-sm flex-1 ${item.isChecked ? "line-through text-muted-foreground" : ""}`}
+                                      onDoubleClick={() => { setEditingItemId(item.id); setEditingItemName(item.itemName); }}
+                                      title="Double-click to rename"
+                                    >
+                                      {item.itemName}
+                                    </span>
+                                  )}
+                                  <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity">
+                                    <button
+                                      className="text-blue-400 hover:text-blue-600 text-xs"
+                                      title="Edit name"
+                                      onClick={() => { setEditingItemId(item.id); setEditingItemName(item.itemName); }}
+                                    >✏</button>
+                                    <button
+                                      className="text-red-400 hover:text-red-600 text-xs"
+                                      onClick={() => { if (confirm("Remove this item?")) removeOnboardingItemM.mutate({ id: item.id }); }}
+                                    >✕</button>
+                                  </div>
                                 </div>
                               ))}
                             </div>
