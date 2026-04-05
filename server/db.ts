@@ -228,6 +228,7 @@ export interface LeadFilters {
   search?: string;
   slaBreached?: boolean;
   isDuplicate?: boolean;
+  classification?: "Lead" | "Prospect" | "Opportunity";
   limit?: number;
   offset?: number;
 }
@@ -270,6 +271,24 @@ export async function getLeads(filters: LeadFilters = {}) {
   }
   if (filters.slaBreached !== undefined) conditions.push(eq(leads.slaBreached, filters.slaBreached));
   if (filters.isDuplicate !== undefined) conditions.push(eq(leads.isDuplicate, filters.isDuplicate));
+  if (filters.classification) {
+    if (filters.classification === "Opportunity") {
+      conditions.push(inArray(leads.stage, ["Proposal Delivered", "Won"]));
+    } else if (filters.classification === "Prospect") {
+      conditions.push(
+        or(
+          eq(leads.stage, "Meeting Scheduled"),
+          and(inArray(leads.stage, ["Leads"]), eq(leads.fitStatus, "Fit" as any))!,
+          and(inArray(leads.stage, ["Leads"]), inArray(leads.leadQuality, ["Hot", "Warm"] as any))!
+        )!
+      );
+    } else {
+      // Lead: exclude Opportunity and Prospect stages
+      conditions.push(
+        sql`(${leads.stage} NOT IN ('Proposal Delivered', 'Won') AND ${leads.stage} != 'Meeting Scheduled' AND NOT (${leads.stage} = 'Leads' AND (${leads.fitStatus} = 'Fit' OR ${leads.leadQuality} IN ('Hot', 'Warm'))))`
+      );
+    }
+  }
   if (filters.search) {
     conditions.push(
       or(
@@ -493,6 +512,23 @@ export async function getLeadsCount(filters: LeadFilters = {}): Promise<number> 
     conditions.push(lte(leads.contactTime, filters.dateTo));
   }
   if (filters.slaBreached !== undefined) conditions.push(eq(leads.slaBreached, filters.slaBreached));
+  if (filters.classification) {
+    if (filters.classification === "Opportunity") {
+      conditions.push(inArray(leads.stage, ["Proposal Delivered", "Won"]));
+    } else if (filters.classification === "Prospect") {
+      conditions.push(
+        or(
+          eq(leads.stage, "Meeting Scheduled"),
+          and(inArray(leads.stage, ["Leads"]), eq(leads.fitStatus, "Fit" as any))!,
+          and(inArray(leads.stage, ["Leads"]), inArray(leads.leadQuality, ["Hot", "Warm"] as any))!
+        )!
+      );
+    } else {
+      conditions.push(
+        sql`(${leads.stage} NOT IN ('Proposal Delivered', 'Won') AND ${leads.stage} != 'Meeting Scheduled' AND NOT (${leads.stage} = 'Leads' AND (${leads.fitStatus} = 'Fit' OR ${leads.leadQuality} IN ('Hot', 'Warm'))))`
+      );
+    }
+  }
 
   const result = await db
     .select({ count: sql<number>`count(*)` })

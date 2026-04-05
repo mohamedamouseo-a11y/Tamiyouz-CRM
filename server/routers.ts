@@ -590,6 +590,7 @@ export const appRouter = router({
           search: z.string().optional(),
           slaBreached: z.boolean().optional(),
           ownerId: z.number().optional(),
+          classification: z.enum(["Lead", "Prospect", "Opportunity"]).optional(),
           limit: z.number().min(1).max(200).default(50),
           offset: z.number().default(0),
         })

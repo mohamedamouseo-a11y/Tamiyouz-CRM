@@ -168,6 +168,7 @@ export default function LeadsList() {
   const [stage, setStage] = useState<string>(() => initialParams.get("stage") ?? "all");
   const [quality, setQuality] = useState<string>(() => initialParams.get("quality") ?? "all");
   const [fitStatusFilter, setFitStatusFilter] = useState<string>(() => initialParams.get("fitStatus") ?? "all");
+  const [classificationFilter, setClassificationFilter] = useState<string>(() => initialParams.get("classification") ?? "all");
   const [campaign, setCampaign] = useState<string>(() => initialParams.get("campaign") ?? "");
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [slaBreached, setSlaBreached] = useState(() => initialParams.get("slaBreached") === "true");
@@ -279,6 +280,9 @@ export default function LeadsList() {
     if (fitStatusFilter !== "all") params.set("fitStatus", fitStatusFilter);
     else params.delete("fitStatus");
 
+    if (classificationFilter !== "all") params.set("classification", classificationFilter);
+    else params.delete("classification");
+
     if (campaign) params.set("campaign", campaign);
     else params.delete("campaign");
 
@@ -303,6 +307,7 @@ export default function LeadsList() {
     campaign,
     dateRange?.from,
     dateRange?.to,
+    classificationFilter,
     fitStatusFilter,
     ownerId,
     page,
@@ -328,6 +333,10 @@ export default function LeadsList() {
       setFitStatusFilter("all");
       didReset = true;
     }
+    if (!visibleColumns.includes("classification") && classificationFilter !== "all") {
+      setClassificationFilter("all");
+      didReset = true;
+    }
     if (!visibleColumns.includes("campaign") && campaign) {
       setCampaign("");
       didReset = true;
@@ -338,7 +347,7 @@ export default function LeadsList() {
     }
 
     if (didReset) setPage(0);
-  }, [visibleColumns, stage, quality, fitStatusFilter, campaign, ownerId]);
+  }, [visibleColumns, stage, quality, fitStatusFilter, classificationFilter, campaign, ownerId]);
 
   async function handleExport() {
     setExporting(true);
@@ -383,6 +392,7 @@ export default function LeadsList() {
     stage: stage !== "all" ? stage : undefined,
     leadQuality: quality !== "all" ? quality : undefined,
     fitStatus: fitStatusFilter !== "all" ? fitStatusFilter : undefined,
+    classification: classificationFilter !== "all" ? (classificationFilter as any) : undefined,
     campaignName: campaign || undefined,
     slaBreached: slaBreached || undefined,
     ownerId: ownerId !== "all" ? Number(ownerId) : undefined,
@@ -508,6 +518,7 @@ export default function LeadsList() {
     stage !== "all" ||
     quality !== "all" ||
     fitStatusFilter !== "all" ||
+    classificationFilter !== "all" ||
     !!campaign ||
     slaBreached ||
     !!dateRange?.from ||
@@ -519,6 +530,7 @@ export default function LeadsList() {
     setStage("all");
     setQuality("all");
     setFitStatusFilter("all");
+    setClassificationFilter("all");
     setCampaign("");
     setSlaBreached(false);
     setDateRange(undefined);
@@ -857,6 +869,29 @@ export default function LeadsList() {
                       <SelectItem value="Fit">✅ Fit</SelectItem>
                       <SelectItem value="Not Fit">❌ Not Fit</SelectItem>
                       <SelectItem value="Pending">⏳ Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {visibleColumns.includes("classification") && (
+                <div className="space-y-2 min-w-[160px]">
+                  <Label>{isRTL ? "التصنيف" : "Classification"}</Label>
+                  <Select
+                    value={classificationFilter}
+                    onValueChange={(v) => {
+                      setClassificationFilter(v);
+                      setPage(0);
+                    }}
+                  >
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder={isRTL ? "التصنيف" : "Classification"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("all")}</SelectItem>
+                      <SelectItem value="Lead">🔵 {isRTL ? "عميل محتمل" : "Lead"}</SelectItem>
+                      <SelectItem value="Prospect">🟡 {isRTL ? "فرصة محتملة" : "Prospect"}</SelectItem>
+                      <SelectItem value="Opportunity">🟢 {isRTL ? "فرصة" : "Opportunity"}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
