@@ -56,6 +56,9 @@ import {
   onboardingChecklists,
   clientOnboardingItems,
   InsertClientOnboardingItem,
+  clientHandoverBriefs,
+  ClientHandoverBrief,
+  InsertClientHandoverBrief,
   clientObjectives,
   keyResults,
   deliverables,
@@ -818,15 +821,42 @@ export async function updateDeal(id: number, data: Partial<InsertDeal>): Promise
       try {
         const existingClient = await db.select().from(clients).where(eq(clients.leadId, data.leadId)).limit(1);
         if (existingClient.length === 0 && lead) {
-          await db.insert(clients).values({
+          const insertResult = await db.insert(clients).values({
             leadId: data.leadId,
             dealId: id,
             businessProfile: lead.businessProfile ?? lead.name ?? null,
-            planStatus: "Active",
+            leadName: lead.name ?? null,
+            phone: lead.phone ?? null,
+            planStatus: "Pending",
             renewalStatus: "Pending",
+            handoverStatus: "AwaitingAssignment",
+            briefStatus: "NotStarted",
             notes: `Auto-created from Deal #${id} won on ${new Date().toISOString()}`,
-          });
-          console.log(`[AccountMgmt] Auto-created client for lead #${data.leadId} from deal #${id}`);
+          } as any);
+          const newClientId = Number((insertResult as any)[0]?.insertId ?? 0);
+          console.log(`[AccountMgmt] Auto-created client #${newClientId} for lead #${data.leadId} from deal #${id}`);
+          // Notify all admins about new client in pool
+          try {
+            const admins = await db.select({ id: users.id }).from(users)
+              .where(and(eq(users.role, "Admin" as any), eq(users.isActive, true), isNull(users.deletedAt)));
+            if (admins.length > 0) {
+              await createBulkInAppNotifications(admins.map(a => ({
+                userId: a.id,
+                type: "system" as any,
+                title: `New Client Awaiting Assignment`,
+                titleAr: `عميل جديد بانتظار التعيين`,
+                body: `${lead.name ?? lead.phone ?? "New lead"} has been won and added to the client pool.`,
+                bodyAr: `تم الفوز بعميل (${lead.name ?? lead.phone ?? "عميل"}) وإضافته لمجموعة العملاء.`,
+                link: `/clients`,
+                isRead: false,
+              })));
+            }
+          } catch (notifErr) {
+            console.error("[AccountMgmt] Admin notification error:", notifErr);
+          }
+        } else if (existingClient.length > 0) {
+          // If client already exists, update handoverStatus
+          await db.update(clients).set({ handoverStatus: "AwaitingAssignment" } as any).where(eq(clients.id, existingClient[0].id));
         }
       } catch (err) {
         console.error("[AccountMgmt] Handoff error:", err);
@@ -2910,10 +2940,13 @@ export async function getOnboardingItems(clientId: number) {
       itemName: clientOnboardingItems.itemName,
       isChecked: clientOnboardingItems.isChecked,
       notes: clientOnboardingItems.notes,
+      phase: (clientOnboardingItems as any).phase,
+      phaseLabel: (clientOnboardingItems as any).phaseLabel,
+      phaseOrder: (clientOnboardingItems as any).phaseOrder,
     })
     .from(clientOnboardingItems)
     .where(eq(clientOnboardingItems.clientId, clientId))
-    .orderBy(desc(clientOnboardingItems.id));
+    .orderBy((clientOnboardingItems as any).phase, (clientOnboardingItems as any).phaseOrder, clientOnboardingItems.id);
 }
 
 export async function getOnboardingItemMeta(id: number) {
@@ -2929,13 +2962,28 @@ export async function getOnboardingItemMeta(id: number) {
   return row;
 }
 
-export async function updateOnboardingItem(id: number, isChecked: boolean) {
+export async function updateOnboardingItem(id: number, isChecked: boolean, notes?: string | null) {
   const db = await getDb();
   if (!db) return;
+  const updateData: any = { isChecked: isChecked ? 1 : 0 };
+  if (notes !== undefined) updateData.notes = notes;
   await db
     .update(clientOnboardingItems)
-    .set({ isChecked: isChecked ? 1 : 0 })
+    .set(updateData)
     .where(eq(clientOnboardingItems.id, id));
+}
+
+export async function addOnboardingItem(clientId: number, itemName: string, phase: number = 1, phaseLabel: string = "Phase 1", phaseOrder: number = 0): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.insert(clientOnboardingItems).values({ clientId, itemName, isChecked: 0, phase, phaseLabel, phaseOrder } as any);
+  return Number((result as any)[0]?.insertId ?? 0);
+}
+
+export async function removeOnboardingItem(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(clientOnboardingItems).where(eq(clientOnboardingItems.id, id));
 }
 
 export async function initializeOnboarding(clientId: number, checklistId: number) {
@@ -2969,6 +3017,133 @@ export async function initializeOnboarding(clientId: number, checklistId: number
       isChecked: 0,
     })) as any,
   );
+}
+
+
+// ─── Handover Briefs ─────────────────────────────────────────────────────────
+
+export async function getHandoverBrief(clientId: number): Promise<ClientHandoverBrief | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(clientHandoverBriefs)
+    .where(eq(clientHandoverBriefs.clientId, clientId))
+    .orderBy(desc(clientHandoverBriefs.createdAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function saveHandoverBrief(clientId: number, data: Omit<InsertClientHandoverBrief, "clientId" | "createdAt" | "updatedAt">): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  // Upsert: delete old and insert new
+  await db.delete(clientHandoverBriefs).where(eq(clientHandoverBriefs.clientId, clientId));
+  const result = await db.insert(clientHandoverBriefs).values({ ...data, clientId } as any);
+  // Update briefStatus on client
+  await db.update(clients).set({ briefStatus: "Submitted" } as any).where(eq(clients.id, clientId));
+  // Update handoverStatus if still AwaitingSalesBrief
+  const clientRow = await db.select({ handoverStatus: (clients as any).handoverStatus }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  if ((clientRow[0] as any)?.handoverStatus === "AwaitingSalesBrief") {
+    await db.update(clients).set({ handoverStatus: "BriefSubmitted" } as any).where(eq(clients.id, clientId));
+  }
+  return Number((result as any)[0]?.insertId ?? 0);
+}
+
+// ─── Default Onboarding Checklist ─────────────────────────────────────────────
+
+const DEFAULT_ONBOARDING_PHASES = [
+  {
+    phase: 2,
+    phaseLabel: "Phase 2: Account Setup",
+    items: [
+      "Access to advertising account granted",
+      "Access to website or landing page granted",
+      "Tracking pixels/tags installed (Meta, Google, etc.)",
+      "UTM parameters configured",
+      "Analytics access granted (Google Analytics / similar)",
+    ],
+  },
+  {
+    phase: 3,
+    phaseLabel: "Phase 3: Creative & Content",
+    items: [
+      "Brand guidelines and assets provided",
+      "Content calendar created",
+      "Ad creatives prepared (images/videos)",
+      "Copy and messaging approved",
+      "Landing pages reviewed and optimized",
+    ],
+  },
+  {
+    phase: 4,
+    phaseLabel: "Phase 4: Campaign Launch",
+    items: [
+      "Campaign structure finalized",
+      "Target audiences defined",
+      "Budget allocation confirmed",
+      "Campaigns created and reviewed",
+      "Campaigns live and running",
+    ],
+  },
+  {
+    phase: 5,
+    phaseLabel: "Phase 5: Reporting & Optimization",
+    items: [
+      "First performance report sent to client",
+      "Weekly optimization schedule set",
+      "KPIs reviewed with client",
+      "A/B tests planned",
+      "Reporting dashboard shared with client",
+    ],
+  },
+  {
+    phase: 6,
+    phaseLabel: "Phase 6: Account Review",
+    items: [
+      "30-day performance review completed",
+      "Client satisfaction check-in done",
+      "Upsell opportunities identified",
+      "Contract renewal discussion initiated (if applicable)",
+      "Account health score updated",
+    ],
+  },
+];
+
+export async function createDefaultOnboardingItems(clientId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  // Check if items already exist
+  const existing = await db.select({ c: sql<number>`COUNT(*)` }).from(clientOnboardingItems).where(eq(clientOnboardingItems.clientId, clientId));
+  if (Number((existing[0] as any)?.c ?? 0) > 0) return;
+  const values: any[] = [];
+  for (const phase of DEFAULT_ONBOARDING_PHASES) {
+    phase.items.forEach((item, idx) => {
+      values.push({ clientId, itemName: item, isChecked: 0, phase: phase.phase, phaseLabel: phase.phaseLabel, phaseOrder: idx });
+    });
+  }
+  if (values.length > 0) {
+    await db.insert(clientOnboardingItems).values(values);
+  }
+}
+
+export async function assignAccountManagerToClient(clientId: number, accountManagerId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(clients).set({
+    accountManagerId,
+    handoverStatus: "InOnboarding",
+    planStatus: "Active",
+  } as any).where(eq(clients.id, clientId));
+  // Create default onboarding items if none exist
+  await createDefaultOnboardingItems(clientId);
+  // Update handoverStatus to AwaitingSalesBrief only if it is AwaitingAssignment
+  const clientRow = await db.select({ handoverStatus: (clients as any).handoverStatus }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  // If brief not yet submitted, set to AwaitingSalesBrief
+  const hs = (clientRow[0] as any)?.handoverStatus;
+  if (hs === "AwaitingAssignment" || hs === "BriefSubmitted") {
+    // Keep InOnboarding (set above)
+  }
 }
 
 export async function listAllUsers() {

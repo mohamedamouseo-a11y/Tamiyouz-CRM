@@ -126,6 +126,8 @@ export const clients = mysqlTable("clients", {
 	healthScore: int().default(0),
 	deletedAt: timestamp({ mode: 'string' }),
 	deletedBy: int(),
+	handoverStatus: mysqlEnum(['AwaitingAssignment','AwaitingSalesBrief','BriefSubmitted','InOnboarding','ReadyForActivation']).default('AwaitingAssignment'),
+	briefStatus: mysqlEnum(['NotStarted','Draft','Submitted','Reviewed','NeedsInfo']).default('NotStarted'),
 },
 (table) => [
 	primaryKey({ columns: [table.id], name: "clients_id"}),
@@ -501,11 +503,41 @@ export const clientOnboardingItems = mysqlTable("client_onboarding_items", {
 	itemName: varchar({ length: 255 }).notNull(),
 	isChecked: tinyint().default(0),
 	notes: text(),
-
+	phase: int().default(1),
+	phaseLabel: varchar({ length: 100 }).default("Phase 1"),
+	phaseOrder: int().default(0),
 },
 (table) => [
 	primaryKey({ columns: [table.id], name: "client_onboarding_items_id"}),
 	index("idx_onboarding_clientId").on(table.clientId),
+]);
+
+// ─── Client Handover Briefs ──────────────────────────────────────────
+export const clientHandoverBriefs = mysqlTable("client_handover_briefs", {
+	id: int().autoincrement().notNull(),
+	clientId: int().notNull(),
+	submittedByUserId: int(),
+	submittedByName: varchar({ length: 255 }),
+	companyName: varchar({ length: 255 }),
+	contactPersonName: varchar({ length: 255 }),
+	phoneOrWhatsapp: varchar({ length: 100 }),
+	signedContract: tinyint().default(0),
+	contractedServiceDetails: text(),
+	packageOrPrice: varchar({ length: 255 }),
+	contractDuration: varchar({ length: 100 }),
+	paymentStatus: varchar({ length: 100 }),
+	clientGoals: text(),
+	painPoints: text(),
+	expectations: text(),
+	salesPromises: text(),
+	dataProvidedByClient: text(),
+	extraNotes: text(),
+	createdAt: timestamp({ mode: 'string' }).default(sql`(now())`).notNull(),
+	updatedAt: timestamp({ mode: 'string' }).default(sql`(now())`).onUpdateNow().notNull(),
+},
+(table) => [
+	primaryKey({ columns: [table.id], name: "client_handover_briefs_id"}),
+	index("idx_handover_briefs_clientId").on(table.clientId),
 ]);
 
 // ─── Phase 4: Dashboards & Performance ──────────────────────────────────────
@@ -654,6 +686,8 @@ export type InsertClientTask = typeof clientTasks.$inferInsert;
 export type OnboardingChecklist = typeof onboardingChecklists.$inferSelect;
 export type ClientOnboardingItem = typeof clientOnboardingItems.$inferSelect;
 export type InsertClientOnboardingItem = typeof clientOnboardingItems.$inferInsert;
+export type ClientHandoverBrief = typeof clientHandoverBriefs.$inferSelect;
+export type InsertClientHandoverBrief = typeof clientHandoverBriefs.$inferInsert;
 export type ClientObjective = typeof clientObjectives.$inferSelect;
 export type InsertClientObjective = typeof clientObjectives.$inferInsert;
 export type KeyResult = typeof keyResults.$inferSelect;
