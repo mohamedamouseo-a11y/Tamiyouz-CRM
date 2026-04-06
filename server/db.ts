@@ -783,6 +783,48 @@ export async function createDeal(data: InsertDeal): Promise<number> {
   if (data.status === "Won") {
     notifyDealWon({ id: dealId, leadId: data.leadId, valueSar: data.valueSar }, leadName, ownerName)
       .catch((err) => console.error("[NotificationEngine] notifyDealWon error:", err));
+    // ── Account Management Handoff: auto-create client when deal is created as Won ──
+    try {
+      const existingClient = await db.select().from(clients).where(eq(clients.leadId, data.leadId)).limit(1);
+      if (existingClient.length === 0 && lead) {
+        const insertResult = await db.insert(clients).values({
+          leadId: data.leadId,
+          dealId: dealId,
+          businessProfile: lead.businessProfile ?? lead.name ?? null,
+          leadName: lead.name ?? null,
+          phone: lead.phone ?? null,
+          planStatus: "Pending",
+          renewalStatus: "Pending",
+          handoverStatus: "AwaitingAssignment",
+          briefStatus: "NotStarted",
+          notes: `Auto-created from Deal #${dealId} won on ${new Date().toISOString()}`,
+        } as any);
+        const newClientId = Number((insertResult as any)[0]?.insertId ?? 0);
+        console.log(`[AccountMgmt] Auto-created client #${newClientId} for lead #${data.leadId} from new deal #${dealId}`);
+        try {
+          const admins = await db.select({ id: users.id }).from(users)
+            .where(and(eq(users.role, "Admin" as any), eq(users.isActive, true), isNull(users.deletedAt)));
+          if (admins.length > 0) {
+            await createBulkInAppNotifications(admins.map(a => ({
+              userId: a.id,
+              type: "system" as any,
+              title: `New Client Awaiting Assignment`,
+              titleAr: `\u0639\u0645\u064a\u0644 \u062c\u062f\u064a\u062f \u0628\u0627\u0646\u062a\u0638\u0627\u0631 \u0627\u0644\u062a\u0639\u064a\u064a\u0646`,
+              body: `${lead.name ?? lead.phone ?? 'New lead'} has been won and added to the client pool.`,
+              bodyAr: `\u062a\u0645 \u0627\u0644\u0641\u0648\u0632 \u0628\u0639\u0645\u064a\u0644 (${lead.name ?? lead.phone ?? '\u0639\u0645\u064a\u0644'}) \u0648\u0625\u0636\u0627\u0641\u062a\u0647 \u0644\u0645\u062c\u0645\u0648\u0639\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621.`,
+              link: `/clients`,
+              isRead: false,
+            })));
+          }
+        } catch (notifErr) {
+          console.error("[AccountMgmt] Admin notification error:", notifErr);
+        }
+      } else if (existingClient.length > 0) {
+        await db.update(clients).set({ handoverStatus: "AwaitingAssignment" } as any).where(eq(clients.id, existingClient[0].id));
+      }
+    } catch (err) {
+      console.error("[AccountMgmt] Handoff error on createDeal:", err);
+    }
   } else if (data.status === "Lost") {
     notifyDealLost({ id: dealId, leadId: data.leadId, lossReason: data.lossReason }, leadName, ownerName)
       .catch((err) => console.error("[NotificationEngine] notifyDealLost error:", err));

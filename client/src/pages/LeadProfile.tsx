@@ -422,6 +422,7 @@ export default function LeadProfile() {
     onSuccess: () => {
       toast.success(t("success"));
       refetchDeal();
+      clientByLeadQ.refetch();
     },
   });
 
@@ -1479,7 +1480,7 @@ export default function LeadProfile() {
                       {canEdit && (
                         <div className="rounded-lg border border-border/40 p-2">
                           <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("dealStatus")}</Label>
-                          <Select defaultValue={deal.status} onValueChange={(v) => updateDeal.mutate({ id: deal.id, status: v as any })}>
+                          <Select defaultValue={deal.status} onValueChange={(v) => updateDeal.mutate({ id: deal.id, leadId, status: v as any })}>
                             <SelectTrigger className="mt-1 h-7 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Pending">{t("Pending")}</SelectItem>
