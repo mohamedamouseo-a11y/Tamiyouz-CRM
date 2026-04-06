@@ -340,6 +340,8 @@ export default function AdminSettings() {
   const isAdmin = ["Admin", "admin"].includes(user?.role ?? "");
   const isMediaBuyer = user?.role === "MediaBuyer";
   const isSuperAdmin = user?.email === "admin@tamiyouz.com";
+  const DASHBOARD_AUDIT_EMAILS = ["admin@tamiyouz.com", "alaa.m@tamiyouzalrowad.com"];
+  const canAccessDashboardAudit = DASHBOARD_AUDIT_EMAILS.includes((user?.email ?? "").toLowerCase());
   const canAccessMeta = isAdmin || isMediaBuyer;
 
   const handleSaveTheme = () => {
@@ -443,7 +445,7 @@ export default function AdminSettings() {
               <Terminal size={13} />
               <span>{isRTL ? "لوحة المطورين" : "Developer Hub"}</span>
             </TabsTrigger>}
-            {isSuperAdmin && <TabsTrigger value="dashboardAudit" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
+            {canAccessDashboardAudit && <TabsTrigger value="dashboardAudit" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               <BarChart3 size={13} />
               <span>{isRTL ? "تدقيق لوحة التحكم" : "Dashboard Audit"}</span>
             </TabsTrigger>}
@@ -917,7 +919,7 @@ export default function AdminSettings() {
             <DeveloperHubTab />
           </TabsContent>}
           {/* ── Dashboard Audit Tab (Super Admin only) ── */}
-          {isSuperAdmin && <TabsContent value="dashboardAudit" className="mt-4">
+          {canAccessDashboardAudit && <TabsContent value="dashboardAudit" className="mt-4">
             <DashboardAuditTab />
           </TabsContent>}
           {isAdmin && <TabsContent value="packages" className="mt-4">

@@ -199,8 +199,9 @@ async function startServer() {
     try {
       const user = await authenticateRequest(req as any).catch(() => null);
       if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
-      if (String(user.email ?? "").toLowerCase() !== "admin@tamiyouz.com") {
-        res.status(403).json({ error: "Super admin access required" });
+      const DASHBOARD_AUDIT_EMAILS = ["admin@tamiyouz.com", "alaa.m@tamiyouzalrowad.com"];
+      if (!DASHBOARD_AUDIT_EMAILS.includes(String(user.email ?? "").toLowerCase())) {
+        res.status(403).json({ error: "Dashboard audit access restricted" });
         return;
       }
       const q = req.query as Record<string, string>;

@@ -307,6 +307,18 @@ const superAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+// Dashboard Audit is accessible to the primary super admin and authorised admin users
+const DASHBOARD_AUDIT_EMAILS = new Set([PRIMARY_SUPER_ADMIN_EMAIL, "alaa.m@tamiyouzalrowad.com"]);
+function canAccessDashboardAudit(user: { email?: string | null }): boolean {
+  return DASHBOARD_AUDIT_EMAILS.has(String(user.email ?? "").toLowerCase());
+}
+const dashboardAuditProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!canAccessDashboardAudit(ctx.user)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Dashboard Audit access is restricted" });
+  }
+  return next({ ctx });
+});
+
 function sanitizeUploadedFileName(fileName: string): string {
   const cleaned = fileName.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_").slice(-120);
   return cleaned || `file-${Date.now()}.bin`;
@@ -4201,13 +4213,13 @@ byLeadStageChanges: protectedProcedure
 
   // -- Dashboard Audit (Super Admin Only) --------------------------------------
   dashboardAudit: router({
-    listMetricDefinitions: superAdminProcedure
+    listMetricDefinitions: dashboardAuditProcedure
       .query(async () => {
         const { listMetricDefinitions } = await import('./services/dashboardAuditService');
         return listMetricDefinitions();
       }),
 
-    runAudit: superAdminProcedure
+    runAudit: dashboardAuditProcedure
       .input(z.object({
         dashboardType: z.enum(['agentDashboard', 'teamDashboard', 'salesFunnel', 'taskSla']),
         metricId: z.string().min(1),
@@ -4225,7 +4237,7 @@ byLeadStageChanges: protectedProcedure
         return result;
       }),
 
-    getRawRows: superAdminProcedure
+    getRawRows: dashboardAuditProcedure
       .input(z.object({
         dashboardType: z.enum(['agentDashboard', 'teamDashboard', 'salesFunnel', 'taskSla']),
         metricId: z.string().min(1),
@@ -4242,7 +4254,7 @@ byLeadStageChanges: protectedProcedure
         return getRawRows(input as any, input.limit);
       }),
 
-    getStoredInputs: superAdminProcedure
+    getStoredInputs: dashboardAuditProcedure
       .input(z.object({
         dashboardType: z.enum(['agentDashboard', 'teamDashboard', 'salesFunnel', 'taskSla']),
         metricId: z.string().min(1),
@@ -4258,7 +4270,7 @@ byLeadStageChanges: protectedProcedure
         return getStoredInputs(input as any, input.rowIds);
       }),
 
-    getRelatedRecords: superAdminProcedure
+    getRelatedRecords: dashboardAuditProcedure
       .input(z.object({
         dashboardType: z.enum(['agentDashboard', 'teamDashboard', 'salesFunnel', 'taskSla']),
         metricId: z.string().min(1),
@@ -4274,7 +4286,7 @@ byLeadStageChanges: protectedProcedure
         return getRelatedRecords(input as any, input.rowIds);
       }),
 
-    getSnapshotInputs: superAdminProcedure
+    getSnapshotInputs: dashboardAuditProcedure
       .input(z.object({
         dashboardType: z.enum(['agentDashboard', 'teamDashboard', 'salesFunnel', 'taskSla']),
         metricId: z.string().min(1),
