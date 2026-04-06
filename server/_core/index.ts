@@ -193,6 +193,41 @@ async function startServer() {
       }
     }
   });
+
+  // -- Dashboard Audit Excel Export (Super Admin Only) ------------------------
+  app.get("/api/export/dashboard-audit", async (req, res) => {
+    try {
+      const user = await authenticateRequest(req as any).catch(() => null);
+      if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+      if (String(user.email ?? "").toLowerCase() !== "admin@tamiyouz.com") {
+        res.status(403).json({ error: "Super admin access required" });
+        return;
+      }
+      const q = req.query as Record<string, string>;
+      if (!q.metricId || !q.dashboardType || !q.dateFrom || !q.dateTo || !q.dateBasis) {
+        res.status(400).json({ error: "Missing required parameters" });
+        return;
+      }
+      const { streamDashboardAuditExcel } = await import("../services/dashboardAuditExportService");
+      const { runAudit } = await import("../services/dashboardAuditService");
+      const { createAuditLog } = await import("../db");
+      const params = {
+        dashboardType: q.dashboardType as any,
+        metricId: q.metricId,
+        dateFrom: new Date(q.dateFrom),
+        dateTo: new Date(q.dateTo),
+        dateBasis: q.dateBasis as any,
+        targetUserId: q.targetUserId ? parseInt(q.targetUserId) : undefined,
+        viewerRole: q.viewerRole || undefined,
+      };
+      const auditResult = await runAudit(params);
+      await createAuditLog({ userId: user.id, userName: user.name, userRole: user.role, action: "dashboardAuditExport", entityType: "dashboardAudit", entityId: 0, entityName: q.metricId, details: { metricId: q.metricId, dashboardType: q.dashboardType } });
+      await streamDashboardAuditExcel(res, params, auditResult, user.name ?? user.email ?? "SuperAdmin");
+    } catch (err: any) {
+      if (!res.headersSent) res.status(500).json({ error: err.message ?? "Export failed" });
+    }
+  });
+
   // ── Meta Leadgen Webhook ──────────────────────────────────────────────────
   // GET: Webhook verification (Meta sends a challenge)
   app.get("/api/meta/webhook", async (req, res) => {

@@ -1007,3 +1007,22 @@ uniqueIndex("exchange_rates_pair_uq").on(table.fromCurrency, table.toCurrency),
 
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
 export type InsertExchangeRate = typeof exchangeRates.$inferInsert;
+
+export const uiInputSnapshots = mysqlTable("ui_input_snapshots", {
+id: int().autoincrement().notNull(),
+entityType: varchar({ length: 64 }).notNull(),
+entityId: int().notNull(),
+operationType: mysqlEnum(['create','update','delete']).notNull().default('create'),
+routeName: varchar({ length: 255 }),
+screenName: varchar({ length: 255 }),
+actorUserId: int(),
+rawInputPayload: json(),
+normalizedPayload: json(),
+persistedSnapshot: json(),
+createdAt: timestamp({ mode: 'string' }).default(sql`(now())`).notNull(),
+},
+(table) => [
+primaryKey({ columns: [table.id], name: "ui_input_snapshots_id"}),
+index("idx_uis_entity").on(table.entityType, table.entityId),
+index("idx_uis_actor").on(table.actorUserId),
+]);

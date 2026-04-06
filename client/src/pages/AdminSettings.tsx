@@ -29,6 +29,7 @@ import PaymobSettingsTab from "@/components/PaymobSettingsTab";
 import InnoCallSettingsTab from "@/components/InnoCallSettingsTab";
 import DemoSyncTab from "@/components/DemoSyncTab";
 import DeveloperHubTab from "@/components/DeveloperHubTab";
+import DashboardAuditTab from "@/components/DashboardAuditTab";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -441,6 +442,10 @@ export default function AdminSettings() {
             {isSuperAdmin && <TabsTrigger value="developerHub" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               <Terminal size={13} />
               <span>{isRTL ? "لوحة المطورين" : "Developer Hub"}</span>
+            </TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="dashboardAudit" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
+              <BarChart3 size={13} />
+              <span>{isRTL ? "تدقيق لوحة التحكم" : "Dashboard Audit"}</span>
             </TabsTrigger>}
             {isAdmin && <TabsTrigger value="packages" className="gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all data-[state=active]:shadow-md data-[state=active]:font-semibold">
               <Package size={13} />
@@ -910,6 +915,10 @@ export default function AdminSettings() {
           {/* ── Developer Hub Tab (Super Admin only) ── */}
           {isSuperAdmin && <TabsContent value="developerHub" className="mt-4">
             <DeveloperHubTab />
+          </TabsContent>}
+          {/* ── Dashboard Audit Tab (Super Admin only) ── */}
+          {isSuperAdmin && <TabsContent value="dashboardAudit" className="mt-4">
+            <DashboardAuditTab />
           </TabsContent>}
           {isAdmin && <TabsContent value="packages" className="mt-4">
             <PackagesTab isRTL={isRTL} />
