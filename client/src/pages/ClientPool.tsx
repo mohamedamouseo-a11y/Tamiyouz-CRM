@@ -515,11 +515,18 @@ export default function ClientPool() {
                           {client.renewalStatus}
                         </Badge>
                       )}
-                      {client.handoverStatus && client.handoverStatus !== "ReadyForActivation" && (
-                        <Badge className={cn("text-xs", handoverStatusColors[client.handoverStatus] || "bg-gray-100 text-gray-800")}>
-                          {handoverStatusLabels[client.handoverStatus] || client.handoverStatus}
-                        </Badge>
-                      )}
+                      {(() => {
+                        // If AM is assigned but handoverStatus is still AwaitingAssignment (stale data guard),
+                        // derive the correct display status rather than showing a contradictory badge.
+                        const displayHandover = (client.accountManagerId && client.handoverStatus === "AwaitingAssignment")
+                          ? "AwaitingSalesBrief"
+                          : client.handoverStatus;
+                        return displayHandover && displayHandover !== "ReadyForActivation" ? (
+                          <Badge className={cn("text-xs", handoverStatusColors[displayHandover] || "bg-gray-100 text-gray-800")}>
+                            {handoverStatusLabels[displayHandover] || displayHandover}
+                          </Badge>
+                        ) : null;
+                      })()}
                       {expandedId === client.id ? (
                         <ChevronUp className="w-4 h-4 text-muted-foreground" />
                       ) : (

@@ -2560,7 +2560,23 @@ export async function createClient(data: InsertClient): Promise<number> {
 export async function updateClient(id: number, data: Partial<InsertClient>): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.update(clients).set(data).where(eq(clients.id, id));
+
+  // If accountManagerId is being set but handoverStatus is NOT explicitly provided,
+  // auto-derive the correct handoverStatus so we never leave a client on "AwaitingAssignment"
+  // after an AM has been assigned.
+  const updateData = { ...data } as any;
+  if (updateData.accountManagerId !== undefined && updateData.handoverStatus === undefined) {
+    const [current] = await db.select({ handoverStatus: (clients as any).handoverStatus })
+      .from(clients).where(eq(clients.id, id)).limit(1);
+    if ((current as any)?.handoverStatus === "AwaitingAssignment") {
+      // Check if a brief exists to determine correct next status
+      const briefRows = await db.select({ id: clientHandoverBriefs.id })
+        .from(clientHandoverBriefs).where(eq(clientHandoverBriefs.clientId, id)).limit(1);
+      updateData.handoverStatus = briefRows.length > 0 ? "InOnboarding" : "AwaitingSalesBrief";
+    }
+  }
+
+  await db.update(clients).set(updateData).where(eq(clients.id, id));
 }
 
 export async function deleteClient(id: number, deletedByUserId?: number): Promise<void> {
