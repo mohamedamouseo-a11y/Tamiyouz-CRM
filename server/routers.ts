@@ -4198,5 +4198,97 @@ byLeadStageChanges: protectedProcedure
         return calculateRoas(input.dateFrom, input.dateTo, input.datePreset);
       }),
   }),
+
+  // -- Dashboard Audit (Super Admin Only) --------------------------------------
+  dashboardAudit: router({
+    listMetricDefinitions: superAdminProcedure
+      .query(async () => {
+        const { listMetricDefinitions } = await import('./services/dashboardAuditService');
+        return listMetricDefinitions();
+      }),
+
+    runAudit: superAdminProcedure
+      .input(z.object({
+        dashboardType: z.enum(['agentDashboard', 'teamDashboard', 'salesFunnel', 'taskSla']),
+        metricId: z.string().min(1),
+        dateFrom: z.date(),
+        dateTo: z.date(),
+        dateBasis: z.enum(['leads.createdAt','leads.contactTime','deals.createdAt','activities.createdAt','clients.createdAt','contracts.createdAt']),
+        targetUserId: z.number().optional(),
+        viewerRole: z.string().optional(),
+        extraFilters: z.record(z.any()).optional(),
+      }))
+      .query(async ({ ctx, input }) => {
+        const { runAudit } = await import('./services/dashboardAuditService');
+        const result = await runAudit(input as any);
+        await createAuditLog({ userId: ctx.user.id, userName: ctx.user.name, userRole: ctx.user.role, action: 'dashboardAuditRun', entityType: 'dashboardAudit', entityId: 0, entityName: input.metricId, details: { metricId: input.metricId, dashboardType: input.dashboardType } });
+        return result;
+      }),
+
+    getRawRows: superAdminProcedure
+      .input(z.object({
+        dashboardType: z.enum(['agentDashboard', 'teamDashboard', 'salesFunnel', 'taskSla']),
+        metricId: z.string().min(1),
+        dateFrom: z.date(),
+        dateTo: z.date(),
+        dateBasis: z.enum(['leads.createdAt','leads.contactTime','deals.createdAt','activities.createdAt','clients.createdAt','contracts.createdAt']),
+        targetUserId: z.number().optional(),
+        viewerRole: z.string().optional(),
+        extraFilters: z.record(z.any()).optional(),
+        limit: z.number().min(1).max(500).default(200),
+      }))
+      .query(async ({ input }) => {
+        const { getRawRows } = await import('./services/dashboardAuditService');
+        return getRawRows(input as any, input.limit);
+      }),
+
+    getStoredInputs: superAdminProcedure
+      .input(z.object({
+        dashboardType: z.enum(['agentDashboard', 'teamDashboard', 'salesFunnel', 'taskSla']),
+        metricId: z.string().min(1),
+        dateFrom: z.date(),
+        dateTo: z.date(),
+        dateBasis: z.enum(['leads.createdAt','leads.contactTime','deals.createdAt','activities.createdAt','clients.createdAt','contracts.createdAt']),
+        targetUserId: z.number().optional(),
+        viewerRole: z.string().optional(),
+        rowIds: z.array(z.number()).max(200),
+      }))
+      .query(async ({ input }) => {
+        const { getStoredInputs } = await import('./services/dashboardAuditService');
+        return getStoredInputs(input as any, input.rowIds);
+      }),
+
+    getRelatedRecords: superAdminProcedure
+      .input(z.object({
+        dashboardType: z.enum(['agentDashboard', 'teamDashboard', 'salesFunnel', 'taskSla']),
+        metricId: z.string().min(1),
+        dateFrom: z.date(),
+        dateTo: z.date(),
+        dateBasis: z.enum(['leads.createdAt','leads.contactTime','deals.createdAt','activities.createdAt','clients.createdAt','contracts.createdAt']),
+        targetUserId: z.number().optional(),
+        viewerRole: z.string().optional(),
+        rowIds: z.array(z.number()).max(100),
+      }))
+      .query(async ({ input }) => {
+        const { getRelatedRecords } = await import('./services/dashboardAuditService');
+        return getRelatedRecords(input as any, input.rowIds);
+      }),
+
+    getSnapshotInputs: superAdminProcedure
+      .input(z.object({
+        dashboardType: z.enum(['agentDashboard', 'teamDashboard', 'salesFunnel', 'taskSla']),
+        metricId: z.string().min(1),
+        dateFrom: z.date(),
+        dateTo: z.date(),
+        dateBasis: z.enum(['leads.createdAt','leads.contactTime','deals.createdAt','activities.createdAt','clients.createdAt','contracts.createdAt']),
+        targetUserId: z.number().optional(),
+        viewerRole: z.string().optional(),
+        rowIds: z.array(z.number()).max(200),
+      }))
+      .query(async ({ input }) => {
+        const { getSnapshotInputs } = await import('./services/dashboardAuditService');
+        return getSnapshotInputs(input as any, input.rowIds);
+      }),
+  }),
 });
 export type AppRouter = typeof appRouter;
