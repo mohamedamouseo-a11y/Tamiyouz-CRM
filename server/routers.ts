@@ -2273,7 +2273,7 @@ byLeadStageChanges: protectedProcedure
         // Tab-based type filtering
         const tabTypeMap: Record<string, string[]> = {
           sla: ["sla_breach"],
-          leads: ["new_lead", "lead_assigned", "lead_distribution"],
+          leads: ["new_lead", "lead_assigned", "lead_distribution", "internal_note"],
           reminders: ["reminder", "meeting_reminder", "follow_up_reminder"],
           campaigns: ["campaign_alert"],
         };
@@ -2367,7 +2367,7 @@ byLeadStageChanges: protectedProcedure
         const conditions: any[] = [eq(inAppNotifications.userId, ctx.user.id), eq(inAppNotifications.isRead, 0)];
         const tabTypeMap: Record<string, string[]> = {
           sla: ["sla_breach"],
-          leads: ["new_lead", "lead_assigned", "lead_distribution"],
+          leads: ["new_lead", "lead_assigned", "lead_distribution", "internal_note"],
           reminders: ["reminder", "meeting_reminder", "follow_up_reminder"],
           campaigns: ["campaign_alert"],
         };
