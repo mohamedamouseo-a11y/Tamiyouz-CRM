@@ -336,7 +336,7 @@ export default function LeadProfile() {
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ id: number; type: string; outcome?: string; notes?: string; activityTime?: string } | null>(null);
 
-  const { data: lead, isLoading, refetch } = trpc.leads.byId.useQuery({ id: leadId }, { enabled: Number.isFinite(leadId) });
+  const { data: lead, isLoading, isError: isLeadError, error: leadError, refetch } = trpc.leads.byId.useQuery({ id: leadId }, { enabled: Number.isFinite(leadId), retry: false });
   const { data: activities, refetch: refetchActivities } = trpc.activities.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const { data: deal, refetch: refetchDeal } = trpc.deals.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
   const clientByLeadQ = trpc.accountManagement.getClientByLeadId.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
@@ -769,6 +769,30 @@ export default function LeadProfile() {
       <CRMLayout>
         <div className="p-6 flex items-center justify-center min-h-64">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      </CRMLayout>
+    );
+  }
+
+  if (isLeadError) {
+    const isForbidden = (leadError as any)?.data?.code === "FORBIDDEN";
+    return (
+      <CRMLayout>
+        <div className="p-10 flex flex-col items-center justify-center gap-4 text-center">
+          <div className="text-4xl">{isForbidden ? "🔒" : "⚠️"}</div>
+          <h2 className="text-xl font-semibold text-foreground">
+            {isForbidden
+              ? (isRTL ? "ليس لديك صلاحية الوصول لهذا العميل" : "Access Denied")
+              : (isRTL ? "حدث خطأ في تحميل البيانات" : "Failed to load lead")}
+          </h2>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            {isForbidden
+              ? (isRTL ? "هذا العميل غير مسند إليك أو تم نقله لموظف آخر" : "This lead is not assigned to you or has been reassigned.")
+              : (leadError as any)?.message}
+          </p>
+          <a href="/leads" className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            {isRTL ? "← العودة للعملاء" : "← Back to Leads"}
+          </a>
         </div>
       </CRMLayout>
     );
