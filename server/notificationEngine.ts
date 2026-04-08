@@ -800,3 +800,55 @@ export async function notifyInboxMediaBuyerLeadPulse(params: {
   }));
   await createBulkInAppNotifications(items as any);
 }
+
+// ─── Notification — Internal Note Created ────────────────────────────────────
+export async function notifyInternalNoteCreated(params: {
+  leadId: number;
+  noteId: number;
+  content: string;
+  creatorId: number;
+}): Promise<void> {
+  const lead = await getLeadById(params.leadId);
+  if (!lead) return;
+
+  const adminIds = await getAdminIds();
+  const recipients = new Set<number>();
+
+  // Add lead owner
+  if (lead.ownerId != null) {
+    const ownerId = Number(lead.ownerId);
+    if (Number.isFinite(ownerId) && ownerId > 0) recipients.add(ownerId);
+  }
+
+  // Add admins / sales managers
+  for (const id of adminIds) recipients.add(id);
+
+  // Never notify the creator of the note about their own action
+  recipients.delete(Number(params.creatorId));
+
+  if (recipients.size === 0) return;
+
+  const display = displayLeadNameOrPhone({ name: (lead as any).name, phone: (lead as any).phone });
+  const snippet =
+    params.content.length > 120
+      ? params.content.slice(0, 120) + "…"
+      : params.content;
+
+  const items: InsertInAppNotification[] = Array.from(recipients).map((userId) => ({
+    userId,
+    type: "internal_note" as any,
+    title: `New internal note on lead: ${display}`,
+    titleAr: `ملاحظة داخلية جديدة على العميل: ${display}`,
+    body: snippet,
+    bodyAr: snippet,
+    isRead: false,
+    link: `/leads/${params.leadId}`,
+    metadata: {
+      leadId: params.leadId,
+      noteId: params.noteId,
+      trigger: "internal_note_created",
+    },
+  }));
+
+  await createBulkInAppNotifications(items);
+}

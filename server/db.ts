@@ -87,7 +87,7 @@ import {
   InsertExchangeRate,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
-import { notifyNewLead, notifyLeadAssigned, notifySLABreach, notifyStageChange, notifyDealWon, notifyDealLost, notifyActivityLogged, notifyLeadQualityChange, notifyLeadTransfer, notifyDuplicateLead } from "./notificationEngine";
+import { notifyNewLead, notifyLeadAssigned, notifySLABreach, notifyStageChange, notifyDealWon, notifyDealLost, notifyActivityLogged, notifyLeadQualityChange, notifyLeadTransfer, notifyDuplicateLead, notifyInternalNoteCreated } from "./notificationEngine";
 import { convertMoney, normalizeCurrency, BASE_CURRENCY } from "./lib/currency";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -2059,7 +2059,17 @@ export async function getInternalNotesByLead(leadId: number) {
 export async function createInternalNote(data: { leadId: number; userId: number; content: string }): Promise<number> {
   const db = await getDb();
   const result = await db.insert(internalNotes).values(data);
-  return Number((result as any)[0]?.insertId ?? 0);
+  const insertedId = Number((result as any)[0]?.insertId ?? 0);
+
+  // Fire-and-forget: notify lead owner and admins
+  notifyInternalNoteCreated({
+    leadId: data.leadId,
+    noteId: insertedId,
+    content: data.content,
+    creatorId: data.userId,
+  }).catch((err) => console.error("[NotificationEngine] notifyInternalNoteCreated error:", err));
+
+  return insertedId;
 }
 
 export async function deleteInternalNote(id: number, deletedByUserId?: number): Promise<void> {
