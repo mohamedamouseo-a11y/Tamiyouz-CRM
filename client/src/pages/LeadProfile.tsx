@@ -337,9 +337,9 @@ export default function LeadProfile() {
   const [editingActivity, setEditingActivity] = useState<{ id: number; type: string; outcome?: string; notes?: string; activityTime?: string } | null>(null);
 
   const { data: lead, isLoading, isError: isLeadError, error: leadError, refetch } = trpc.leads.byId.useQuery({ id: leadId }, { enabled: Number.isFinite(leadId), retry: false });
-  const { data: activities, refetch: refetchActivities } = trpc.activities.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
-  const { data: deal, refetch: refetchDeal } = trpc.deals.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
-  const clientByLeadQ = trpc.accountManagement.getClientByLeadId.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
+  const { data: activities, refetch: refetchActivities } = trpc.activities.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) && !!lead, retry: false });
+  const { data: deal, refetch: refetchDeal } = trpc.deals.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) && !!lead, retry: false });
+  const clientByLeadQ = trpc.accountManagement.getClientByLeadId.useQuery({ leadId }, { enabled: Number.isFinite(leadId) && !!lead, retry: false });
   const briefQ = trpc.accountManagement.getHandoverBrief.useQuery(
     { clientId: clientByLeadQ.data?.id ?? 0 },
     { enabled: !!clientByLeadQ.data?.id },
@@ -348,11 +348,11 @@ export default function LeadProfile() {
   const { data: campaigns } = trpc.campaigns.list.useQuery();
   const { data: allUsers } = trpc.users.list.useQuery();
   const users = ["Admin", "SalesManager", "admin"].includes(user?.role ?? "") ? allUsers : undefined;
-  const { data: internalNotes, refetch: refetchNotes } = trpc.notes.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
-  const { data: transfers, refetch: refetchTransfers } = trpc.transfers.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
-  const { data: attachments, refetch: refetchAttachments } = trpc.attachments.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
-  const { data: leadAssignments, refetch: refetchAssignments } = trpc.assignments.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
-  const { data: stageChanges } = trpc.auditLogs.byLeadStageChanges.useQuery({ leadId }, { enabled: Number.isFinite(leadId) });
+  const { data: internalNotes, refetch: refetchNotes } = trpc.notes.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) && !!lead, retry: false });
+  const { data: transfers, refetch: refetchTransfers } = trpc.transfers.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) && !!lead, retry: false });
+  const { data: attachments, refetch: refetchAttachments } = trpc.attachments.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) && !!lead, retry: false });
+  const { data: leadAssignments, refetch: refetchAssignments } = trpc.assignments.byLead.useQuery({ leadId }, { enabled: Number.isFinite(leadId) && !!lead, retry: false });
+  const { data: stageChanges } = trpc.auditLogs.byLeadStageChanges.useQuery({ leadId }, { enabled: Number.isFinite(leadId) && !!lead, retry: false });
   const { data: tamaraStatus } = trpc.tamara.isEnabled.useQuery();
   const { data: paymobStatus } = trpc.paymob.isEnabled.useQuery();
   const { data: slaConfig } = trpc.sla.get.useQuery();
