@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
-import PublicHelpLayout from "@/components/PublicHelpLayout";
+import CRMLayout from "@/components/CRMLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -1768,7 +1768,7 @@ export default function HelpCenter() {
   }, [navigate]);
 
   return (
-    <PublicHelpLayout>
+    <CRMLayout>
       <div className={`min-h-full space-y-6 p-4 md:p-6 ${isRTL ? "font-sans" : ""}`} dir={isRTL ? "rtl" : "ltr"}>
 
         {/* Hero Search */}
@@ -2074,6 +2074,6 @@ export default function HelpCenter() {
         </Card>
 
       </div>
-    </PublicHelpLayout>
+    </CRMLayout>
   );
 }

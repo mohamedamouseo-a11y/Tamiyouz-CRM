@@ -34,7 +34,6 @@ import TAMDashboard from "./pages/TAMDashboard";
 import CSATSurvey from "./pages/CSATSurvey";
 import AMCalendarPage from "./pages/AMCalendarPage";
 import HelpCenter from "./pages/HelpCenter";
-import AppRouteSeo from "./components/AppRouteSeo";
 import NotificationSettings from "./pages/NotificationSettings";
 import MetaCampaigns from "./pages/MetaCampaigns";
 import MetaCombinedPage from "./pages/MetaCombinedPage";
@@ -99,7 +98,6 @@ function App() {
             <TooltipProvider>
               <InnoCallProvider>
                 <Toaster />
-                <AppRouteSeo />
                 <Router />
                 <SalesHeroesChat />
               </InnoCallProvider>
