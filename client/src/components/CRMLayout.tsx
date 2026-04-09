@@ -214,6 +214,12 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
       roles: ["Admin", "admin", "AccountManagerLead"],
     },
     {
+      href: "/tam-dashboard",
+      labelKey: "tamDashboard",
+      icon: <ClipboardList size={18} />,
+      roles: ["Admin", "admin", "SalesManager", "AccountManager", "AccountManagerLead"],
+    },
+    {
       href: "/import",
       labelKey: "importLeads",
       icon: <FileSpreadsheet size={18} />,

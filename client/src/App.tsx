@@ -30,6 +30,7 @@ import ClientProfile from "./pages/ClientProfile";
 import RenewalPipeline from "./pages/RenewalPipeline";
 import AMDashboard from "./pages/AMDashboard";
 import AMLeadDashboard from "./pages/AMLeadDashboard";
+import TAMDashboard from "./pages/TAMDashboard";
 import CSATSurvey from "./pages/CSATSurvey";
 import AMCalendarPage from "./pages/AMCalendarPage";
 import HelpCenter from "./pages/HelpCenter";
@@ -68,6 +69,7 @@ function Router() {
       <Route path="/renewals" component={RenewalPipeline} />
       <Route path="/am-dashboard" component={AMDashboard} />
       <Route path="/am-lead-dashboard" component={AMLeadDashboard} />
+      <Route path="/tam-dashboard" component={TAMDashboard} />
       <Route path="/am-calendar" component={AMCalendarPage} />
       <Route path="/csat/:clientId" component={CSATSurvey} />
       <Route path="/notification-settings" component={NotificationSettings} />

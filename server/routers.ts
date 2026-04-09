@@ -185,7 +185,10 @@ import {
   smartHandover,
   addCollaborator,
   removeLeadAssignment,
-  checkLeadAccess,
+  getTamReviewByLead,
+  upsertTamReview,
+  submitTamSalesFeedback,
+  getTamDashboardStats,
   getMeetingNotificationConfig,
   updateMeetingNotificationConfig,
   getLeadReminders,
@@ -1528,6 +1531,128 @@ export const appRouter = router({
       }),
   }),
 
+  // ─── TAM Workflow ──────────────────────────────────────────────────────
+  tamWorkflow: router({
+    byLead: protectedProcedure
+      .input(z.object({ leadId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role === "SalesAgent") {
+          const access = await checkLeadAccess(input.leadId, ctx.user.id);
+          if (!access.hasAccess) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+          }
+        }
+        return getTamReviewByLead(input.leadId);
+      }),
+
+    upsert: protectedProcedure
+      .input(z.object({
+        leadId: z.number(),
+        status: z.enum(["Draft", "ReadyForSalesAction", "WaitingForReview", "ClosedWon", "ClosedLost"]).default("Draft"),
+        dropReasonCategory: z.enum(["service_understanding", "wrong_expectations", "technical_gap", "budget", "timing", "trust", "competition", "other"]).default("other"),
+        dropReasonDetails: z.string().optional(),
+        leadNature: z.string().optional(),
+        insightDoc: z.string().optional(),
+        nextBestAction: z.string().optional(),
+        salesImprovementNotes: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const lead = await getLeadById(input.leadId);
+        if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found" });
+
+        const access = await checkLeadAccess(input.leadId, ctx.user.id);
+        const isPrivileged = ["Admin", "admin", "SalesManager"].includes(ctx.user.role);
+        const canManage = isPrivileged || ["technical_account_manager", "account_manager"].includes(access.role ?? "");
+        if (!canManage) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the TAM owner can update this workflow" });
+        }
+
+        const id = await upsertTamReview({
+          leadId: input.leadId,
+          tamUserId: ctx.user.id,
+          salesUserId: lead.ownerId ?? null,
+          status: input.status,
+          dropReasonCategory: input.dropReasonCategory,
+          dropReasonDetails: input.dropReasonDetails,
+          leadNature: input.leadNature,
+          insightDoc: input.insightDoc,
+          nextBestAction: input.nextBestAction,
+          salesImprovementNotes: input.salesImprovementNotes,
+        });
+
+        if (input.status === "ReadyForSalesAction" && lead.ownerId) {
+          await createInAppNotification({
+            userId: lead.ownerId,
+            type: "internal_note" as any,
+            title: `TAM guidance is ready for ${lead.name || lead.phone || `Lead #${lead.id}`}`,
+            titleAr: `تمت إضافة توجيهات TAM للعميل ${lead.name || lead.phone || `#${lead.id}`}`,
+            body: input.nextBestAction || input.insightDoc || "Review Lobna's guidance before contacting the lead.",
+            bodyAr: input.nextBestAction || input.insightDoc || "راجع التوجيهات قبل التواصل مع العميل.",
+            isRead: false,
+            link: `/leads/${input.leadId}`,
+            metadata: { leadId: input.leadId, trigger: "tam_ready_for_sales_action", workflowStatus: input.status },
+          } as any);
+        }
+
+        return { id, success: true };
+      }),
+
+    submitSalesFeedback: protectedProcedure
+      .input(z.object({
+        leadId: z.number(),
+        callOutcome: z.enum(["Interested", "NotInterested", "NeedFollowUp", "NoAnswer", "Won", "Lost", "Other"]),
+        objection: z.string().optional(),
+        nextStep: z.string().min(1),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const lead = await getLeadById(input.leadId);
+        if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found" });
+
+        const isPrivileged = ["Admin", "admin", "SalesManager"].includes(ctx.user.role);
+        const access = await checkLeadAccess(input.leadId, ctx.user.id);
+        const isSalesOwner = lead.ownerId === ctx.user.id || access.role === "owner";
+        if (!isPrivileged && !isSalesOwner) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only the sales owner can submit this follow-up" });
+        }
+
+        const review = await getTamReviewByLead(input.leadId);
+        if (!review?.id) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "TAM review not found" });
+        }
+
+        const id = await submitTamSalesFeedback({
+          leadId: input.leadId,
+          salesUserId: ctx.user.id,
+          callOutcome: input.callOutcome,
+          objection: input.objection,
+          nextStep: input.nextStep,
+        });
+
+        if (review.tamUserId && review.tamUserId !== ctx.user.id) {
+          await createInAppNotification({
+            userId: review.tamUserId,
+            type: "internal_note" as any,
+            title: `Sales follow-up submitted for ${lead.name || lead.phone || `Lead #${lead.id}`}`,
+            titleAr: `تم إرسال نتيجة متابعة السيلز للعميل ${lead.name || lead.phone || `#${lead.id}`}`,
+            body: `Outcome: ${input.callOutcome}. Next step: ${input.nextStep}`,
+            bodyAr: `النتيجة: ${input.callOutcome}. الخطوة التالية: ${input.nextStep}`,
+            isRead: false,
+            link: `/leads/${input.leadId}`,
+            metadata: { leadId: input.leadId, trigger: "tam_sales_feedback", callOutcome: input.callOutcome },
+          } as any);
+        }
+
+        return { id, success: true };
+      }),
+
+    dashboard: protectedProcedure
+      .input(z.object({ userId: z.number().optional(), dateFrom: z.date().optional(), dateTo: z.date().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const isPrivileged = ["Admin", "admin", "SalesManager", "AccountManagerLead"].includes(ctx.user.role);
+        const targetUserId = isPrivileged && input?.userId ? input.userId : ctx.user.id;
+        return getTamDashboardStats(targetUserId, input?.dateFrom, input?.dateTo);
+      }),
+  }),
 
 
 // ─── Lead Attachments ─────────────────────────────────────────────────────
@@ -1722,7 +1847,7 @@ attachments: router({
       .input(z.object({
         leadId: z.number(),
         userId: z.number(),
-        role: z.enum(["collaborator", "client_success", "account_manager", "observer"]),
+        role: z.enum(["collaborator", "client_success", "account_manager", "technical_account_manager", "observer"]),
         reason: z.string().optional(),
         notes: z.string().optional(),
       }))
@@ -1752,12 +1877,14 @@ attachments: router({
             collaborator: "Collaborator",
             client_success: "Client Success",
             account_manager: "Account Manager",
+            technical_account_manager: "Technical Account Manager",
             observer: "Observer",
           };
           const roleLabelsAr: Record<string, string> = {
             collaborator: "متعاون",
             client_success: "نجاح العملاء",
             account_manager: "مدير حسابات",
+            technical_account_manager: "مدير حسابات تقني",
             observer: "مراقب",
           };
           const roleLabel = roleLabels[input.role] ?? input.role;

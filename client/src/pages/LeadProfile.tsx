@@ -1,4 +1,5 @@
 import LeadReminders from "@/components/LeadReminders";
+import TAMWorkflowCard from "@/components/TAMWorkflowCard";
 import CRMLayout from "@/components/CRMLayout";
 import LeadQualityBadge from "@/components/LeadQualityBadge";
 import { Badge } from "@/components/ui/badge";
@@ -1620,6 +1621,7 @@ export default function LeadProfile() {
                           observer: isRTL ? "مراقب" : "Observer",
                           client_success: "Client Success",
                           account_manager: "Account Manager",
+                          technical_account_manager: "Technical Account Manager",
                         };
                         const roleColors: Record<string, string> = {
                           owner: "bg-blue-100 text-blue-800 border-blue-300",
@@ -1627,6 +1629,7 @@ export default function LeadProfile() {
                           observer: "bg-gray-100 text-gray-600 border-gray-300",
                           client_success: "bg-amber-100 text-amber-800 border-amber-300",
                           account_manager: "bg-green-100 text-green-800 border-green-300",
+                          technical_account_manager: "bg-violet-100 text-violet-800 border-violet-300",
                         };
 
                         return (
@@ -1673,6 +1676,8 @@ export default function LeadProfile() {
                   )}
                 </CardContent>
               </Card>
+
+              <TAMWorkflowCard leadId={leadId} leadOwnerId={lead?.ownerId} />
 
               {/* ── Attachments ── */}
               <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
@@ -2074,6 +2079,7 @@ export default function LeadProfile() {
                   <SelectItem value="collaborator">{isRTL ? "متعاون (تعديل)" : "Collaborator (Edit)"}</SelectItem>
                   <SelectItem value="client_success">{isRTL ? "Client Success Lead" : "Client Success Lead"}</SelectItem>
                   <SelectItem value="account_manager">{isRTL ? "Account Manager" : "Account Manager"}</SelectItem>
+                  <SelectItem value="technical_account_manager">{isRTL ? "Technical Account Manager" : "Technical Account Manager"}</SelectItem>
                   <SelectItem value="observer">{isRTL ? "مراقب (عرض فقط)" : "Observer (View Only)"}</SelectItem>
                 </SelectContent>
               </Select>

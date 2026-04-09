@@ -706,7 +706,7 @@ export const leadAssignments = mysqlTable("lead_assignments", {
 id: int().autoincrement().notNull(),
 leadId: int(),
 userId: int().notNull(),
-role: mysqlEnum(['owner','collaborator','observer','client_success','account_manager']).default('collaborator').notNull(),
+role: mysqlEnum(['owner','collaborator','observer','client_success','account_manager','technical_account_manager']).default('collaborator').notNull(),
 permissions: mysqlEnum(['full','edit','view']).default('edit').notNull(),
 assignedBy: int(),
 reason: varchar({ length: 500 }),
@@ -725,6 +725,37 @@ primaryKey({ columns: [table.id], name: "lead_assignments_id"}),
 ]);
 export type LeadAssignment = typeof leadAssignments.$inferSelect;
 export type InsertLeadAssignment = typeof leadAssignments.$inferInsert;
+
+// ─── TAM Workflow Reviews ───────────────────────────────────────────────────
+export const leadTamReviews = mysqlTable("lead_tam_reviews", {
+id: int().autoincrement().notNull(),
+leadId: int().notNull(),
+tamUserId: int().notNull(),
+salesUserId: int(),
+status: mysqlEnum("lead_tam_review_status", ['Draft','ReadyForSalesAction','WaitingForReview','ClosedWon','ClosedLost']).default('Draft').notNull(),
+dropReasonCategory: mysqlEnum("lead_tam_review_drop_reason", ['service_understanding','wrong_expectations','technical_gap','budget','timing','trust','competition','other']).default('other').notNull(),
+dropReasonDetails: text(),
+leadNature: text(),
+insightDoc: text(),
+nextBestAction: text(),
+salesImprovementNotes: text(),
+callOutcome: mysqlEnum("lead_tam_review_call_outcome", ['Interested','NotInterested','NeedFollowUp','NoAnswer','Won','Lost','Other']),
+objection: text(),
+nextStep: text(),
+readyForSalesActionAt: timestamp({ mode: 'string' }),
+salesFeedbackAt: timestamp({ mode: 'string' }),
+createdAt: timestamp({ mode: 'string' }).default(sql`(now())`).notNull(),
+updatedAt: timestamp({ mode: 'string' }).default(sql`(now())`).onUpdateNow().notNull(),
+},
+(table) => [
+index("idx_tamreviews_leadId").on(table.leadId),
+index("idx_tamreviews_tamUserId").on(table.tamUserId),
+index("idx_tamreviews_salesUserId").on(table.salesUserId),
+index("idx_tamreviews_status").on(table.status),
+primaryKey({ columns: [table.id], name: "lead_tam_reviews_id"}),
+]);
+export type LeadTamReview = typeof leadTamReviews.$inferSelect;
+export type InsertLeadTamReview = typeof leadTamReviews.$inferInsert;
 
 // ─── Meeting Notification Config ──────────────────────────────────────────────
 export const meetingNotificationConfig = mysqlTable("meeting_notification_config", {

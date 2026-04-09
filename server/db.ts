@@ -66,6 +66,8 @@ import {
   clientCommunications,
   csatSurveys,
   leadAssignments,
+  leadTamReviews,
+  InsertLeadTamReview,
   InsertClientObjective,
   InsertKeyResult,
   InsertDeliverable,
@@ -4409,7 +4411,7 @@ export async function getLeadAssignments(leadId: number) {
     LEFT JOIN users u ON u.id = la.userId
     LEFT JOIN users ab ON ab.id = la.assignedBy
     WHERE la.leadId = ${leadId} AND la.isActive = 1
-    ORDER BY FIELD(la.role, 'owner', 'collaborator', 'client_success', 'account_manager', 'observer'), la.createdAt ASC
+    ORDER BY FIELD(la.role, 'owner', 'collaborator', 'client_success', 'account_manager', 'technical_account_manager', 'observer'), la.createdAt ASC
   `);
   return (rows as any)[0] ?? [];
 }
@@ -4585,6 +4587,7 @@ export async function addCollaborator(data: {
     collaborator: 'edit',
     client_success: 'edit',
     account_manager: 'full',
+    technical_account_manager: 'edit',
     observer: 'view',
   };
   return createLeadAssignment({
@@ -4618,7 +4621,7 @@ export async function checkLeadAccess(leadId: number, userId: number): Promise<{
   const rows = await db.execute(sql`
     SELECT role, permissions FROM lead_assignments
     WHERE leadId = ${leadId} AND userId = ${userId} AND isActive = 1
-    ORDER BY FIELD(role, 'owner', 'collaborator', 'client_success', 'account_manager', 'observer')
+    ORDER BY FIELD(role, 'owner', 'collaborator', 'client_success', 'account_manager', 'technical_account_manager', 'observer')
     LIMIT 1
   `);
   const result = (rows as any)[0] ?? [];
@@ -4626,6 +4629,158 @@ export async function checkLeadAccess(leadId: number, userId: number): Promise<{
     return { hasAccess: true, role: result[0].role, permissions: result[0].permissions };
   }
   return { hasAccess: false, role: null, permissions: null };
+}
+
+// ─── TAM Workflow Reviews ───────────────────────────────────────────────────
+export async function getTamReviewByLead(leadId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.execute(sql`
+    SELECT r.*, tu.name AS tamUserName, su.name AS salesUserName
+    FROM lead_tam_reviews r
+    LEFT JOIN users tu ON tu.id = r.tamUserId
+    LEFT JOIN users su ON su.id = r.salesUserId
+    WHERE r.leadId = ${leadId}
+    ORDER BY r.updatedAt DESC
+    LIMIT 1
+  `);
+  return (rows as any)[0]?.[0] ?? null;
+}
+
+export async function upsertTamReview(data: {
+  leadId: number;
+  tamUserId: number;
+  salesUserId?: number | null;
+  status?: 'Draft' | 'ReadyForSalesAction' | 'WaitingForReview' | 'ClosedWon' | 'ClosedLost';
+  dropReasonCategory?: 'service_understanding' | 'wrong_expectations' | 'technical_gap' | 'budget' | 'timing' | 'trust' | 'competition' | 'other';
+  dropReasonDetails?: string | null;
+  leadNature?: string | null;
+  insightDoc?: string | null;
+  nextBestAction?: string | null;
+  salesImprovementNotes?: string | null;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const existing = await getTamReviewByLead(data.leadId);
+  const patch: Partial<InsertLeadTamReview> = {
+    tamUserId: data.tamUserId,
+    ...(data.salesUserId !== undefined ? { salesUserId: data.salesUserId } : {}),
+    ...(data.status ? { status: data.status } : {}),
+    ...(data.dropReasonCategory ? { dropReasonCategory: data.dropReasonCategory } : {}),
+    ...(data.dropReasonDetails !== undefined ? { dropReasonDetails: data.dropReasonDetails } : {}),
+    ...(data.leadNature !== undefined ? { leadNature: data.leadNature } : {}),
+    ...(data.insightDoc !== undefined ? { insightDoc: data.insightDoc } : {}),
+    ...(data.nextBestAction !== undefined ? { nextBestAction: data.nextBestAction } : {}),
+    ...(data.salesImprovementNotes !== undefined ? { salesImprovementNotes: data.salesImprovementNotes } : {}),
+    ...(data.status === 'ReadyForSalesAction' ? { readyForSalesActionAt: new Date().toISOString().slice(0, 19).replace('T', ' ') } : {}),
+  };
+
+  if (existing?.id) {
+    await db.update(leadTamReviews).set(patch as any).where(eq(leadTamReviews.id, existing.id));
+    return Number(existing.id);
+  }
+
+  const result = await db.insert(leadTamReviews).values({
+    leadId: data.leadId,
+    tamUserId: data.tamUserId,
+    salesUserId: data.salesUserId ?? null,
+    status: data.status ?? 'Draft',
+    dropReasonCategory: data.dropReasonCategory ?? 'other',
+    dropReasonDetails: data.dropReasonDetails ?? null,
+    leadNature: data.leadNature ?? null,
+    insightDoc: data.insightDoc ?? null,
+    nextBestAction: data.nextBestAction ?? null,
+    salesImprovementNotes: data.salesImprovementNotes ?? null,
+    readyForSalesActionAt: data.status === 'ReadyForSalesAction' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null,
+  } as any);
+  return Number((result as any)[0]?.insertId ?? 0);
+}
+
+export async function submitTamSalesFeedback(data: {
+  leadId: number;
+  salesUserId: number;
+  callOutcome: 'Interested' | 'NotInterested' | 'NeedFollowUp' | 'NoAnswer' | 'Won' | 'Lost' | 'Other';
+  objection?: string | null;
+  nextStep?: string | null;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const existing = await getTamReviewByLead(data.leadId);
+  if (!existing?.id) throw new Error('TAM review not found');
+
+  const nextStatus = data.callOutcome === 'Won'
+    ? 'ClosedWon'
+    : data.callOutcome === 'Lost'
+      ? 'ClosedLost'
+      : 'WaitingForReview';
+
+  await db.update(leadTamReviews).set({
+    salesUserId: data.salesUserId,
+    callOutcome: data.callOutcome,
+    objection: data.objection ?? null,
+    nextStep: data.nextStep ?? null,
+    salesFeedbackAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    status: nextStatus as any,
+  } as any).where(eq(leadTamReviews.id, existing.id));
+
+  return Number(existing.id);
+}
+
+export async function getTamDashboardStats(tamUserId: number, dateFrom?: Date, dateTo?: Date) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      kpis: { workedLeads: 0, wonAfterReview: 0, readyForSales: 0, waitingReview: 0, winRate: 0 },
+      recentLeads: [],
+    };
+  }
+
+  const filters: any[] = [eq(leadTamReviews.tamUserId, tamUserId)];
+  if (dateFrom) filters.push(gte(leadTamReviews.createdAt, dateFrom.toISOString().slice(0, 19).replace('T', ' ')) as any);
+  if (dateTo) filters.push(lte(leadTamReviews.createdAt, dateTo.toISOString().slice(0, 19).replace('T', ' ')) as any);
+
+  const reviews = await db.select().from(leadTamReviews).where(and(...filters)).orderBy(desc(leadTamReviews.updatedAt));
+  const leadIds = reviews.map((review) => review.leadId);
+
+  let wonAfterReview = 0;
+  if (leadIds.length) {
+    const wonRows = await db.execute(sql`
+      SELECT DISTINCT r.leadId
+      FROM lead_tam_reviews r
+      LEFT JOIN deals d ON d.leadId = r.leadId AND d.deletedAt IS NULL
+      LEFT JOIN leads l ON l.id = r.leadId AND l.deletedAt IS NULL
+      WHERE r.tamUserId = ${tamUserId}
+        AND (d.status = 'Won' OR l.stage = 'Won')
+        ${dateFrom ? sql`AND r.createdAt >= ${dateFrom.toISOString().slice(0, 19).replace('T', ' ')}` : sql``}
+        ${dateTo ? sql`AND r.createdAt <= ${dateTo.toISOString().slice(0, 19).replace('T', ' ')}` : sql``}
+    `);
+    wonAfterReview = Number(((wonRows as any)[0] ?? []).length);
+  }
+
+  const recentRows = leadIds.length
+    ? await db.execute(sql`
+        SELECT r.id, r.leadId, r.status, r.dropReasonCategory, r.callOutcome, r.updatedAt,
+               l.name AS leadName, l.phone AS leadPhone, l.stage AS leadStage,
+               u.name AS salesOwnerName
+        FROM lead_tam_reviews r
+        LEFT JOIN leads l ON l.id = r.leadId
+        LEFT JOIN users u ON u.id = r.salesUserId
+        WHERE r.tamUserId = ${tamUserId}
+        ORDER BY r.updatedAt DESC
+        LIMIT 12
+      `)
+    : [{ 0: [] }];
+
+  const readyForSales = reviews.filter((review) => review.status === 'ReadyForSalesAction').length;
+  const waitingReview = reviews.filter((review) => review.status === 'WaitingForReview').length;
+  const workedLeads = new Set(reviews.map((review) => review.leadId)).size;
+  const winRate = workedLeads > 0 ? Math.round((wonAfterReview / workedLeads) * 1000) / 10 : 0;
+
+  return {
+    kpis: { workedLeads, wonAfterReview, readyForSales, waitingReview, winRate },
+    recentLeads: (recentRows as any)[0] ?? [],
+  };
 }
 
 // ─── Meeting Notification Config ──────────────────────────────────────────────
