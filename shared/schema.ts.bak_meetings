@@ -729,37 +729,6 @@ primaryKey({ columns: [table.id], name: "lead_tam_reviews_id"}),
 export type LeadTamReview = typeof leadTamReviews.$inferSelect;
 export type InsertLeadTamReview = typeof leadTamReviews.$inferInsert;
 
-// ─── TAM Meeting Briefs ─────────────────────────────────────────────────────
-export const leadMeetingBriefs = mysqlTable("lead_meeting_briefs", {
-id: int().autoincrement().notNull(),
-leadId: int().notNull(),
-tamUserId: int().notNull(),
-salesUserId: int(),
-meetingAt: timestamp({ mode: 'string' }).notNull(),
-source: mysqlEnum('lead_meeting_brief_source', ['activity','calendar','manual']).default('manual').notNull(),
-calendarEventId: varchar({ length: 255 }),
-status: mysqlEnum('lead_meeting_brief_status', ['Draft','ReadyForMeeting','Completed']).default('Draft').notNull(),
-talkingPoints: text(),
-objectives: text(),
-clientNeedsToHear: text(),
-redFlags: text(),
-prepareReminderId: int(),
-salesReminderId: int(),
-readyAt: timestamp({ mode: 'string' }),
-createdAt: timestamp({ mode: 'string' }).default(sql`(now())`).notNull(),
-updatedAt: timestamp({ mode: 'string' }).default(sql`(now())`).onUpdateNow().notNull(),
-},
-(table) => [
-index("idx_meetingbrief_leadId").on(table.leadId),
-index("idx_meetingbrief_tamUserId").on(table.tamUserId),
-index("idx_meetingbrief_salesUserId").on(table.salesUserId),
-index("idx_meetingbrief_status").on(table.status),
-index("idx_meetingbrief_meetingAt").on(table.meetingAt),
-primaryKey({ columns: [table.id], name: "lead_meeting_briefs_id"}),
-]);
-export type LeadMeetingBrief = typeof leadMeetingBriefs.$inferSelect;
-export type InsertLeadMeetingBrief = typeof leadMeetingBriefs.$inferInsert;
-
 // ─── Meeting Notification Config ──────────────────────────────────────────────
 export const meetingNotificationConfig = mysqlTable("meeting_notification_config", {
 	id: int().autoincrement().notNull(),

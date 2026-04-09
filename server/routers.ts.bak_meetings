@@ -189,9 +189,6 @@ import {
   upsertTamReview,
   submitTamSalesFeedback,
   getTamDashboardStats,
-  getLeadMeetingBriefByLead,
-  upsertLeadMeetingBrief,
-  ensureMeetingBriefAutomationForLead,
   getMeetingNotificationConfig,
   updateMeetingNotificationConfig,
   getLeadReminders,
@@ -1024,21 +1021,6 @@ export const appRouter = router({
           }
         }
 
-        if (input.type === "Meeting" && input.activityTime) {
-          try {
-            const lead = await getLeadById(input.leadId);
-            await ensureMeetingBriefAutomationForLead({
-              leadId: input.leadId,
-              meetingAt: new Date(input.activityTime),
-              salesUserId: lead?.ownerId ?? ctx.user.id,
-              actorUserId: ctx.user.id,
-              source: "activity",
-            });
-          } catch (err) {
-            console.error("[MeetingBrief] Error creating meeting brief workflow from activity:", err);
-          }
-        }
-
         return { id };
       }),
 
@@ -1672,118 +1654,6 @@ export const appRouter = router({
       }),
   }),
 
-  meetingBriefs: router({
-    byLead: protectedProcedure
-      .input(z.object({ leadId: z.number() }))
-      .query(async ({ ctx, input }) => {
-        if (ctx.user.role === "SalesAgent") {
-          const access = await checkLeadAccess(input.leadId, ctx.user.id);
-          if (!access.hasAccess) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-          }
-        }
-        return getLeadMeetingBriefByLead(input.leadId);
-      }),
-
-    upsert: protectedProcedure
-      .input(z.object({
-        leadId: z.number(),
-        meetingAt: z.date().optional(),
-        status: z.enum(["Draft", "ReadyForMeeting", "Completed"]).default("Draft"),
-        talkingPoints: z.string().optional(),
-        objectives: z.string().optional(),
-        clientNeedsToHear: z.string().optional(),
-        redFlags: z.string().optional(),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        const lead = await getLeadById(input.leadId);
-        if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found" });
-
-        const access = await checkLeadAccess(input.leadId, ctx.user.id);
-        const existing = await getLeadMeetingBriefByLead(input.leadId);
-        const isPrivileged = ["Admin", "admin", "SalesManager"].includes(ctx.user.role);
-        const canManage = isPrivileged || ["technical_account_manager", "account_manager"].includes(access.role ?? "");
-        if (!canManage) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only the TAM owner can update the meeting brief" });
-        }
-
-        const meetingAt = input.meetingAt ?? (existing?.meetingAt ? new Date(String(existing.meetingAt).replace(' ', 'T')) : undefined);
-        const id = await upsertLeadMeetingBrief({
-          leadId: input.leadId,
-          tamUserId: Number(existing?.tamUserId ?? ctx.user.id),
-          salesUserId: lead.ownerId ?? null,
-          meetingAt,
-          source: existing?.source ?? 'manual',
-          calendarEventId: existing?.calendarEventId ?? null,
-          status: input.status,
-          talkingPoints: input.talkingPoints,
-          objectives: input.objectives,
-          clientNeedsToHear: input.clientNeedsToHear,
-          redFlags: input.redFlags,
-          prepareReminderId: existing?.prepareReminderId ? Number(existing.prepareReminderId) : undefined,
-          salesReminderId: existing?.salesReminderId ? Number(existing.salesReminderId) : undefined,
-        });
-
-        if (input.status === "ReadyForMeeting" && lead.ownerId && meetingAt) {
-          const reminderDate = new Date(meetingAt);
-          reminderDate.setHours(reminderDate.getHours() - 2);
-          const effectiveReminderDate = reminderDate > new Date() ? reminderDate : new Date();
-          let salesReminderId = existing?.salesReminderId ? Number(existing.salesReminderId) : 0;
-          if (salesReminderId) {
-            await updateLeadReminder(salesReminderId, {
-              title: "Review Meeting Brief",
-              description: input.clientNeedsToHear || input.talkingPoints || "Review the TAM meeting brief before the meeting.",
-              reminderDate: effectiveReminderDate,
-              reminderTime: effectiveReminderDate.toTimeString().slice(0, 5),
-              priority: 'High',
-              color: '#2563eb',
-              status: 'Pending',
-            });
-          } else {
-            salesReminderId = await createLeadReminder({
-              leadId: input.leadId,
-              userId: lead.ownerId,
-              title: "Review Meeting Brief",
-              description: input.clientNeedsToHear || input.talkingPoints || "Review the TAM meeting brief before the meeting.",
-              reminderDate: effectiveReminderDate,
-              reminderTime: effectiveReminderDate.toTimeString().slice(0, 5),
-              priority: 'High',
-              color: '#2563eb',
-            });
-          }
-          await upsertLeadMeetingBrief({
-            leadId: input.leadId,
-            tamUserId: Number(existing?.tamUserId ?? ctx.user.id),
-            salesUserId: lead.ownerId ?? null,
-            meetingAt,
-            source: existing?.source ?? 'manual',
-            calendarEventId: existing?.calendarEventId ?? null,
-            status: input.status,
-            talkingPoints: input.talkingPoints,
-            objectives: input.objectives,
-            clientNeedsToHear: input.clientNeedsToHear,
-            redFlags: input.redFlags,
-            prepareReminderId: existing?.prepareReminderId ? Number(existing.prepareReminderId) : undefined,
-            salesReminderId,
-          });
-
-          await createInAppNotification({
-            userId: lead.ownerId,
-            type: "internal_note" as any,
-            title: `Meeting brief is ready for ${lead.name || lead.phone || `Lead #${lead.id}`}`,
-            titleAr: `تم تجهيز Meeting Brief للعميل ${lead.name || lead.phone || `#${lead.id}`}`,
-            body: input.clientNeedsToHear || input.talkingPoints || "Review the brief before contacting the client.",
-            bodyAr: input.clientNeedsToHear || input.talkingPoints || "راجع الـ brief قبل التواصل مع العميل.",
-            isRead: false,
-            link: `/leads/${input.leadId}`,
-            metadata: { leadId: input.leadId, trigger: "tam_meeting_brief_ready", meetingAt: meetingAt.toISOString() },
-          } as any);
-        }
-
-        return { id, success: true };
-      }),
-  }),
-
 
 // ─── Lead Attachments ─────────────────────────────────────────────────────
 attachments: router({
@@ -2396,21 +2266,6 @@ byLeadStageChanges: protectedProcedure
           entityId: 0,
           details: { eventId: result.id, summary: input.summary, leadId: input.leadId },
         });
-        if (input.leadId) {
-          try {
-            const lead = await getLeadById(input.leadId);
-            await ensureMeetingBriefAutomationForLead({
-              leadId: input.leadId,
-              meetingAt: new Date(input.startDateTime),
-              salesUserId: lead?.ownerId ?? ctx.user.id,
-              actorUserId: ctx.user.id,
-              source: "calendar",
-              calendarEventId: result.id,
-            });
-          } catch (err) {
-            console.error("[MeetingBrief] Error creating meeting brief workflow from calendar:", err);
-          }
-        }
         return result;
       }),
 

@@ -1,6 +1,5 @@
 import LeadReminders from "@/components/LeadReminders";
 import TAMWorkflowCard from "@/components/TAMWorkflowCard";
-import MeetingBriefCard from "@/components/MeetingBriefCard";
 import CRMLayout from "@/components/CRMLayout";
 import LeadQualityBadge from "@/components/LeadQualityBadge";
 import { Badge } from "@/components/ui/badge";
@@ -1679,7 +1678,6 @@ export default function LeadProfile() {
               </Card>
 
               <TAMWorkflowCard leadId={leadId} leadOwnerId={lead?.ownerId} />
-              <MeetingBriefCard leadId={leadId} leadOwnerId={lead?.ownerId} leadStage={lead?.stage} />
 
               {/* ── Attachments ── */}
               <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
