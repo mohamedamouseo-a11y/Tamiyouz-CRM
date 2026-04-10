@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -422,8 +423,8 @@ export default function RakanWidget() {
   const rakanName = "راكان";
 
   if (isDismissed) {
-    return (
-      <div className={cn("fixed z-50", isRTL ? "left-6" : "right-6")} style={{ bottom: "24px" }}>
+    return createPortal(
+      <div className={cn("fixed z-[9999]", isRTL ? "left-6" : "right-6")} style={{ bottom: "24px" }}>
         <button
           onClick={handleShow}
           className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-700 text-white shadow-lg transition-all hover:scale-110"
@@ -432,17 +433,17 @@ export default function RakanWidget() {
           <Bot size={18} />
         </button>
       </div>
-    );
+    , document.body);
   }
 
-  return (
+  return createPortal(
     <TooltipProvider>
-      <div className={cn("fixed z-50", isRTL ? "left-6" : "right-6")} style={{ bottom: "96px" }}>
+      <div className={cn("fixed z-[9999]", isRTL ? "left-6" : "right-6")} style={{ bottom: "96px" }}>
         {/* ── Chat Window ──────────────────────────────────────────────────── */}
         {isOpen && (
           <div
             className={cn(
-              "fixed w-[380px] max-w-[calc(100vw-2rem)]",
+              "fixed z-[9999] w-[380px] max-w-[calc(100vw-2rem)]",
               "bg-background border border-border rounded-2xl shadow-2xl",
               "flex flex-col overflow-hidden",
               "animate-in slide-in-from-bottom-4 fade-in duration-200",
@@ -1077,5 +1078,5 @@ export default function RakanWidget() {
         )}
       </div>
     </TooltipProvider>
-  );
+  , document.body);
 }

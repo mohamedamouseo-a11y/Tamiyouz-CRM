@@ -62,8 +62,12 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [logoImgError, setLogoImgError] = useState(false);
   const sidebarNavRef = useRef<HTMLElement>(null);
   const sidebarScrollPos = useRef(0);
+
+  // Reset logo error when URL changes (e.g. after admin saves a new logo)
+  useEffect(() => { setLogoImgError(false); }, [tokens.logoUrl]);
 
   // Preserve sidebar scroll position across navigations
   const handleNavScroll = useCallback(() => {
@@ -264,8 +268,8 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border/50" style={{ background: `linear-gradient(135deg, color-mix(in srgb, ${tokens.primaryColor} 8%, transparent), transparent)` }}>
-        {tokens.logoUrl ? (
-          <img src={tokens.logoUrl} alt="Logo" className="h-9 w-auto drop-shadow-sm" />
+        {tokens.logoUrl && !logoImgError ? (
+          <img src={tokens.logoUrl} alt="Logo" className="h-9 w-auto drop-shadow-sm" onError={() => setLogoImgError(true)} />
         ) : (
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg"
