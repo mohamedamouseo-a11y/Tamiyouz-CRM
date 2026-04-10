@@ -12,8 +12,7 @@ import { X, Send, Search, Minimize2, Maximize2, Smile } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const LOGO_URL =
-  "https://tamiyouz.com/wp-content/uploads/2025/06/logo_6c7f064383640f5c36d63389d45cf9ed_1x.webp";
+const LOGO_URL = "/logo.png";
 
 type ChatUser = {
   id: number;
@@ -92,7 +91,7 @@ export default function SalesHeroesChat() {
   const [isMinimized, setIsMinimized] = useState(false);
 
   // ─── Draggable state ───────────────────────────────────────────────
-  const [position, setPosition] = useState({ x: 40, y: 40 }); // distance from right/bottom
+  const [position, setPosition] = useState({ x: 24, y: 24 }); // distance from right/bottom
   const dragging = useRef(false);
   const dragStart = useRef({ px: 0, py: 0, sx: 0, sy: 0 });
   const wasDragged = useRef(false);
