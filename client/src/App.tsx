@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -74,8 +74,12 @@ function Router() {
       <Route path="/am-calendar" component={AMCalendarPage} />
       <Route path="/csat/:clientId" component={CSATSurvey} />
       <Route path="/notification-settings" component={NotificationSettings} />
-      <Route path="/help-center" component={HelpCenter} />
-      <Route path="/help-center/:slug" component={HelpCenter} />
+      <Route path="/help-center">{() => <Redirect to="/ar/help-center" />}</Route>
+      <Route path="/help-center/:slug">{(p: any) => <Redirect to={"/ar/help-center/" + p.slug} />}</Route>
+      <Route path="/ar/help-center" component={HelpCenter} />
+      <Route path="/ar/help-center/:slug" component={HelpCenter} />
+      <Route path="/en/help-center" component={HelpCenter} />
+      <Route path="/en/help-center/:slug" component={HelpCenter} />
       <Route path="/support-center" component={SupportCenter} />
       <Route path="/support-center/admin" component={SupportAdminInbox} />
       <Route path="/support-center/:id" component={SupportRequestDetail} />

@@ -6,7 +6,12 @@ export default function AppRouteSeo() {
   const [location] = useLocation();
 
   useEffect(() => {
-    if (location.startsWith("/help-center")) return;
+    const isPublicHelp = (
+      location.startsWith("/help-center") ||
+      location.startsWith("/ar/help-center") ||
+      location.startsWith("/en/help-center")
+    );
+    if (isPublicHelp) return;
 
     applyDocumentSeo({
       title: "Tamiyouz CRM",

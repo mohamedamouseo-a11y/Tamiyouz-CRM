@@ -1,0 +1,709 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/getting-started--dashboard</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--dashboard"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/getting-started--dashboard"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--dashboard"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/getting-started--settings</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--settings"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/getting-started--settings"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--settings"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/getting-started--roles-permissions</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--roles-permissions"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/getting-started--roles-permissions"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--roles-permissions"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/getting-started--data-import</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--data-import"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/getting-started--data-import"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--data-import"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/getting-started--backup</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--backup"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/getting-started--backup"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--backup"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--leads</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--leads"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--leads"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--leads"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--deals</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--deals"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--deals"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--deals"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--sales-funnel</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--sales-funnel"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--sales-funnel"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--sales-funnel"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--activities</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--activities"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--activities"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--activities"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--renewals</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--renewals"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--renewals"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--renewals"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--customers</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--customers"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--customers"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--customers"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--customer-profile</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--customer-profile"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--customer-profile"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--customer-profile"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--tamara-payments</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--tamara-payments"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--tamara-payments"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--tamara-payments"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--client-handover</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--client-handover"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--client-handover"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--client-handover"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--campaigns</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--campaigns"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--campaigns"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--campaigns"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--meta-campaigns</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--meta-campaigns"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--meta-campaigns"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--meta-campaigns"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--tiktok-campaigns</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--tiktok-campaigns"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--tiktok-campaigns"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--tiktok-campaigns"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--campaign-analytics</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--campaign-analytics"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--campaign-analytics"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--campaign-analytics"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--meta-integration</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--meta-integration"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--meta-integration"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--meta-integration"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--tiktok-integration</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--tiktok-integration"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--tiktok-integration"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--tiktok-integration"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--team-dashboard</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--team-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--team-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--team-dashboard"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--audit-log</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--audit-log"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--audit-log"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--audit-log"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--meta-aggregated-analytics</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--meta-aggregated-analytics"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--meta-aggregated-analytics"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--meta-aggregated-analytics"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--account-manager-dashboard</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--account-manager-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--account-manager-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--account-manager-dashboard"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--rakan-ai</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--rakan-ai"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/smart-tools-ai--rakan-ai"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--rakan-ai"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--lead-intelligence</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--lead-intelligence"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/smart-tools-ai--lead-intelligence"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--lead-intelligence"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--conversation-monitoring</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--conversation-monitoring"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/smart-tools-ai--conversation-monitoring"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--conversation-monitoring"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--custom-fields</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--custom-fields"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--custom-fields"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--custom-fields"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--lead-sources</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--lead-sources"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--lead-sources"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--lead-sources"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--notifications</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--notifications"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--notifications"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--notifications"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--dark-mode</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--dark-mode"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--dark-mode"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--dark-mode"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--language</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--language"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--language"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--language"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--reset-password</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--reset-password"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--reset-password"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--reset-password"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--task-sla</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--task-sla"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--task-sla"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--task-sla"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--lead-profile</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--lead-profile"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--lead-profile"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--lead-profile"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--sales-calendar</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--sales-calendar"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--sales-calendar"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--sales-calendar"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--inbox</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--inbox"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--inbox"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--inbox"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--trash</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--trash"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--trash"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--trash"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--am-calendar</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--am-calendar"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--am-calendar"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--am-calendar"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--am-lead-dashboard</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--am-lead-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--am-lead-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--am-lead-dashboard"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--tam-dashboard</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--tam-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--tam-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--tam-dashboard"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--forgot-password</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--forgot-password"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--forgot-password"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--forgot-password"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--meeting-reminders</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--meeting-reminders"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--meeting-reminders"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--meeting-reminders"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/getting-started--dashboard</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--dashboard"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/getting-started--dashboard"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--dashboard"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/getting-started--settings</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--settings"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/getting-started--settings"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--settings"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/getting-started--roles-permissions</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--roles-permissions"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/getting-started--roles-permissions"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--roles-permissions"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/getting-started--data-import</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--data-import"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/getting-started--data-import"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--data-import"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/getting-started--backup</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--backup"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/getting-started--backup"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/getting-started--backup"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--leads</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--leads"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--leads"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--leads"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--deals</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--deals"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--deals"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--deals"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--sales-funnel</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--sales-funnel"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--sales-funnel"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--sales-funnel"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--activities</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--activities"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--activities"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--activities"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--renewals</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--renewals"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--renewals"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--renewals"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--customers</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--customers"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--customers"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--customers"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--customer-profile</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--customer-profile"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--customer-profile"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--customer-profile"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--tamara-payments</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--tamara-payments"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--tamara-payments"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--tamara-payments"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--client-handover</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--client-handover"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--client-handover"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--client-handover"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--campaigns</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--campaigns"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--campaigns"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--campaigns"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--meta-campaigns</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--meta-campaigns"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--meta-campaigns"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--meta-campaigns"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--tiktok-campaigns</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--tiktok-campaigns"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--tiktok-campaigns"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--tiktok-campaigns"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--campaign-analytics</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--campaign-analytics"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--campaign-analytics"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--campaign-analytics"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--meta-integration</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--meta-integration"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--meta-integration"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--meta-integration"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--tiktok-integration</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--tiktok-integration"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/marketing-campaigns--tiktok-integration"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/marketing-campaigns--tiktok-integration"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--team-dashboard</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--team-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--team-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--team-dashboard"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--audit-log</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--audit-log"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--audit-log"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--audit-log"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--meta-aggregated-analytics</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--meta-aggregated-analytics"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--meta-aggregated-analytics"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--meta-aggregated-analytics"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--account-manager-dashboard</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--account-manager-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--account-manager-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--account-manager-dashboard"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/smart-tools-ai--rakan-ai</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--rakan-ai"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/smart-tools-ai--rakan-ai"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--rakan-ai"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/smart-tools-ai--lead-intelligence</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--lead-intelligence"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/smart-tools-ai--lead-intelligence"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--lead-intelligence"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/smart-tools-ai--conversation-monitoring</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--conversation-monitoring"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/smart-tools-ai--conversation-monitoring"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/smart-tools-ai--conversation-monitoring"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--custom-fields</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--custom-fields"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--custom-fields"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--custom-fields"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--lead-sources</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--lead-sources"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--lead-sources"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--lead-sources"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--notifications</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--notifications"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--notifications"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--notifications"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--dark-mode</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--dark-mode"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--dark-mode"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--dark-mode"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--language</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--language"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--language"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--language"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--reset-password</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--reset-password"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--reset-password"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--reset-password"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--task-sla</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--task-sla"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--task-sla"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--task-sla"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--lead-profile</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--lead-profile"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--lead-profile"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--lead-profile"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--sales-calendar</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--sales-calendar"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--sales-calendar"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--sales-calendar"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--inbox</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--inbox"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--inbox"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--inbox"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--trash</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--trash"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--trash"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--trash"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/sales-customers--am-calendar</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--am-calendar"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/sales-customers--am-calendar"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/sales-customers--am-calendar"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--am-lead-dashboard</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--am-lead-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--am-lead-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--am-lead-dashboard"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--tam-dashboard</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--tam-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/reports-analytics--tam-dashboard"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/reports-analytics--tam-dashboard"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--forgot-password</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--forgot-password"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--forgot-password"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--forgot-password"/>
+  </url>
+  <url>
+    <loc>https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--meeting-reminders</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--meeting-reminders"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sales.tamiyouzplaform.com/en/help-center/settings-advanced--meeting-reminders"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sales.tamiyouzplaform.com/ar/help-center/settings-advanced--meeting-reminders"/>
+  </url>
+</urlset>

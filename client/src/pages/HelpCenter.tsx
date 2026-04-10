@@ -1696,10 +1696,15 @@ const categories = buildCategories();
 const popularArticles = ARTICLES.filter((a) => a.popular);
 
 export default function HelpCenter() {
-  const { t, isRTL, lang } = useLanguage();
+  const { t } = useLanguage();
   const { tokens } = useThemeTokens();
-  const [, navigate] = useLocation();
-  const [, params] = useRoute("/help-center/:slug");
+  const [location, navigate] = useLocation();
+  const urlLang = location.startsWith("/en/") ? "en" : "ar";
+  const isRTL = urlLang === "ar";
+  const lang = urlLang;
+  const [, paramsAr] = useRoute("/ar/help-center/:slug");
+  const [, paramsEn] = useRoute("/en/help-center/:slug");
+  const params = paramsAr || paramsEn;
 
   const isEn = lang === "en";
 
@@ -1768,7 +1773,7 @@ export default function HelpCenter() {
   }, [navigate]);
 
   return (
-    <PublicHelpLayout>
+    <PublicHelpLayout lang={urlLang} currentSlug={params?.slug || null}>
       <div className={`min-h-full space-y-6 p-4 md:p-6 ${isRTL ? "font-sans" : ""}`} dir={isRTL ? "rtl" : "ltr"}>
 
         {/* Hero Search */}

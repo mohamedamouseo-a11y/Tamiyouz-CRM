@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /ar/help-center
+Allow: /en/help-center
+Allow: /googlebdb40928fcfee5ce.html
+Disallow: /
+
+Sitemap: https://sales.tamiyouzplaform.com/sitemap.xml
